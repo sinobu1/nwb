@@ -6,6 +6,10 @@ import logging
 import traceback
 import os
 import asyncio
+import nest_asyncio
+
+# Apply nest_asyncio to allow nested event loops
+nest_asyncio.apply()
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -81,6 +85,11 @@ async def handle_message(update, context):
         await update.message.reply_text(response)
         logger.info(f"Sent static response: {response}")
         return
+    elif "где потанцевать в москве" in user_message.lower():
+        response = "Клуб 'Gipsy' на Красном Октябре — вход от 500 ₽, топовая музыка!"
+        await update.message.reply_text(response)
+        logger.info(f"Sent static response: {response}")
+        return
     
     # Yandex Maps for other "где поесть" queries
     if "где поесть" in user_message.lower():
@@ -136,15 +145,5 @@ async def main():
         logger.error(f"Error in main: {str(e)}\n{traceback.format_exc()}")
         raise
 
-def run():
-    # Get or create an event loop
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # If loop is already running (e.g., in Railway), create a new task
-        loop.create_task(main())
-    else:
-        # Run the main coroutine in the loop
-        loop.run_until_complete(main())
-
 if __name__ == "__main__":
-    run()
+    asyncio.run(main())
