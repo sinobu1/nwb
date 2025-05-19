@@ -323,10 +323,10 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"User {user_id} requesting image generation with model {IMAGE_MODEL_NAME} for prompt: '{prompt_text}'")
         
         image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
-        generation_prompt = f"Generate an image of: {prompt_text}"
+        ggeneration_prompt = prompt_text
 
         response = await image_model.generate_content_async(generation_prompt)
-        logger.debug(f"Raw image generation response from model {IMAGE_MODEL_NAME}: {response}")
+        logger.warning(f"!!!! RAW IMAGE RESPONSE !!!! from model {IMAGE_MODEL_NAME}: {response}")
 
         text_part_content = None
         if response.text:
