@@ -33,7 +33,7 @@ MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
 # --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" # !!! ПРОВЕРЬТЕ ЭТО ИМЯ !!!
+IMAGE_MODEL_NAME = "imagen-3.0-generate-002" # !!! НОВОЕ ИМЯ МОДЕЛИ ДЛЯ ТЕСТА !!!
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
@@ -307,7 +307,9 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         generation_prompt = prompt_text 
         
         logger.warning(f"!!!! Sending to IMAGE MODEL {IMAGE_MODEL_NAME} with prompt: '{generation_prompt}'")
-        response = await image_model.generate_content_async(generation_prompt)
+        response = await image_model.generate_content_async(
+    contents=[genai.types.Part(text=generation_prompt)]
+)
         logger.warning(f"!!!! RAW IMAGE RESPONSE !!!! from model {IMAGE_MODEL_NAME}: {response}")
 
         text_part_content = None
