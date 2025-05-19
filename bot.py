@@ -33,7 +33,7 @@ MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
 # --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" 
+IMAGE_MODEL_NAME = "imagen-3.0-generate-002" 
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
