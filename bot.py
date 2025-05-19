@@ -316,8 +316,18 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(preliminary_message_text, parse_mode=ParseMode.MARKDOWN_V2)
     except telegram.error.BadRequest:
         await update.message.reply_text(f"✨ Генерирую изображение для запроса: \"{prompt_text}\"...")
-    except Exception as e_prelim:
-        logger.warning(f"Could not send preliminary message or chat action for /imagine: {e_prelim}")
+    except Exception as e_imagine: # Этот блок уже есть
+    logger.error(f"Error in imagine_command for prompt '{prompt_text}': {e_imagine}\n{traceback.format_exc()}")
+    if "API key not valid" in str(e_imagine).lower():
+         await update.message.reply_text("Ошибка API Google: Ключ API недействителен. Пожалуйста, проверьте настройки.")
+    elif "model" in str(e_imagine).lower() and ("not found" in str(e_imagine).lower() or "permission denied" in str(e_imagine).lower() or "does not support" in str(e_imagine).lower()):
+         await update.message.reply_text(f"Ошибка API Google: Модель '{IMAGE_MODEL_NAME}' не найдена, к ней нет доступа или она не поддерживает запрошенный тип генерации. Проверьте имя модели и разрешения ключа API.")
+    elif "The requested combination of response modalities is not supported" in str(e_imagine):
+         await update.message.reply_text(f"Ошибка конфигурации модели: Модель '{IMAGE_MODEL_NAME}' не смогла обработать запрос на генерацию только изображения с текущими параметрами. Она может ожидать или возвращать также текст.")
+    elif isinstance(e_imagine, genai.types.BlockedPromptException): # Если есть такой тип исключения для блокировки
+         await update.message.reply_text("Запрос на генерацию изображения был заблокирован по соображениям безопасности.")
+    else:
+        await update.message.reply_text("Произошла непредвиденная ошибка при генерации изображения.")
 
     try:
         logger.info(f"User {user_id} requesting image generation with model {IMAGE_MODEL_NAME} for prompt: '{prompt_text}'")
