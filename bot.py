@@ -17,141 +17,178 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Telegram Bot Token
-TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0") # ЗАМЕНИТЕ НА ВАШ ТОКЕН
+TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТЕЛЕГРАМ_ТОКЕН") # ЗАМЕНИТЕ НА ВАШ ТОКЕН
 # Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI") # ЗАМЕНИТЕ НА ВАШ КЛЮЧ
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ВАШ_GEMINI_API_КЛЮЧ") # ЗАМЕНИТЕ НА ВАШ КЛЮЧ
 # Yandex Maps API Key
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # ЗАМЕНИТЕ НА ВАШ КЛЮЧ API ЯНДЕКС.КАРТ
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # Опционально, для функционала карт
 
-# --- НОВЫЕ ПАРАМЕТРЫ ---
-# Максимальное количество токенов для ответа Gemini (1 токен ~ 4 символа)
-MAX_OUTPUT_TOKENS_GEMINI = 1500 # Можно настроить. Для "Историка" это примерно 200-250 слов.
-# Максимальное количество символов в сообщении Telegram (Telegram сам обрежет на 4096)
-# Установим свой лимит, чтобы сообщения не были слишком длинными на экране
-MAX_MESSAGE_LENGTH_TELEGRAM = 1500 # Можно настроить
+# --- КОНФИГУРАЦИЯ БОТА ---
+MAX_OUTPUT_TOKENS_GEMINI = 1500 # Как вы и настроили
+MAX_MESSAGE_LENGTH_TELEGRAM = 2000 # Немного увеличил, можно настроить (Telegram лимит 4096)
 
-# --- Обновление Личностей ---
-PERSONALITIES = {
-    "neuropal": {
-        "name": "NeuroPal (Москва)",
+# --- РЕЖИМЫ РАБОТЫ (бывшие "личности") ---
+AI_MODES = {
+    "universal_ai": {
+        "name": "🤖 Универсальный ИИ",
         "prompt": (
-            "Ты NeuroPal, дружелюбный и очень осведомленный ИИ-ассистент по Москве. "
-            "Твоя задача - предоставлять полезную, интересную и, насколько это возможно для ИИ, актуальную информацию о Москве. "
-            "Отвечай кратко, но содержательно. Если вопрос общий, старайся уложиться в 2-3 абзаца. "
-            "Если тебя спрашивают о конкретных местах (кафе, бары, клубы), старайся предлагать популярные и хорошо зарекомендовавшие себя варианты. "
-            "Поскольку твои знания ограничены датой последнего обновления, всегда вежливо указывай, что цены, часы работы и другие детали стоит перепроверить. "
-            "Избегай слишком общих или очевидных советов. "
-            "Твой стиль - современный и немного остроумный. Не упоминай, что ты ИИ или бот, если это не критично."
+            "Ты — Gemini, продвинутый мультимодальный ИИ-ассистент от Google. "
+            "Твоя задача — помогать пользователю с разнообразными запросами: отвечать на вопросы, генерировать текст, "
+            "давать объяснения, выполнять анализ и предоставлять информацию по широкому кругу тем. "
+            "Будь вежлив, объективен, точен и полезен. Если твои знания ограничены по времени, предупреждай об этом. "
+            "Избегай личных мнений, если тебя об этом не просят."
         ),
-        "welcome": "NeuroPal (Москва) снова с вами! Задавайте вопросы о столице."
+        "welcome": "Активирован режим 'Универсальный ИИ'. Какой у вас запрос?"
     },
-    "historian": {
-        "name": "Историк",
+    "creative_helper": {
+        "name": "✍️ Творческий Помощник",
         "prompt": (
-            "Ты эрудированный историк. Твоя задача - рассказывать интересные факты и истории. "
-            "Отвечай увлекательно, как будто читаешь лекцию. "
-            "Избегай упоминания, что ты ИИ или бот. "
-            "Старайся, чтобы твой основной рассказ был содержательным, но не чрезмерно длинным, ориентируясь на 3-4 абзаца." # Мягкое указание на длину
+            "Ты — Gemini, креативный ИИ-партнёр и писатель. "
+            "Помогай пользователю генерировать идеи, писать тексты (рассказы, стихи, сценарии, маркетинговые материалы), "
+            "придумывать слоганы, разрабатывать концепции и решать другие творческие задачи. "
+            "Будь вдохновляющим, оригинальным и предлагай нестандартные подходы."
         ),
-        "welcome": "Приветствую! Я Историк. Какую эпоху или событие мы сегодня исследуем?"
+        "welcome": "Режим 'Творческий Помощник' к вашим услугам! Над какой творческой задачей поработаем?"
     },
+    # Можно добавить другие режимы, например, для анализа, программирования и т.д.
 }
-DEFAULT_PERSONALITY_KEY = "neuropal"
+DEFAULT_AI_MODE_KEY = "universal_ai"
 
-# --- Инициализация Gemini client с новой моделью ---
+# --- ДОСТУПНЫЕ МОДЕЛИ GEMINI ДЛЯ ВЫБОРА ---
+AVAILABLE_TEXT_MODELS = {
+    "gemini_2_5_flash_preview": {
+        "name": "💎 G-2.5 Flash Preview (04-17)", # Более дружелюбное имя для кнопки
+        "id": "gemini-2.5-flash-preview-04-17"
+    },
+    "gemini_2_0_flash": {
+        "name": "⚡️ G-2.0 Flash",
+        "id": "gemini-2.0-flash"
+    }
+    # Можно добавить gemini-1.5-pro-latest или gemini-1.5-flash-latest, если они доступны и нужны
+}
+DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS["gemini_2_5_flash_preview"]["id"] # Модель по умолчанию
+
+# --- Инициализация Gemini API (только конфигурация) ---
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    # Используем Gemini 2.5 Flash Preview
-    gemini_model_name = "gemini-2.5-flash-preview-04-17" # Убедитесь, что это имя доступно в вашем API
-    gemini_model = genai.GenerativeModel(gemini_model_name)
-    logger.info(f"Gemini client initialized successfully with model {gemini_model_name}")
+    logger.info("Gemini API configured successfully.")
 except Exception as e:
-    logger.error(f"Failed to initialize Gemini client with model {gemini_model_name}: {str(e)}")
-    gemini_model = None # Бот сможет работать со статикой, но не с Gemini
+    logger.error(f"Failed to configure Gemini API: {str(e)}")
+    # В этом случае бот не сможет обращаться к Gemini
 
-async def get_current_personality_prompt(context: ContextTypes.DEFAULT_TYPE) -> str:
-    personality_key = context.user_data.get('current_personality', DEFAULT_PERSONALITY_KEY)
-    return PERSONALITIES.get(personality_key, PERSONALITIES[DEFAULT_PERSONALITY_KEY])["prompt"]
+# --- Функции для получения текущих настроек пользователя ---
+def get_current_mode_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
+    mode_key = context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
-async def get_current_personality_name(context: ContextTypes.DEFAULT_TYPE) -> str:
-    personality_key = context.user_data.get('current_personality', DEFAULT_PERSONALITY_KEY)
-    return PERSONALITIES.get(personality_key, PERSONALITIES[DEFAULT_PERSONALITY_KEY])["name"]
+def get_current_model_id(context: ContextTypes.DEFAULT_TYPE) -> str:
+    return context.user_data.get('selected_model_id', DEFAULT_MODEL_ID)
 
+def get_current_model_display_name(context: ContextTypes.DEFAULT_TYPE) -> str:
+    selected_id = get_current_model_id(context)
+    for model_info in AVAILABLE_TEXT_MODELS.values():
+        if model_info["id"] == selected_id:
+            return model_info["name"]
+    return "Неизвестная модель"
+
+
+# --- КОМАНДЫ БОТА ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        context.user_data.setdefault('current_personality', DEFAULT_PERSONALITY_KEY)
-        current_persona_name = await get_current_personality_name(context)
-        keyboard = [
-            [InlineKeyboardButton(details["name"], callback_data=f"set_persona_{key}")]
-            for key, details in PERSONALITIES.items()
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            f"Привет! Я многогранный бот. Сейчас я в режиме: {current_persona_name}.\n"
-            "Вы можете выбрать другую личность или задавать мне вопросы.\n"
-            "Используйте /persona, чтобы снова сменить личность.",
-            reply_markup=reply_markup
-        )
-        logger.info(f"Start command received from {update.message.from_user.id}")
-    except Exception as e:
-        logger.error(f"Error in start command: {str(e)}\n{traceback.format_exc()}")
-        await update.message.reply_text("Произошла ошибка при запуске. Попробуйте снова.")
+    context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    context.user_data.setdefault('selected_model_id', DEFAULT_MODEL_ID)
 
-async def select_persona(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    current_mode = get_current_mode_details(context)
+    current_model_name = get_current_model_display_name(context)
+
+    await update.message.reply_text(
+        f"Привет! Я многофункциональный ИИ-бот.\n\n"
+        f"Текущий режим: *{current_mode['name']}*\n"
+        f"Текущая модель: *{current_model_name}*\n\n"
+        "Вы можете:\n"
+        "▫️ Задавать мне вопросы или давать задания.\n"
+        "▫️ Сменить режим работы: /mode\n"
+        "▫️ Выбрать другую модель ИИ: /model\n\n"
+        "Просто напишите ваш запрос!",
+        parse_mode=telegram.constants.ParseMode.MARKDOWN
+    )
+    logger.info(f"Start command processed for user {update.message.from_user.id}")
+
+async def select_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton(details["name"], callback_data=f"set_persona_{key}")]
-        for key, details in PERSONALITIES.items()
+        [InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")]
+        for key, details in AI_MODES.items()
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Выберите личность для бота:', reply_markup=reply_markup)
+    await update.message.reply_text('Выберите режим работы для ИИ:', reply_markup=reply_markup)
+
+async def select_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton(details["name"], callback_data=f"set_model_{key}")] # key здесь будет ключ из AVAILABLE_TEXT_MODELS
+        for key, details in AVAILABLE_TEXT_MODELS.items()
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Выберите модель ИИ для использования:', reply_markup=reply_markup)
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    if data.startswith("set_persona_"):
-        persona_key = data.split("set_persona_")[1]
-        if persona_key in PERSONALITIES:
-            context.user_data['current_personality'] = persona_key
-            welcome_message = PERSONALITIES[persona_key]["welcome"]
-            await query.edit_message_text(text=f"Личность изменена на: {PERSONALITIES[persona_key]['name']}.\n{welcome_message}")
-            logger.info(f"User {query.from_user.id} changed personality to {persona_key}")
+
+    if data.startswith("set_mode_"):
+        mode_key = data.split("set_mode_")[1]
+        if mode_key in AI_MODES:
+            context.user_data['current_ai_mode'] = mode_key
+            mode_details = AI_MODES[mode_key]
+            await query.edit_message_text(
+                text=f"Режим изменен на: *{mode_details['name']}*.\n{mode_details['welcome']}",
+                parse_mode=telegram.constants.ParseMode.MARKDOWN
+            )
+            logger.info(f"User {query.from_user.id} changed AI mode to {mode_key}")
         else:
-            await query.edit_message_text(text="Ошибка: Такая личность не найдена.")
+            await query.edit_message_text(text="Ошибка: Такой режим не найден.")
 
-async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Эта функция остается как заглушка
-    await update.message.reply_text("Премиум функции пока в разработке! Следите за обновлениями.")
-
+    elif data.startswith("set_model_"):
+        model_key_in_dict = data.split("set_model_")[1] # Это ключ из словаря AVAILABLE_TEXT_MODELS
+        if model_key_in_dict in AVAILABLE_TEXT_MODELS:
+            selected_model_info = AVAILABLE_TEXT_MODELS[model_key_in_dict]
+            context.user_data['selected_model_id'] = selected_model_info["id"]
+            await query.edit_message_text(
+                text=f"Модель изменена на: *{selected_model_info['name']}*.",
+                parse_mode=telegram.constants.ParseMode.MARKDOWN
+            )
+            logger.info(f"User {query.from_user.id} changed AI model to {selected_model_info['id']}")
+        else:
+            await query.edit_message_text(text="Ошибка: Такая модель не найдена.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     user_id = update.message.from_user.id
-    logger.info(f"Received message from {user_id}: {user_message}")
+    logger.info(f"Received message from {user_id}: '{user_message}'")
 
-    current_personality_key = context.user_data.get('current_personality', DEFAULT_PERSONALITY_KEY)
-    system_prompt = await get_current_personality_prompt(context)
+    current_mode_details = get_current_mode_details(context)
+    system_prompt = current_mode_details["prompt"]
+    selected_model_id = get_current_model_id(context)
 
-    # Обработка статических ответов и Яндекс.Карт (преимущественно для NeuroPal)
-    if current_personality_key == "neuropal":
+    # Статические ответы и Яндекс.Карты (если активен режим "Универсальный ИИ")
+    # и если API ключ Яндекс.Карт предоставлен
+    if context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY) == "universal_ai":
         if "где поесть на таганке" in user_message.lower(): # Пример статического ответа
-            response = "На Таганке много всего! Например, 'Грабли' для бюджетного обеда или 'Теремок' для блинов. Если ищете что-то конкретное, уточните кухню!"
+            response = "На Таганке множество кафе! Например, 'Грабли' для бюджетного обеда или 'Теремок'. Для более точной рекомендации уточните, пожалуйста, ваши предпочтения (кухня, ценовой диапазон)."
             await update.message.reply_text(response)
-            logger.info(f"Sent static response for NeuroPal: {response}")
+            logger.info(f"Sent static response for universal_ai: {response}")
             return
-        # ... (другие статические ответы для NeuroPal можно добавить сюда)
+        # ... (другие статические ответы)
 
+        # Пример интеграции с Яндекс.Картами (оставлен для демонстрации)
+        # Эту часть можно дорабатывать или убрать, если не нужна
         if "где поесть" in user_message.lower() and YANDEX_API_KEY != "YOUR_YANDEX_API_KEY":
-            # Логика Яндекс.Карт остается прежней, но можно улучшать отдельно
             try:
-                # ... (код для Яндекс.Карт из предыдущей версии) ...
-                # Этот блок можно оставить как есть или доработать
                 place_query = user_message.split("где поесть")[-1].strip()
                 if place_query.startswith("на "): place_query = place_query[3:]
                 if not place_query: place_query = "Москва центр"
                 
                 search_text = f"кафе {place_query}"
-                api_url = f"https://search-maps.yandex.ru/v1/?text={requests.utils.quote(search_text)}&type=biz&lang=ru_RU&apikey={YANDEX_API_KEY}&results=1&rspn=1&ll=37.617700,55.755863&spn=0.552069,0.400552" # Добавлен ll и spn для центра Москвы
+                api_url = f"https://search-maps.yandex.ru/v1/?text={requests.utils.quote(search_text)}&type=biz&lang=ru_RU&apikey={YANDEX_API_KEY}&results=1&rspn=1&ll=37.617700,55.755863&spn=0.552069,0.400552"
                 
                 response_maps = requests.get(api_url)
                 response_maps.raise_for_status()
@@ -160,134 +197,106 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if data_maps.get('features') and data_maps['features'][0].get('properties', {}).get('CompanyMetaData'):
                     place_name = data_maps['features'][0]['properties']['CompanyMetaData'].get('name', 'Неизвестное место')
                     place_address = data_maps['features'][0]['properties']['CompanyMetaData'].get('address', '')
-                    response = f"Яндекс.Карты подсказывают: {place_name} ({place_address}). Рекомендую проверить актуальность перед визитом!"
+                    response = f"Яндекс.Карты предлагают: {place_name} ({place_address}). Рекомендую уточнить детали перед визитом!"
                 else:
-                    response = f"Не удалось быстро найти '{place_query}' через Яндекс.Карты. Попробуйте более общий запрос или другой район."
+                    response = f"Не удалось быстро найти '{place_query}' через Яндекс.Карты. Попробуйте другой запрос."
                 await update.message.reply_text(response)
-                logger.info(f"Sent Yandex response for NeuroPal: {response}")
-            except requests.exceptions.RequestException as e_req:
-                logger.error(f"Yandex Maps API request error: {str(e_req)}")
-                await update.message.reply_text("Проблемы с доступом к Яндекс.Картам. Попробуйте позже.")
-            except Exception as e:
-                logger.error(f"Yandex Maps error: {str(e)}\n{traceback.format_exc()}")
-                await update.message.reply_text("Ошибка при поиске на Яндекс.Картах.")
-            return
+                logger.info(f"Sent Yandex response for universal_ai: {response}")
+            except Exception as e_maps:
+                logger.error(f"Yandex Maps error: {str(e_maps)}\n{traceback.format_exc()}")
+                await update.message.reply_text("Возникла проблема при обращении к Яндекс.Картам.")
+            return # Завершаем обработку, если сработали Яндекс.Карты
 
+    # Общие команды, не зависящие от режима (можно добавить)
     if "расскажи шутку" in user_message.lower():
-        response = "Почему программисты не любят природу? Слишком много багов! 😄"
+        response = "Почему компьютеры так умны? Потому что они слушают свою материнскую плату! 😄"
         await update.message.reply_text(response)
         logger.info(f"Sent static joke response: {response}")
         return
 
-    if not gemini_model:
-        await update.message.reply_text("Модель Gemini временно недоступна. Пожалуйста, попробуйте позже.")
-        logger.warning("Gemini client is not initialized.")
-        return
-
+    # --- Взаимодействие с Gemini ---
     try:
-        logger.info(f"Sending to Gemini ({gemini_model_name}) with system prompt for {current_personality_key} and message: '{user_message}'")
+        # Динамическое создание экземпляра модели на основе выбора пользователя
+        active_gemini_model = genai.GenerativeModel(selected_model_id)
+        logger.info(f"Using Gemini model: {selected_model_id} for user {user_id}")
         
         generation_config = genai.types.GenerationConfig(
             max_output_tokens=MAX_OUTPUT_TOKENS_GEMINI,
-            temperature=0.7 
+            temperature=0.75 # Можно сделать настраиваемой
         )
 
-        chat = gemini_model.start_chat(history=[
+        # Формирование истории для чата
+        # Первое сообщение - системный промт, второе - "согласие" модели (улучшает следование промту)
+        chat_history = [
             {"role": "user", "parts": [system_prompt]},
-            {"role": "model", "parts": [PERSONALITIES[current_personality_key].get("welcome", "Я готов.")]}
-        ])
+            {"role": "model", "parts": [current_mode_details.get("welcome", "Хорошо, я готов.")]}
+        ]
+        
+        chat = active_gemini_model.start_chat(history=chat_history)
+        
+        # Отправка сообщения пользователя в чат
         response_gen = await chat.send_message_async(
             user_message,
             generation_config=generation_config
         )
 
-        # --- ДОБАВЛЕНО ПОДРОБНОЕ ЛОГИРОВАНИЕ ОТВЕТА GEMINI ---
-        logger.info(f"Raw Gemini response object: {response_gen}") # Логируем весь объект ответа
-        
-        # Проверяем наличие prompt_feedback и логируем его, если есть
-        try:
-            if response_gen.prompt_feedback:
-                logger.info(f"Gemini prompt feedback: {response_gen.prompt_feedback}")
-        except AttributeError:
-            logger.info("Gemini response object has no attribute 'prompt_feedback'")
+        # Логирование ответа от Gemini (оставляем для отладки)
+        logger.debug(f"Raw Gemini response object: {response_gen}")
+        if hasattr(response_gen, 'prompt_feedback') and response_gen.prompt_feedback:
+            logger.debug(f"Gemini prompt feedback: {response_gen.prompt_feedback}")
+        if hasattr(response_gen, 'candidates') and response_gen.candidates:
+            logger.debug(f"Gemini candidates count: {len(response_gen.candidates)}")
+            for i, candidate in enumerate(response_gen.candidates):
+                logger.debug(f"Candidate {i} finish reason: {candidate.finish_reason}")
+                logger.debug(f"Candidate {i} safety ratings: {candidate.safety_ratings}")
 
-        # Проверяем наличие candidates и логируем их содержимое
-        try:
-            if response_gen.candidates:
-                logger.info(f"Gemini candidates count: {len(response_gen.candidates)}")
-                for i, candidate in enumerate(response_gen.candidates):
-                    logger.info(f"Candidate {i} finish reason: {candidate.finish_reason}")
-                    logger.info(f"Candidate {i} safety ratings: {candidate.safety_ratings}")
-                    # Попытка получить текст из кандидата, если он есть
-                    try:
-                        if candidate.content and candidate.content.parts:
-                            logger.info(f"Candidate {i} text part(s): {[part.text for part in candidate.content.parts if hasattr(part, 'text')]}")
-                        else:
-                            logger.info(f"Candidate {i} has no content or parts with text.")
-                    except Exception as e_candidate_text:
-                        logger.error(f"Error accessing candidate {i} text: {e_candidate_text}")
-            else:
-                logger.warning("Gemini response has no candidates.")
-        except AttributeError:
-            logger.warning("Gemini response object has no attribute 'candidates', or it's empty.")
-        # --- КОНЕЦ ПОДРОБНОГО ЛОГИРОВАНИЯ ---
-
-        reply = response_gen.text # Эта строка может все еще быть источником пустого текста
+        reply = response_gen.text
         
-        # --- ДОБАВЛЕНА ПРОВЕРКА НА ПУСТОЙ REPLY ---
         if not reply or not reply.strip():
-            logger.warning(f"Gemini returned empty or whitespace-only text. User message: '{user_message}'. Personality: {current_personality_key}. Check safety ratings or finish reason in logs above.")
-            # Формируем сообщение для пользователя, если Gemini ничего не ответил
-            reply = "К сожалению, ИИ не смог сформировать осмысленный ответ на ваш запрос или он был заблокирован фильтрами. Пожалуйста, попробуйте переформулировать свой вопрос."
-        # --- КОНЕЦ ПРОВЕРКИ НА ПУСТОЙ REPLY ---
-
-        # Обрезка ответа по длине, если он все еще слишком длинный
+            logger.warning(f"Gemini returned empty text. Model: {selected_model_id}, User msg: '{user_message}'. Finish_reason: {response_gen.candidates[0].finish_reason if response_gen.candidates else 'N/A'}")
+            reply = "ИИ не смог сформировать ответ или он был отфильтрован. Попробуйте переформулировать запрос."
+        
         if len(reply) > MAX_MESSAGE_LENGTH_TELEGRAM:
             reply = reply[:MAX_MESSAGE_LENGTH_TELEGRAM - 3] + "..."
-            logger.info(f"Gemini response was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} chars.")
+            logger.info(f"Gemini response truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} chars.")
 
         await update.message.reply_text(reply)
-        logger.info(f"Sent response to user (length: {len(reply)} chars)")
+        logger.info(f"Sent Gemini response to user {user_id} (model: {selected_model_id}, length: {len(reply)})")
 
-    except telegram.error.BadRequest as tg_bad_request:
-        # Эта ошибка теперь менее вероятна из-за проверки на пустой reply выше,
-        # но оставим на всякий случай
-        logger.error(f"Telegram BadRequest: {str(tg_bad_request)} trying to send reply: '{reply}'\n{traceback.format_exc()}")
-        await update.message.reply_text(
-            "Произошла ошибка при отправке ответа в Telegram (возможно, из-за форматирования). Попробуйте еще раз."
-        )
     except Exception as e:
-        # Общий обработчик других ошибок, включая возможные ошибки от API Gemini,
-        # которые не были пойманы ранее (например, проблемы с аутентификацией, квотами и т.д.)
-        logger.error(f"An unexpected error occurred: {str(e)}\n{traceback.format_exc()}")
-        current_persona_name = await get_current_personality_name(context)
+        logger.error(f"Error during Gemini interaction or message handling: {str(e)}\n{traceback.format_exc()}")
         await update.message.reply_text(
-            f"Извините, произошла непредвиденная ошибка при общении с ИИ ({current_persona_name}). Пожалуйста, попробуйте еще раз позже."
+            f"К сожалению, произошла ошибка при обработке вашего запроса с моделью {get_current_model_display_name(context)}. Пожалуйста, попробуйте позже или смените модель/режим."
         )
 
 async def main():
+    # Проверка наличия токенов перед запуском
+    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN:
+        logger.critical("CRITICAL: TELEGRAM_TOKEN is not set or uses a placeholder. Please set your actual token.")
+        return
+    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY:
+        logger.critical("CRITICAL: GEMINI_API_KEY is not set or uses a placeholder. Please set your actual key.")
+        # Можно разрешить запуск без Gemini для статических функций, но лучше остановить.
+        # return 
+        
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler(["mode", "select_mode"], select_mode)) # Команда для смены режима
+    application.add_handler(CommandHandler(["model", "select_model"], select_model)) # Команда для смены модели
+    # application.add_handler(CommandHandler("premium", premium)) # Если будет премиум
+    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_callback))
+
+    logger.info("Starting bot with new concept...")
     try:
-        application = Application.builder().token(TOKEN).build()
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("persona", select_persona))
-        application.add_handler(CommandHandler("premium", premium))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application.add_handler(CallbackQueryHandler(button_callback))
-        logger.info("Starting bot...")
         await application.run_polling()
-    except Exception as e:
-        logger.error(f"Error in main: {str(e)}\n{traceback.format_exc()}")
-        raise
+    except telegram.error.NetworkError as ne:
+        logger.error(f"Telegram NetworkError: {ne}. Retrying might be necessary or check network.")
+    except Exception as e_main:
+        logger.error(f"Critical error in main polling loop: {e_main}\n{traceback.format_exc()}")
+
 
 if __name__ == "__main__":
-    if TOKEN == "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0" or "YOUR_BOT_TOKEN" in TOKEN: # Добавил еще проверку
-        logger.critical("CRITICAL: DEFAULT TELEGRAM TOKEN IS USED. Please replace it with your actual token.")
-    if GEMINI_API_KEY == "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI" or "YOUR_GEMINI_API_KEY" in GEMINI_API_KEY:
-        logger.critical("CRITICAL: DEFAULT GEMINI API KEY IS USED. Please replace it with your actual key.")
-    if YANDEX_API_KEY == "YOUR_YANDEX_API_KEY":
-        logger.warning("YANDEX_API_KEY is not set. Yandex Maps functionality will not work correctly.")
-    
-    if gemini_model is None:
-        logger.warning("Gemini model could not be initialized. Bot will have limited functionality.")
-
     asyncio.run(main())
