@@ -185,12 +185,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        logger.info(f"Sending to Gemini ({gemini_model_name}) with system prompt fragment for {current_personality_key} and message: '{user_message}'")
+        logger.info(f"Sending to Gemini ({gemini_model_name}) with system prompt for {current_personality_key} and message: '{user_message}'")
         
-        # Настройка генерации для Gemini
         generation_config = genai.types.GenerationConfig(
             max_output_tokens=MAX_OUTPUT_TOKENS_GEMINI,
-            temperature=0.7 # Можно настроить "креативность"
+            temperature=0.7 
         )
 
         chat = gemini_model.start_chat(history=[
@@ -202,21 +201,68 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             generation_config=generation_config
         )
 
-        reply = response_gen.text
+        # --- ДОБАВЛЕНО ПОДРОБНОЕ ЛОГИРОВАНИЕ ОТВЕТА GEMINI ---
+        logger.info(f"Raw Gemini response object: {response_gen}") # Логируем весь объект ответа
         
-        # --- Обрезка ответа по длине, если он все еще слишком длинный ---
+        # Проверяем наличие prompt_feedback и логируем его, если есть
+        try:
+            if response_gen.prompt_feedback:
+                logger.info(f"Gemini prompt feedback: {response_gen.prompt_feedback}")
+        except AttributeError:
+            logger.info("Gemini response object has no attribute 'prompt_feedback'")
+
+        # Проверяем наличие candidates и логируем их содержимое
+        try:
+            if response_gen.candidates:
+                logger.info(f"Gemini candidates count: {len(response_gen.candidates)}")
+                for i, candidate in enumerate(response_gen.candidates):
+                    logger.info(f"Candidate {i} finish reason: {candidate.finish_reason}")
+                    logger.info(f"Candidate {i} safety ratings: {candidate.safety_ratings}")
+                    # Попытка получить текст из кандидата, если он есть
+                    try:
+                        if candidate.content and candidate.content.parts:
+                            logger.info(f"Candidate {i} text part(s): {[part.text for part in candidate.content.parts if hasattr(part, 'text')]}")
+                        else:
+                            logger.info(f"Candidate {i} has no content or parts with text.")
+                    except Exception as e_candidate_text:
+                        logger.error(f"Error accessing candidate {i} text: {e_candidate_text}")
+            else:
+                logger.warning("Gemini response has no candidates.")
+        except AttributeError:
+            logger.warning("Gemini response object has no attribute 'candidates', or it's empty.")
+        # --- КОНЕЦ ПОДРОБНОГО ЛОГИРОВАНИЯ ---
+
+        reply = response_gen.text # Эта строка может все еще быть источником пустого текста
+        
+        # --- ДОБАВЛЕНА ПРОВЕРКА НА ПУСТОЙ REPLY ---
+        if not reply or not reply.strip():
+            logger.warning(f"Gemini returned empty or whitespace-only text. User message: '{user_message}'. Personality: {current_personality_key}. Check safety ratings or finish reason in logs above.")
+            # Формируем сообщение для пользователя, если Gemini ничего не ответил
+            reply = "К сожалению, ИИ не смог сформировать осмысленный ответ на ваш запрос или он был заблокирован фильтрами. Пожалуйста, попробуйте переформулировать свой вопрос."
+        # --- КОНЕЦ ПРОВЕРКИ НА ПУСТОЙ REPLY ---
+
+        # Обрезка ответа по длине, если он все еще слишком длинный
         if len(reply) > MAX_MESSAGE_LENGTH_TELEGRAM:
             reply = reply[:MAX_MESSAGE_LENGTH_TELEGRAM - 3] + "..."
             logger.info(f"Gemini response was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} chars.")
 
         await update.message.reply_text(reply)
-        logger.info(f"Sent Gemini response (length: {len(reply)} chars)")
+        logger.info(f"Sent response to user (length: {len(reply)} chars)")
 
+    except telegram.error.BadRequest as tg_bad_request:
+        # Эта ошибка теперь менее вероятна из-за проверки на пустой reply выше,
+        # но оставим на всякий случай
+        logger.error(f"Telegram BadRequest: {str(tg_bad_request)} trying to send reply: '{reply}'\n{traceback.format_exc()}")
+        await update.message.reply_text(
+            "Произошла ошибка при отправке ответа в Telegram (возможно, из-за форматирования). Попробуйте еще раз."
+        )
     except Exception as e:
-        logger.error(f"Gemini error: {str(e)}\n{traceback.format_exc()}")
+        # Общий обработчик других ошибок, включая возможные ошибки от API Gemini,
+        # которые не были пойманы ранее (например, проблемы с аутентификацией, квотами и т.д.)
+        logger.error(f"An unexpected error occurred: {str(e)}\n{traceback.format_exc()}")
         current_persona_name = await get_current_personality_name(context)
         await update.message.reply_text(
-            f"Извините, произошла ошибка при общении с ИИ ({current_persona_name}). Пожалуйста, попробуйте еще раз позже."
+            f"Извините, произошла непредвиденная ошибка при общении с ИИ ({current_persona_name}). Пожалуйста, попробуйте еще раз позже."
         )
 
 async def main():
