@@ -7,7 +7,7 @@ from telegram.constants import ParseMode, ChatAction # ChatAction все еще 
 from telegram.helpers import escape_markdown
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, CallbackQueryHandler
+    ContextTypes, CallbackQueryHandler, PicklePersistence # <--- ДОБАВЛЕНО ЗДЕСЬ
 )
 import google.generativeai as genai
 import google.api_core.exceptions # Оставим на случай специфических ошибок API
