@@ -5,6 +5,7 @@ import requests
 import logging
 import traceback
 import os
+import asyncio
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -133,7 +134,17 @@ async def main():
         await application.run_polling()
     except Exception as e:
         logger.error(f"Error in main: {str(e)}\n{traceback.format_exc()}")
+        raise
+
+def run():
+    # Get or create an event loop
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # If loop is already running (e.g., in Railway), create a new task
+        loop.create_task(main())
+    else:
+        # Run the main coroutine in the loop
+        loop.run_until_complete(main())
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    run()
