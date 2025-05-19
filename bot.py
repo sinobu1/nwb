@@ -1,34 +1,42 @@
 import telegram
 from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup, Update,
-    ReplyKeyboardMarkup, KeyboardButton, BotCommand # Добавлены импорты
+    ReplyKeyboardMarkup, KeyboardButton, BotCommand
 )
-from telegram.constants import ParseMode, ChatAction # Добавили ChatAction
+from telegram.constants import ParseMode, ChatAction
 from telegram.helpers import escape_markdown
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters, 
+    Application, CommandHandler, MessageHandler, filters,
     ContextTypes, CallbackQueryHandler
 )
 import google.generativeai as genai
-import requests 
+import requests
 import logging
 import traceback
 import os
 import asyncio
 import nest_asyncio
+import io # Для генерации изображений
 
 nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO) # Можно поставить level=logging.DEBUG для более подробных логов
 logger = logging.getLogger(__name__)
 
-TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0") 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY")
+# --- КЛЮЧИ API И ТОКЕНЫ ---
+# !!! ВАЖНО: Замените плейсхолдеры на ваши реальные значения или настройте переменные окружения !!!
+TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТЕЛЕГРАМ_ТОКЕН")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ВАШ_GEMINI_API_КЛЮЧ")
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # Опционально, если используете Яндекс.Карты
 
+# --- КОНФИГУРАЦИЯ БОТА ---
 MAX_OUTPUT_TOKENS_GEMINI = 1500
-MAX_MESSAGE_LENGTH_TELEGRAM = 2500
+MAX_MESSAGE_LENGTH_TELEGRAM = 2500 # Максимальная длина сообщения в символах для Telegram
 
-# --- РЕЖИМЫ РАБОТЫ (с промтами для простого структурированного текста) ---
+# --- ИМЕНА МОДЕЛЕЙ ---
+# Имя модели для генерации изображений (!!! УБЕДИТЕСЬ, ЧТО ЭТО ИМЯ КОРРЕКТНО ДЛЯ ВАШЕГО API !!!)
+IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" # Пример, нужно точное имя!
+
+# --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
     "universal_ai": {
         "name": "🤖 Универсальный ИИ",
@@ -46,7 +54,8 @@ AI_MODES = {
             "    - Характеристика два...\n"
             "4.  **Без специального форматирования:** Пожалуйста, НЕ используй Markdown-разметку (звездочки для жирного текста или курсива, обратные апострофы для кода, символы цитирования и т.д.). Генерируй только ясный, чистый текст.\n"
             "5.  **Логическая Завершённость:** Старайся, чтобы твои ответы были полными. Если ответ содержит списки, убедись, что последний пункт завершен. Лучше не начинать новый пункт, если не уверен, что успеешь его закончить в рамках разумной длины ответа.\n"
-            "6.  **Читаемость:** Главное — чтобы ответ был понятным, хорошо структурированным и легким для восприятия."
+            "6.  **Читаемость:** Главное — чтобы ответ был понятным, хорошо структурированным и легким для восприятия.\n"
+            "7. **Без лишних символов:** Не используй в тексте избыточные скобки, дефисы или другие знаки пунктуации, если они не несут смысловой нагрузки или не требуются правилами грамматики."
         ),
         "welcome": "Активирован режим 'Универсальный ИИ'. Какой у вас запрос?"
     },
@@ -71,16 +80,18 @@ AI_MODES = {
 DEFAULT_AI_MODE_KEY = "universal_ai"
 
 AVAILABLE_TEXT_MODELS = {
-    "gemini_2_5_flash_preview": {"name": "💎 G-2.5 Flash Preview", "id": "gemini-2.5-flash-preview-04-17"}, # Убрали (04-17) из имени
+    "gemini_2_5_flash_preview": {"name": "💎 G-2.5 Flash Preview", "id": "gemini-2.5-flash-preview-04-17"},
     "gemini_2_0_flash": {"name": "⚡️ G-2.0 Flash", "id": "gemini-2.0-flash"}
 }
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS["gemini_2_5_flash_preview"]["id"]
 
+# --- Инициализация Gemini API ---
 try:
     genai.configure(api_key=GEMINI_API_KEY)
     logger.info("Gemini API configured successfully.")
 except Exception as e:
     logger.error(f"Failed to configure Gemini API: {str(e)}")
+    # Можно добавить выход из программы или флаг, что Gemini недоступен
 
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 def get_current_mode_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
@@ -100,22 +111,35 @@ def get_current_model_display_name(context: ContextTypes.DEFAULT_TYPE) -> str:
 def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
     if len(text) <= max_length:
         return text, False
-    suffix = "\n\n_(...ответ был сокращен)_" # Можно оставить Markdown для этого системного сообщения
+    # Простой текстовый суффикс
+    suffix = "\n\n(...ответ был сокращен)"
     adjusted_max_length = max_length - len(suffix)
-    if adjusted_max_length <= 0: return text[:max_length-3] + "...", True 
+    if adjusted_max_length <= 0: return text[:max_length-len("...")] + "...", True # Упрощенный аварийный суффикс
+
     truncated_text = text[:adjusted_max_length]
     possible_cut_points = []
-    for sep in ['\n\n', '. ', '! ', '? ', '\n']: # Ищем сначала двойной перенос, потом предложения, потом одинарный перенос
+    # Ищем сначала двойной перенос (конец абзаца), потом предложения, потом одинарный перенос
+    for sep in ['\n\n', '. ', '! ', '? ', '\n']:
         pos = truncated_text.rfind(sep)
         if pos != -1:
-            actual_pos = pos + (len(sep) -1 if sep.endswith(' ') else len(sep)) # Правильно обрезаем
+            # Определяем точную точку среза
+            actual_pos = pos + (len(sep) -1 if sep.endswith(' ') and len(sep) > 1 else len(sep))
             if actual_pos > 0 : possible_cut_points.append(actual_pos)
+    
     if possible_cut_points:
         cut_at = max(possible_cut_points)
-        if cut_at > adjusted_max_length * 0.6: return text[:cut_at].strip() + suffix, True
+        # Обрезаем, если нашли подходящую точку не слишком близко к началу
+        if cut_at > adjusted_max_length * 0.5: # Оставляем хотя бы половину, если режем по хорошей точке
+             return text[:cut_at].strip() + suffix, True
+
+    # Если не нашли хорошей точки для абзаца/предложения, режем по последнему пробелу
     last_space = truncated_text.rfind(' ')
-    if last_space != -1 and last_space > adjusted_max_length * 0.6: return text[:last_space].strip() + suffix, True
-    return text[:adjusted_max_length].strip() + suffix, True
+    if last_space != -1 and last_space > adjusted_max_length * 0.5: # Оставляем хотя бы половину
+        return text[:last_space].strip() + suffix, True
+    
+    # Самый крайний случай - жесткая обрезка с простым многоточием
+    return text[:max_length-len("...")] + "...", True
+
 
 # --- ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ПОСТОЯННОЙ КЛАВИАТУРЫ ---
 def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
@@ -140,9 +164,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     model_line = f"{escape_markdown('Текущая модель: ', version=2)}*{model_name_content}*"
     you_can = escape_markdown("Вы можете:", version=2)
     action1 = escape_markdown("▫️ Задавать мне вопросы или давать задания.", version=2)
-    action2 = "▫️ Сменить режим работы (кнопка или /mode)" 
-    action3 = "▫️ Выбрать другую модель ИИ (кнопка или /model)" 
-    action4 = "▫️ Получить помощь (кнопка или /help)"
+    action2 = "▫️ Сменить режим работы (кнопка или `/mode`)" 
+    action3 = "▫️ Выбрать другую модель ИИ (кнопка или `/model`)" 
+    action4 = "▫️ Сгенерировать изображение (команда `/imagine`)" # Добавили imagine
+    action5 = "▫️ Получить помощь (кнопка или `/help`)"
     invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
 
     text_to_send = (
@@ -153,15 +178,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{action1}\n"
         f"{action2}\n"
         f"{action3}\n"
-        f"{action4}\n\n"
+        f"{action4}\n" # Добавили imagine
+        f"{action5}\n\n"
         f"{invitation}"
     )
     
-    try: # Отправляем приветствие с постоянной клавиатурой
+    try:
         await update.message.reply_text(
             text_to_send, 
             parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=get_main_reply_keyboard() # Добавляем клавиатуру
+            reply_markup=get_main_reply_keyboard()
         )
         logger.info(f"Start command processed for user {update.message.from_user.id} with new escaping and reply keyboard.")
     except telegram.error.BadRequest as e:
@@ -174,26 +200,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "▫️ Задавать мне вопросы или давать задания.\n"
             "▫️ Сменить режим работы (кнопка или /mode)\n"
             "▫️ Выбрать другую модель ИИ (кнопка или /model)\n"
+            "▫️ Сгенерировать изображение (команда /imagine)\n"
             "▫️ Получить помощь (кнопка или /help)\n\n"
             "Просто напишите ваш запрос!"
         )
         await update.message.reply_text(plain_text_version, reply_markup=get_main_reply_keyboard())
         logger.info("Sent /start message as plain text after MarkdownV2 failure, with reply keyboard.")
 
-async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE): # Переименовал для ясности
-    """Вызывается командой /mode или кнопкой '🤖 Режим ИИ'."""
+async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")] for key, details in AI_MODES.items()]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите режим работы для ИИ:', reply_markup=reply_markup)
 
-async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE): # Переименовал
-    """Вызывается командой /model или кнопкой '⚙️ Модель ИИ'."""
+async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(details["name"], callback_data=f"set_model_{key}")] for key, details in AVAILABLE_TEXT_MODELS.items()]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите модель ИИ для использования:', reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Вызывается командой /help или кнопкой '❓ Помощь'."""
     current_mode_details = get_current_mode_details(context)
     current_model_display_name_text = get_current_model_display_name(context)
 
@@ -208,37 +232,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{escape_markdown('Основные команды и кнопки:', version=2)}\n"
         f"`/start` {escape_markdown('- это сообщение и основные настройки.', version=2)}\n"
         f"`/mode` {escape_markdown(' или кнопка ', version=2)}`🤖 Режим ИИ` {escape_markdown('- позволяет сменить текущий режим (специализацию) ИИ.', version=2)}\n"
-        f"`/model` {escape_markdown(' или кнопка ', version=2)}`⚙️ Модель ИИ` {escape_markdown('- позволяет выбрать одну из доступных моделей Gemini.', version=2)}\n"
+        f"`/model` {escape_markdown(' или кнопка ', version=2)}`⚙️ Модель ИИ` {escape_markdown('- позволяет выбрать одну из доступных моделей Gemini для текста.', version=2)}\n"
+        f"`/imagine <описание>` {escape_markdown(f'- генерирует изображение по вашему текстовому описанию (использует модель {IMAGE_MODEL_NAME}).', version=2)}\n"
         f"`/help` {escape_markdown(' или кнопка ', version=2)}`❓ Помощь` {escape_markdown('- это сообщение помощи.', version=2)}\n\n"
-        f"{escape_markdown('После выбора режима и модели просто отправьте свой вопрос или задание боту.', version=2)}\n\n"
+        f"{escape_markdown('После выбора режима и модели (для текста) просто отправьте свой вопрос или задание боту.', version=2)}\n\n"
         f"{escape_markdown('Подсказка: вы можете скрыть/показать клавиатуру с кнопками с помощью иконки клавиатуры в вашем клиенте Telegram.', version=2)}"
     )
     try:
-        await update.message.reply_text(
-            help_text, 
-            parse_mode=ParseMode.MARKDOWN_V2, 
-            reply_markup=get_main_reply_keyboard() # Можно и здесь показывать клавиатуру
-        )
+        await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending /help message with MarkdownV2: {e}\nText was: {help_text}\n{traceback.format_exc()}")
-        # Упрощенный текст для фолбэка
         plain_help_text = (
              "Это ИИ-бот.\n"
              f"Режим: {current_mode_details['name']}, Модель: {current_model_display_name_text}\n"
-             "Используйте команды /mode, /model, /help или кнопки ниже."
+             "Используйте команды /mode, /model, /imagine <описание>, /help или кнопки ниже."
         )
         await update.message.reply_text(plain_help_text, reply_markup=get_main_reply_keyboard())
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код button_callback остается почти таким же, как в ответе 26, с фолбэком на plain text)
-    # Убедитесь, что escape_markdown используется для имен режимов/моделей и welcome сообщений
     query = update.callback_query
     await query.answer()
     data = query.data
-    message_to_edit = query.message # Сообщение, к которому привязаны кнопки
+    message_to_edit = query.message 
 
     new_text = ""
-    parse_mode_to_use = ParseMode.MARKDOWN_V2
     plain_text_fallback = ""
 
     if data.startswith("set_mode_"):
@@ -270,34 +287,132 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if new_text:
         try:
-            await message_to_edit.edit_text(text=new_text, parse_mode=parse_mode_to_use, reply_markup=message_to_edit.reply_markup) # Сохраняем исходные кнопки если они были
+            await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=message_to_edit.reply_markup)
         except telegram.error.BadRequest as e:
             logger.warning(f"Failed to edit message with MarkdownV2 in button_callback: {e}. Sending plain text. Text was: {new_text}")
             await message_to_edit.edit_text(text=plain_text_fallback, reply_markup=message_to_edit.reply_markup)
 
+# --- НОВЫЙ ОБРАБОТЧИК ДЛЯ /imagine ---
+async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "🎨 Чтобы сгенерировать изображение, введите описание после команды.\n"
+            "Например: `/imagine яркий тропический закат над океаном`",
+            reply_markup=get_main_reply_keyboard() # Предлагаем клавиатуру для удобства
+        )
+        return
+
+    prompt_text = " ".join(context.args)
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id if update.effective_user else "UnknownUser"
+
+    escaped_prompt_for_msg = escape_markdown(prompt_text, version=2)
+    preliminary_message_text = f"✨ Генерирую изображение для запроса: \"_{escaped_prompt_for_msg}_\"\\.\\.\\."
+    
+    try:
+        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
+        await update.message.reply_text(preliminary_message_text, parse_mode=ParseMode.MARKDOWN_V2)
+    except telegram.error.BadRequest:
+        await update.message.reply_text(f"✨ Генерирую изображение для запроса: \"{prompt_text}\"...")
+    except Exception as e_prelim:
+        logger.warning(f"Could not send preliminary message or chat action for /imagine: {e_prelim}")
+
+    try:
+        logger.info(f"User {user_id} requesting image generation with model {IMAGE_MODEL_NAME} for prompt: '{prompt_text}'")
+        
+        image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
+        
+        # Пытаемся сформировать промпт так, чтобы модель поняла, что нужна картинка
+        generation_prompt = f"Generate an image of: {prompt_text}" 
+        # Для некоторых моделей может быть достаточно просто prompt_text
+
+        response = await image_model.generate_content_async(generation_prompt)
+        
+        logger.debug(f"Raw image generation response from model {IMAGE_MODEL_NAME}: {response}")
+
+        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
+            block_reason_val = response.prompt_feedback.block_reason
+            block_reason_name = ""
+            # Пытаемся получить имя из enum, если это возможно
+            if hasattr(block_reason_val, 'name'):
+                block_reason_name = block_reason_val.name 
+            else: # Иначе просто числовое значение
+                block_reason_name = str(block_reason_val)
+
+            if block_reason_val == 0: # BLOCK_REASON_UNSPECIFIED or Not Blocked (0)
+                 pass 
+            else:
+                logger.warning(f"Image generation blocked for prompt '{prompt_text}'. Reason: {block_reason_name} ({block_reason_val})")
+                escaped_reason = escape_markdown(str(block_reason_name).replace("_"," ").title(), version=2)
+                await update.message.reply_text(
+                    f"Не удалось сгенерировать изображение. Запрос был заблокирован по причине: _{escaped_reason}_\\. Попробуйте изменить описание.",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+
+        image_found = False
+        if response.parts:
+            for part in response.parts:
+                if part.mime_type and part.mime_type.startswith("image/"):
+                    image_bytes = part.inline_data.data
+                    photo_to_send = io.BytesIO(image_bytes) 
+                    
+                    escaped_caption = escape_markdown(f"🖼️ Ваше изображение для: \"{prompt_text}\"", version=2)
+                    await update.message.reply_photo(
+                        photo=photo_to_send,
+                        caption=escaped_caption,
+                        parse_mode=ParseMode.MARKDOWN_V2
+                    )
+                    image_found = True
+                    logger.info(f"Image sent successfully for prompt: '{prompt_text}'")
+                    break 
+        
+        if not image_found:
+            logger.warning(f"No image part found in response for prompt: '{prompt_text}'. Full response: {response}")
+            await update.message.reply_text("Не удалось извлечь изображение из ответа модели. Модель не вернула картинку или вернула неожиданный формат. Попробуйте еще раз или измените запрос.")
+
+    except google.api_core.exceptions.GoogleAPIError as e_google:
+        logger.error(f"Google API error during image generation for prompt '{prompt_text}': {e_google}\n{traceback.format_exc()}")
+        # Более специфичное сообщение для пользователя, если ошибка от Google
+        if "API key not valid" in str(e_google).lower():
+             await update.message.reply_text("Ошибка API Google: Ключ API недействителен. Пожалуйста, проверьте настройки.")
+        elif "model" in str(e_google).lower() and ("not found" in str(e_google).lower() or "permission denied" in str(e_google).lower()):
+             await update.message.reply_text(f"Ошибка API Google: Модель '{IMAGE_MODEL_NAME}' не найдена или к ней нет доступа. Пожалуйста, проверьте имя модели и разрешения ключа API.")
+        else:
+            await update.message.reply_text(f"Произошла ошибка API Google при генерации изображения. Пожалуйста, попробуйте позже.\nДетали: {str(e_google)[:200]}")
+    except AttributeError as e_attr: 
+        logger.error(f"AttributeError parsing image response for prompt '{prompt_text}': {e_attr}\n{traceback.format_exc()}")
+        await update.message.reply_text(f"Не удалось обработать ответ от модели изображений ({IMAGE_MODEL_NAME}). Возможно, используется некорректное имя модели или структура ответа была неожиданной.")
+    except Exception as e_imagine:
+        logger.error(f"Unexpected error in imagine_command for prompt '{prompt_text}': {e_imagine}\n{traceback.format_exc()}")
+        await update.message.reply_text("Произошла непредвиденная ошибка при генерации изображения.")
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код handle_message остается таким же, как в ответе 35 - отправка ИИ ответа как простого текста)
     user_message = update.message.text
-    user_id = update.message.from_user.id
+    user_id = update.effective_user.id if update.effective_user else "UnknownUser"
     logger.info(f"Received message from {user_id}: '{user_message}'")
 
     current_mode_details = get_current_mode_details(context)
     system_prompt = current_mode_details["prompt"]
     selected_model_id = get_current_model_id(context)
 
-    if user_message.lower() == "/help": # Обработка /help как обычного сообщения, если не через CommandHandler
+    if user_message.lower() == "/help": 
         await help_command(update, context)
         return
     
-    # Статические ответы (если нужны)
-    # ...
-    
-
+    try:
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id,
+            action=ChatAction.TYPING
+        )
+        logger.debug(f"Sent 'typing' action to chat {update.effective_chat.id}")
+    except Exception as e_typing:
+        logger.warning(f"Could not send 'typing' action: {e_typing}")
 
     try:
         active_gemini_model = genai.GenerativeModel(selected_model_id)
-        logger.info(f"Using Gemini model: {selected_model_id} for user {user_id}")
+        logger.info(f"Using text model: {selected_model_id} for user {user_id}")
         
         generation_config = genai.types.GenerationConfig(
             max_output_tokens=MAX_OUTPUT_TOKENS_GEMINI,
@@ -309,44 +424,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"role": "model", "parts": [model_welcome_text]} 
         ]
         chat = active_gemini_model.start_chat(history=chat_history)
-        # --- НАЧАЛО: Отправка действия "печатает..." ---
-        try:
-            await context.bot.send_chat_action(
-                chat_id=update.effective_chat.id,
-                action=ChatAction.TYPING  # Используем импортированный ChatAction
-            )
-            logger.debug(f"Sent 'typing' action to chat {update.effective_chat.id}")
-        except Exception as e_typing:
-            # Если не удалось отправить действие, не страшно, просто логируем
-            logger.warning(f"Could not send 'typing' action: {e_typing}")
-        # --- КОНЕЦ: Отправка действия "печатает..." ---
         response_gen = await chat.send_message_async(user_message, generation_config=generation_config)
 
         reply_text = response_gen.text
         
         if not reply_text or not reply_text.strip():
-            logger.warning(f"Gemini returned empty text. Model: {selected_model_id}, User msg: '{user_message}'. Finish_reason: {response_gen.candidates[0].finish_reason if response_gen.candidates else 'N/A'}")
+            logger.warning(f"Gemini returned empty text. Model: {selected_model_id}, User msg: '{user_message}'. Finish_reason: {response_gen.candidates[0].finish_reason if response_gen.candidates and response_gen.candidates[0] else 'N/A'}")
             reply_text = "ИИ не смог сформировать ответ или он был отфильтрован. Попробуйте переформулировать запрос."
         
         reply_text_for_sending, was_truncated = smart_truncate(reply_text, MAX_MESSAGE_LENGTH_TELEGRAM)
-        if was_truncated:
-            # Для _(...ответ был сокращен)_ можно использовать MarkdownV2, если хотим курсив
-            try:
-                await update.message.reply_text(reply_text_for_sending, parse_mode=ParseMode.MARKDOWN_V2)
-            except telegram.error.BadRequest: # Если в суффиксе проблема или в тексте
-                await update.message.reply_text(escape_markdown(reply_text_for_sending, version=2)) # Безопасный вариант
-            logger.info(f"Sent (possibly truncated) Gemini response as plain text with smart_truncate suffix attempt.")
-        else:
-            await update.message.reply_text(reply_text_for_sending) # Отправляем без parse_mode
-            logger.info(f"Sent Gemini response as plain text (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
-
-    except Exception as e:
-        logger.error(f"Error during Gemini interaction or message handling: {str(e)}\n{traceback.format_exc()}")
         
-        current_model_name_raw = get_current_model_display_name(context) # Получаем "чистое" имя для plain text
-        escaped_display_name = escape_markdown(current_model_name_raw, version=2) # Экранируем для Markdown
+        # Отправляем ответы ИИ как простой текст
+        await update.message.reply_text(reply_text_for_sending)
+        logger.info(f"Sent Gemini response as plain text (model: {selected_model_id}, length: {len(reply_text_for_sending)}). Truncated: {was_truncated}")
 
-        # Новое сообщение об ошибке с Markdown
+    except Exception as e: # Основной обработчик ошибок Gemini
+        logger.error(f"Error during Gemini text interaction or message handling: {str(e)}\n{traceback.format_exc()}")
+        
+        current_model_name_raw = get_current_model_display_name(context) 
+        escaped_display_name = escape_markdown(current_model_name_raw, version=2)
+    
         error_message_text_md = (
             f"Ой, что-то пошло не так при обращении к ИИ-модели (*{escaped_display_name}*)\\. "
             "Это может быть временный сбой на сервере ИИ\\. \n\n"
@@ -354,8 +451,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Если ошибка не исчезнет, можно также попробовать сменить режим (команда `/mode` или кнопка `🤖 Режим ИИ`) "
             "или модель ИИ (команда `/model` или кнопка `⚙️ Модель ИИ`)\\."
         )
-        
-        # Запасной вариант сообщения об ошибке (простой текст)
         plain_error_text = (
             f"Ой, что-то пошло не так при обращении к ИИ-модели ({current_model_name_raw}). "
             "Это может быть временный сбой на сервере ИИ.\n\n"
@@ -363,22 +458,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Если ошибка не исчезнет, можно также попробовать сменить режим (команда /mode или кнопка 'Режим ИИ') "
             "или модель ИИ (команда /model или кнопка 'Модель ИИ')."
         )
-
         try:
             await update.message.reply_text(error_message_text_md, parse_mode=ParseMode.MARKDOWN_V2)
         except telegram.error.BadRequest:
             logger.warning("Failed to send MarkdownV2 formatted error message, sending plain text.")
             await update.message.reply_text(plain_error_text)
-        except Exception as e_send_error: # Ловим другие возможные ошибки при отправке
+        except Exception as e_send_error: 
             logger.error(f"Failed to send error message to user: {e_send_error}")
-            # В самом крайнем случае, если даже простое сообщение не уходит, мы уже ничего не можем сделать
 
-# --- ФУНКЦИЯ ДЛЯ УСТАНОВКИ КОМАНД БОТА ---
 async def set_bot_commands(application: Application):
     commands = [
         BotCommand("start", "🚀 Перезапуск / Настройки"),
         BotCommand("mode", "🧠 Сменить режим ИИ"),
-        BotCommand("model", "⚙️ Выбрать модель ИИ"),
+        BotCommand("model", "⚙️ Выбрать текстовую модель ИИ"),
+        BotCommand("imagine", "🎨 Сгенерировать изображение"),
         BotCommand("help", "ℹ️ Помощь"),
     ]
     try:
@@ -387,38 +480,32 @@ async def set_bot_commands(application: Application):
     except Exception as e:
         logger.error(f"Failed to set bot commands: {e}")
 
-
 async def main():
-    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN:
-        logger.critical("CRITICAL: TELEGRAM_TOKEN is not set or uses a placeholder.")
+    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN :
+        logger.critical("CRITICAL: TELEGRAM_TOKEN is not set or uses a placeholder. Please set your actual token in the code or as an environment variable.")
         return
     if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY:
-        logger.critical("CRITICAL: GEMINI_API_KEY is not set or uses a placeholder.")
-        return
+        logger.critical("CRITICAL: GEMINI_API_KEY is not set or uses a placeholder. Please set your actual key in the code or as an environment variable.")
+        return # Рекомендуется не запускать без ключа Gemini, если он основная функция
         
     application = Application.builder().token(TOKEN).build()
 
-    # Установка команд бота при старте
     await set_bot_commands(application)
 
-    # Обработчики команд
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("mode", select_mode_command)) 
     application.add_handler(CommandHandler("model", select_model_command))
+    application.add_handler(CommandHandler("imagine", imagine_command))
     application.add_handler(CommandHandler("help", help_command))
 
-    # Обработчики для кнопок постоянной клавиатуры
-    # Добавляем их ПЕРЕД общим обработчиком текстовых сообщений
     application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
     application.add_handler(MessageHandler(filters.Text(["⚙️ Модель ИИ"]), select_model_command))
     application.add_handler(MessageHandler(filters.Text(["❓ Помощь"]), help_command))
     
-    # Общий обработчик текстовых сообщений (для запросов к ИИ)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    # Обработчик нажатий на inline-кнопки (для выбора режима/модели после команд /mode, /model)
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    logger.info("Starting bot with UI enhancements (ReplyKeyboard, BotCommands)...")
+    logger.info("Starting bot with Image Generation, UI enhancements, and plain text AI responses...")
     await application.run_polling()
 
 if __name__ == "__main__":
