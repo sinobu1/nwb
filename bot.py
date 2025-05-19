@@ -9,8 +9,7 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ContextTypes, CallbackQueryHandler
 )
-import google.genai as genai
-from google.genai.types import GenerateContentConfig, Modality
+import google.generativeai as genai
 import google.api_core.exceptions # Импортируем для явного отлова ошибок API
 import requests
 import logging
