@@ -62,7 +62,7 @@ DEFAULT_PERSONALITY_KEY = "neuropal"
 try:
     genai.configure(api_key=GEMINI_API_KEY)
     # Используем Gemini 2.5 Flash Preview
-    gemini_model_name = "gemini-2.5-flash-preview" # Убедитесь, что это имя доступно в вашем API
+    gemini_model_name = "gemini-2.5-flash-preview-04-17" # Убедитесь, что это имя доступно в вашем API
     gemini_model = genai.GenerativeModel(gemini_model_name)
     logger.info(f"Gemini client initialized successfully with model {gemini_model_name}")
 except Exception as e:
