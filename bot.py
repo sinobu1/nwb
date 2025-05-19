@@ -24,8 +24,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
-TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТЕЛЕГРАМ_ТОКЕН") # ЗАМЕНИТЕ!!
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ВАШ_GEMINI_API_КЛЮЧ") # ЗАМЕНИТЕ!!
+TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0") # ЗАМЕНИТЕ!!
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI") # ЗАМЕНИТЕ!!
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # Опционально
 
 # --- КОНФИГУРАЦИЯ БОТА ---
