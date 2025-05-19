@@ -1,6 +1,7 @@
 import telegram
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update # Добавил ParseMode
-from telegram.constants import ParseMode # Явно импортируем ParseMode
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode # Используем ParseMode
+from telegram.helpers import escape_markdown # Импортируем escape_markdown
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import google.generativeai as genai
 import requests 
@@ -9,6 +10,7 @@ import traceback
 import os
 import asyncio
 import nest_asyncio
+
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
