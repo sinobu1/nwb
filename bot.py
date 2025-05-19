@@ -71,7 +71,7 @@ AI_MODES = {
 DEFAULT_AI_MODE_KEY = "universal_ai"
 
 AVAILABLE_TEXT_MODELS = {
-    "gemini_2_5_flash_preview": {"name": "💎 G-2.5 Flash Preview (04-17)", "id": "gemini-2.5-flash-preview-04-17"},
+    "gemini_2_5_flash_preview": {"name": "💎 G-2.5 Flash Preview", "id": "gemini-2.5-flash-preview-04-17"}, # Убрали (04-17) из имени
     "gemini_2_0_flash": {"name": "⚡️ G-2.0 Flash", "id": "gemini-2.0-flash"}
 }
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS["gemini_2_5_flash_preview"]["id"]
