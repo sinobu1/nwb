@@ -468,10 +468,10 @@ async def set_bot_commands(application: Application):
 
 async def main():
     # Проверка токенов при запуске
-    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) not in [8,9,10,11] : # Более гибкая проверка длины ID бота
+    if "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) not in [8,9,10,11] : # Более гибкая проверка длины ID бота
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or uses a placeholder. Please set your actual token.")
         return
-    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY or len(GEMINI_API_KEY) < 30:
+    if "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI" in GEMINI_API_KEY or not GEMINI_API_KEY or len(GEMINI_API_KEY) < 30:
         logger.critical("CRITICAL: GEMINI_API_KEY is not set correctly or uses a placeholder. Please set your actual key.")
         return
         
