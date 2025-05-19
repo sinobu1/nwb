@@ -139,12 +139,12 @@ AVAILABLE_TEXT_MODELS = {
         "is_limited": True,
         "limit_type": "subscription_daily_custom", # Для нее будет отдельная логика подписки
         "limit_if_no_subscription": 2, # Количество бесплатных пробных запросов
-        "subscription_daily_limit": DEFAULT_CUSTOM_API_SUBSCRIPTION_REQUESTS_DAILY, # 25 для подписчиков
-        "cost_category": "custom_api_pro_premium",
-        "pricing_info": { # Информация для расчета себестоимости (если известна)
-            # "input_per_1k_tokens_rub": 0.25, # Пример, если знаете цены GenAPI
-            # "output_per_1k_tokens_rub": 2.00
-             "cost_per_request_rub_approx": 2.33 # Примерная стоимость на основе вашего лога ("cost": 2.3243)
+        "subscription_daily_limit": 25, # Количество запросов для подписчиков
+        "pricing_info": {
+            "cost_per_request_rub_approx": 1.20, # ВАША ОЦЕНКА ПОСЛЕ ОПТИМИЗАЦИИ
+            "subscription_price_rub_monthly": 999, # Ваша установленная цена
+            "subscription_duration_days": 30,
+            "description": "Доступ к премиум модели Gemini 2.5 Pro, 25 запросов в день."
         }
     }
 }
@@ -361,6 +361,85 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(plain_text_version, reply_markup=get_main_reply_keyboard())
     logger.info(f"Start command processed for user {user_id}.")
+
+async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = "ℹ️ **Информация о подписках**\n\n"
+    text += "Мы предлагаем следующие уровни доступа к нашим продвинутым моделям:\n\n"
+
+    # Пример для "custom_api_gemini_2_5_pro"
+    pro_model_key = "custom_api_gemini_2_5_pro"
+    if pro_model_key in AVAILABLE_TEXT_MODELS:
+        pro_config = AVAILABLE_TEXT_MODELS[pro_model_key]
+        pricing = pro_config.get("pricing_info")
+        if pricing:
+            text += f"💎 **Подписка '{escape_markdown(pro_config['name'], version=2)}'**\n"
+            text += f"   ▫️ {escape_markdown(str(pro_config.get('subscription_daily_limit', 'N/A')), version=2)} запросов в день\n"
+            text += f"   ▫️ {escape_markdown(pricing.get('description', ''), version=2)}\n"
+            text += f"   ▫️ Стоимость: *{escape_markdown(str(pricing.get('subscription_price_rub_monthly', 'N/A')), version=2)} ₽ / {escape_markdown(str(pricing.get('subscription_duration_days', 30)), version=2)} дней*\n"
+            text += f"   ▫️ Для оформления: свяжитесь с @{context.bot.username} (или ваш контакт)\n\n" # Замените на реальный контакт
+
+    # Можно добавить информацию о других платных моделях или общем "Pro" пакете
+    # ...
+
+    text += escape_markdown("Бесплатные лимиты для базовых моделей указаны в команде /usage.", version=2)
+    
+    try:
+        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
+    except telegram.error.BadRequest:
+        await update.message.reply_text("Информация о подписках временно недоступна.")
+
+# Не забудьте добавить в main():
+# application.add_handler(CommandHandler("subscribe", subscribe_info_command))
+# И в set_bot_commands():
+# BotCommand("subscribe", "💎 Подписки и цены")
+# YOUR_ADMIN_ID = 123456789 # Определите ваш ID
+
+async def grant_subscription_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+     if update.effective_user.id != YOUR_ADMIN_ID: "nstmgln2007"
+        await update.message.reply_text("Эта команда доступна только администратору.")
+        return
+    
+    try:
+        # /grantsub <user_id> <level_key> <days>
+        # level_key: pro, advanced, custom_pro (соответствует ключам подписки, которые вы определите)
+        args = context.args
+        if len(args) != 3:
+            await update.message.reply_text("Использование: /grantsub <user_id> <level_key> <days>\nДоступные уровни: pro_google, custom_pro_access (пример)")
+            return
+            
+        target_user_id = int(args[0])
+        sub_level_key = args[1].lower() # Например, "custom_pro_access"
+        days = int(args[2])
+
+        # Проверка, что такой уровень подписки существует (можно сделать более гибко)
+        defined_subscription_levels = ["pro_google", "advanced_google", "custom_pro_access"] # Пример
+        if sub_level_key not in defined_subscription_levels:
+            await update.message.reply_text(f"Неизвестный уровень подписки: {sub_level_key}. Доступны: {', '.join(defined_subscription_levels)}")
+            return
+
+        all_user_subscriptions = context.bot_data.setdefault('user_subscriptions', {})
+        
+        from datetime import timedelta # Убедитесь, что импорт есть в начале файла
+        valid_until_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+        
+        all_user_subscriptions[target_user_id] = {
+            'level': sub_level_key,
+            'valid_until': valid_until_date
+        }
+        
+        # Сохранение bot_data (PicklePersistence должна делать это при штатном завершении,
+        # но для надежности можно и явно, хотя это замедляет)
+        # await context.application.persistence.flush() # Если нужно принудительное сохранение
+
+        await update.message.reply_text(f"Пользователю {target_user_id} выдана подписка '{sub_level_key}' на {days} дней (до {valid_until_date}).")
+        logger.info(f"Admin {update.effective_user.id} granted subscription '{sub_level_key}' for {days} days to user {target_user_id}.")
+
+    except (IndexError, ValueError) as e:
+        await update.message.reply_text(f"Ошибка в аргументах: {e}\nИспользование: /grantsub <user_id> <level_key> <days>")
+    except Exception as e_grant:
+        logger.error(f"Error in grant_subscription_command: {e_grant}\n{traceback.format_exc()}")
+        await update.message.reply_text(f"Произошла ошибка при выдаче подписки: {e_grant}")
+
 
 async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")] for key, details in AI_MODES.items()]
