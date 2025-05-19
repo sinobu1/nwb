@@ -33,7 +33,7 @@ MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
 # --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" 
+IMAGE_MODEL_NAME = "imagen-3.0-generate-002" 
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
@@ -282,7 +282,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
     logger.debug(f"Prompt text: '{prompt_text}', Chat ID: {chat_id}")
 
-    # Preliminary message
+    # Предварительное сообщение
     escaped_prompt = escape_markdown(prompt_text, version=2)
     preliminary_message = f"✨ Генерирую изображение для: \"_{escaped_prompt}_\"..."
     try:
@@ -295,91 +295,82 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✨ Генерирую изображение для: \"{prompt_text}\"...")
 
     try:
-        logger.info(f"Attempting to initialize image model: {IMAGE_MODEL_NAME}")
-        image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
-        logger.debug("Image model initialized successfully")
+        logger.info(f"Attempting to initialize Imagen model: imagen-3.0-generate-001")
+        imagen = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        logger.debug("Imagen model initialized successfully")
 
-        # Configure generation
-        generation_config = genai.types.GenerationConfig(
-            temperature=0.9
-        )
-        logger.debug(f"Generation config created: {generation_config}")
-
-        # Structure the prompt as text (per documentation)
+        # Генерация изображения
         logger.info(f"Sending image generation request for prompt: '{prompt_text}'")
-        response = await image_model.generate_content_async(
-            contents=prompt_text,  # Простая строка, как в примере документации
-            generation_config=generation_config
+        result = await imagen.generate_images_async(
+            prompt=prompt_text,
+            number_of_images=1,
+            safety_filter_level="block_only_high",
+            person_generation="dont_allow",
+            aspect_ratio="1:1"
         )
-        logger.debug(f"Image generation response received: {response}")
+        logger.debug(f"Image generation result received: {result}")
 
-        # Check prompt feedback
-        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
-            block_reason = response.prompt_feedback.block_reason
-            block_reason_name = getattr(block_reason, 'name', str(block_reason))
-            logger.warning(f"Image generation blocked. Reason: {block_reason_name}")
-            await update.message.reply_text(
-                f"Запрос заблокирован: _{escape_markdown(block_reason_name.replace('_', ' ').title(), version=2)}_. Измените описание.",
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            return
-
-        # Extract image
+        # Извлечение изображения
         image_found = False
-        if hasattr(response, 'candidates') and response.candidates:
-            candidate = response.candidates[0]
-            logger.debug(f"Candidate: {candidate}")
-            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                for part in candidate.content.parts:
-                    logger.debug(f"Processing part: {part}")
-                    if hasattr(part, 'inline_data') and part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                        image_bytes = part.inline_data.data
-                        photo = io.BytesIO(image_bytes)
-                        caption = f"🖼️ Изображение для: \"_{escaped_prompt}_\""
-                        try:
-                            await update.message.reply_photo(
-                                photo=photo,
-                                caption=caption,
-                                parse_mode=ParseMode.MARKDOWN_V2
-                            )
-                            image_found = True
-                            logger.info(f"Image sent for prompt: '{prompt_text}'")
-                        except telegram.error.BadRequest:
-                            await update.message.reply_photo(
-                                photo=io.BytesIO(image_bytes),
-                                caption=f"🖼️ Изображение для: \"{prompt_text}\""
-                            )
-                            image_found = True
-                        break
-            else:
-                logger.warning(f"No content/parts in candidate: {candidate}")
+        if hasattr(result, 'images') and result.images:
+            image = result.images[0]
+            photo = io.BytesIO(image._pil_image.tobytes())
+            caption = f"🖼️ Изображение для: \"_{escaped_prompt}_\""
+            try:
+                await update.message.reply_photo(
+                    photo=photo,
+                    caption=caption,
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                image_found = True
+                logger.info(f"Image sent for prompt: '{prompt_text}'")
+            except telegram.error.BadRequest:
+                await update.message.reply_photo(
+                    photo=io.BytesIO(image._pil_image.tobytes()),
+                    caption=f"🖼️ Изображение для: \"{prompt_text}\""
+                )
+                image_found = True
+                logger.info(f"Image sent as plain text caption for prompt: '{prompt_text}'")
         else:
-            logger.warning(f"No candidates in response: {response}")
+            logger.warning(f"No images in result: {result}")
 
         if not image_found:
-            logger.error(f"No image found in response for prompt: '{prompt_text}'")
+            logger.error(f"No image found in result for prompt: '{prompt_text}'")
             await update.message.reply_text(
                 "Не удалось сгенерировать изображение. Возможно, модель не вернула изображение."
             )
 
-    except google.api_core.exceptions.InvalidArgument as e:
-        logger.error(f"InvalidArgument: {e}\n{traceback.format_exc()}")
+    except google.api_core.exceptions.PermissionDenied:
+        logger.error(f"Permission denied for model imagen-3.0-generate-001")
         await update.message.reply_text(
-            f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e)}."
+            "Нет доступа к модели 'imagen-3.0-generate-001'. Проверьте настройки API или подайте запрос на доступ."
+        )
+    except google.api_core.exceptions.NotFound:
+        logger.error(f"Model imagen-3.0-generate-001 not found")
+        await update.message.reply_text(
+            "Модель 'imagen-3.0-generate-001' не найдена. Проверьте доступность модели в вашем регионе."
+        )
+    except google.api_core.exceptions.QuotaExceeded:
+        logger.error(f"Quota exceeded for model imagen-3.0-generate-001")
+        await update.message.reply_text(
+            "Достигнут лимит запросов к API. Попробуйте позже."
+        )
+    except google.api_core.exceptions.InvalidArgument as e:
+        logger.error(f"Invalid argument for model imagen-3.0-generate-001: {e}")
+        await update.message.reply_text(
+            f"Ошибка в запросе к модели: {str(e)}."
         )
     except google.api_core.exceptions.GoogleAPIError as e:
         logger.error(f"Google API error: {e}\n{traceback.format_exc()}")
         error_msg = "Ошибка API Google. Попробуйте позже."
         if "api key not valid" in str(e).lower():
             error_msg = "Недействительный API-ключ."
-        elif "model" in str(e).lower() and ("not found" in str(e).lower() or "permission denied" in str(e).lower()):
-            error_msg = f"Модель '{IMAGE_MODEL_NAME}' не найдена или нет доступа."
-        elif "resource has been exhausted" in str(e).lower():
-            error_msg = "Достигнут лимит API. Попробуйте позже."
         await update.message.reply_text(error_msg)
     except Exception as e:
         logger.error(f"Unexpected error: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text("Непредвиденная ошибка при генерации изображения.")
+        await update.message.reply_text(
+            "Непредвиденная ошибка при генерации изображения."
+        )
 
 
 # --- handle_message, set_bot_commands, main остаются такими же, как в ответе 49 ---
