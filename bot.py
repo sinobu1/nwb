@@ -33,7 +33,7 @@ MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
 # --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "imagen-3.0-generate-002" 
+IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" 
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
@@ -295,27 +295,26 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✨ Генерирую изображение для: \"{prompt_text}\"...")
 
     try:
-        logger.info(f"Initializing image model: {IMAGE_MODEL_NAME}")
-        client = genai.Client()  # Инициализация клиента
-        logger.debug("Client initialized")
+        logger.info(f"Attempting to initialize image model: {IMAGE_MODEL_NAME}")
+        image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
+        logger.debug("Image model initialized successfully")
 
-        # Конфигурация генерации
-        config = GenerateContentConfig(
-            temperature=0.9,
-            response_modalities=[Modality.TEXT, Modality.IMAGE]  # Явно указываем модальности
+        # Configure generation
+        generation_config = genai.types.GenerationConfig(
+            temperature=0.9
         )
-        logger.debug(f"Generation config: {config}")
+        logger.debug(f"Generation config created: {generation_config}")
 
+        # Structure the prompt as text (per documentation)
         logger.info(f"Sending image generation request for prompt: '{prompt_text}'")
-        response = await client.models.generate_content_async(
-            model=IMAGE_MODEL_NAME,
-            contents=prompt_text,  # Простая строка для промпта
-            config=config
+        response = await image_model.generate_content_async(
+            contents=prompt_text,  # Простая строка, как в примере документации
+            generation_config=generation_config
         )
-        logger.debug(f"Image generation response: {response}")
+        logger.debug(f"Image generation response received: {response}")
 
-        # Проверка блокировки промпта
-        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason:
+        # Check prompt feedback
+        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
             block_reason = response.prompt_feedback.block_reason
             block_reason_name = getattr(block_reason, 'name', str(block_reason))
             logger.warning(f"Image generation blocked. Reason: {block_reason_name}")
@@ -325,7 +324,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Извлечение изображения
+        # Extract image
         image_found = False
         if hasattr(response, 'candidates') and response.candidates:
             candidate = response.candidates[0]
@@ -363,7 +362,12 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Не удалось сгенерировать изображение. Возможно, модель не вернула изображение."
             )
 
-    except genai.APIError as e:
+    except google.api_core.exceptions.InvalidArgument as e:
+        logger.error(f"InvalidArgument: {e}\n{traceback.format_exc()}")
+        await update.message.reply_text(
+            f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e)}."
+        )
+    except google.api_core.exceptions.GoogleAPIError as e:
         logger.error(f"Google API error: {e}\n{traceback.format_exc()}")
         error_msg = "Ошибка API Google. Попробуйте позже."
         if "api key not valid" in str(e).lower():
