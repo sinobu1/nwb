@@ -17,9 +17,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Telegram Bot Token
-TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТЕЛЕГРАМ_ТОКЕН") # ЗАМЕНИТЕ НА ВАШ ТОКЕН
+TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0") # ЗАМЕНИТЕ НА ВАШ ТОКЕН
 # Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ВАШ_GEMINI_API_КЛЮЧ") # ЗАМЕНИТЕ НА ВАШ КЛЮЧ
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI") # ЗАМЕНИТЕ НА ВАШ КЛЮЧ
 # Yandex Maps API Key
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # Опционально, для функционала карт
 
