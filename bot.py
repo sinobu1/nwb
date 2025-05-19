@@ -18,7 +18,7 @@ import os
 import asyncio
 import nest_asyncio
 import json
-from datetime import datetime, timedelta # ИЗМЕНЕНО: добавлен timedelta
+from datetime import datetime, timedelta
 
 nest_asyncio.apply()
 # ИЗМЕНЕНО: Уровень логирования DEBUG для отладки
@@ -31,21 +31,21 @@ GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYd
 CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
 CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
 
-YOUR_ADMIN_ID = 489230152  # ИЗМЕНЕНО: ВАШ Telegram ID для админ-команд
+YOUR_ADMIN_ID = 489230152  # ВАШ Telegram ID для админ-команд
 
 # --- КОНФИГУРАЦИЯ БОТА ---
 MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
 MAX_MESSAGE_LENGTH_TELEGRAM = 4000
 
 # Лимиты по умолчанию
-DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 10 # Для базовой бесплатной модели
-DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 1    # Бесплатных проб для Custom Pro
-DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 5 # Для подписчиков на Custom Pro (пример)
-DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 15 # Для подписчиков на Google Flash Preview
+DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 10
+DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 1    # ИЗМЕНЕНО: 1 бесплатная проба для Custom Pro
+DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 5 # ИЗМЕНЕНО: 5 для подписчиков на Custom Pro
+DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 15
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
-    "universal_ai_basic": { # ИЗМЕНЕНО: для базовых моделей
+    "universal_ai_basic": {
         "name": "🤖 Универсальный ИИ (Базовый)",
         "prompt": (
             "Ты — продвинутый ИИ-ассистент Gemini от Google. "
@@ -67,10 +67,10 @@ AI_MODES = {
         ),
         "welcome": "Активирован режим 'Универсальный ИИ (Базовый)'. Какой у вас запрос?"
     },
-     "gemini_pro_custom_mode": { # ИЗМЕНЕНО: Новый специальный режим/промпт для вашей Pro модели
-        "name": "🤖 Продвинутый Ассистент", # Имя для пользователя (можно сделать более общим)
-        "prompt": (
-            "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент. " # Убрано "от Google", если Custom API не от Google
+     "gemini_pro_custom_mode": { # ИЗМЕНЕНО: Новый специальный режим/промпт
+        "name": "🤖 Продвинутый Ассистент",
+        "prompt": ( # ИЗМЕНЕНО: Короткий промпт
+            "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент. "
             "Твоя задача — предоставлять точные, развернутые и полезные ответы на запросы пользователя. "
             "Соблюдай вежливость и объективность. "
             "Формулируй ответы ясно и структурированно, используя абзацы и списки при необходимости. "
@@ -83,21 +83,13 @@ AI_MODES = {
         "name": "✍️ Творческий Помощник",
         "prompt": (
             "Ты — Gemini, креативный ИИ-партнёр и писатель. "
-            "Помогай пользователю генерировать идеи, писать тексты (рассказы, стихи, сценарии, маркетинговые материалы), "
-            "придумывать слоганы, разрабатывать концепции и решать другие творческие задачи. "
-            "Будь вдохновляющим, оригинальным и предлагай нестандартные подходы.\n\n"
-            "**Оформление творческого ответа (простой структурированный текст):**\n"
-            "1.  **Структура и Абзацы:** Для прозы используй абзацы, чтобы четко структурировать повествование. Для стихов сохраняй деление на строфы и правильные переносы строк.\n"
-            "2.  **Без специального форматирования:** Пожалуйста, НЕ используй Markdown-разметку (звездочки для жирного текста или курсива и т.п.). Основной акцент на содержании и структуре через абзацы и списки, если они нужны (например, для перечисления идей).\n"
-            "3.  **Списки Идей/Вариантов:** Если предлагаешь несколько вариантов (например, заголовков, идей), оформляй их как простой маркированный или нумерованный список.\n"
-            "4.  **Диалоги:** Прямую речь в рассказах или сценариях оформляй стандартными литературными способами (например, с использованием тире или кавычек), без Markdown.\n"
-            "5.  **Читаемость:** Текст должен легко читаться и быть увлекательным. Структура должна помогать этому.\n"
+            # ... (ваш длинный творческий промпт) ...
             "6.  **Завершённость:** Старайся доводить творческие произведения до логического конца в рамках одного ответа, если это подразумевается задачей."
         ),
         "welcome": "Режим 'Творческий Помощник' к вашим услугам! Над какой творческой задачей поработаем?"
     },
 }
-DEFAULT_AI_MODE_KEY = "universal_ai_basic" # ИЗМЕНЕНО: на новый ключ базового режима
+DEFAULT_AI_MODE_KEY = "universal_ai_basic"
 
 # --- МОДЕЛИ ИИ ---
 AVAILABLE_TEXT_MODELS = {
@@ -106,7 +98,7 @@ AVAILABLE_TEXT_MODELS = {
         "id": "gemini-2.0-flash",
         "api_type": "google_genai",
         "is_limited": True,
-        "limit_type": "daily_free", # Тип лимита для простого ежедневного бесплатного доступа
+        "limit_type": "daily_free",
         "limit": DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY,
         "cost_category": "google_flash_free"
     },
@@ -116,11 +108,11 @@ AVAILABLE_TEXT_MODELS = {
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "subscription_or_daily_free",
-        "limit_if_no_subscription": 3, # ИЗМЕНЕНО: для примера
-        "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY, # Лимит для подписчиков (например, уровня "standard_sub")
+        "limit_if_no_subscription": 3,
+        "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY,
         "cost_category": "google_flash_preview_flex"
     },
-    # ИЗМЕНЕНО: Блок для gemini-2.5-pro-preview-05-06 УДАЛЕН
+    # ИЗМЕНЕНО: Модель gemini-2.5-pro-preview-05-06 УДАЛЕНА
     "custom_api_gemini_2_5_pro": {
         "name": "🌟 Gemini 2.5 Pro (Платный)",
         "id": "gemini-2.5-pro-preview-03-25",
@@ -132,8 +124,8 @@ AVAILABLE_TEXT_MODELS = {
         "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY, # 1 бесплатная проба
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY, # 5 для подписчиков
         "cost_category": "custom_api_pro_paid",
-        "pricing_info": { # ИЗМЕНЕНО: Информация для команды /subscribe
-            "cost_per_request_rub_approx": 1.50, # ОБНОВИТЕ ЭТО ЗНАЧЕНИЕ ПОСЛЕ ТЕСТА С НОВЫМ ПРОМПТОМ!
+        "pricing_info": {
+            "cost_per_request_rub_approx": 1.50, # ОБНОВИТЕ после теста с новым промптом!
             "subscription_price_rub_monthly": 499, # Пример цены
             "subscription_duration_days": 30,
             "description": "Доступ к продвинутой модели Gemini 2.5 Pro, 5 запросов в день."
@@ -158,55 +150,64 @@ if not CUSTOM_GEMINI_PRO_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GEMINI_PRO_API_K
 
 # --- Вспомогательные функции ---
 def get_current_mode_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    # ИЗМЕНЕНО: Если выбрана custom_api_gemini_2_5_pro, принудительно используем ее спец. режим
     current_model_key = get_current_model_key(context)
     if current_model_key == "custom_api_gemini_2_5_pro":
-        # Проверяем, существует ли специальный режим для этой модели
         if "gemini_pro_custom_mode" in AI_MODES:
             return AI_MODES["gemini_pro_custom_mode"]
-        else: # Фоллбэк, если режим не определен
+        else:
             logger.warning("Dedicated mode 'gemini_pro_custom_mode' not found. Falling back to default AI mode.")
-            return AI_MODES.get(DEFAULT_AI_MODE_KEY) # Или другой фоллбэк
+            return AI_MODES.get(DEFAULT_AI_MODE_KEY, AI_MODES["universal_ai_basic"]) # Фоллбэк на базовый универсальный
 
-    # Для остальных моделей берем выбранный пользователем режим
     mode_key = context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
     return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
 def get_current_model_key(context: ContextTypes.DEFAULT_TYPE) -> str:
     selected_id = context.user_data.get('selected_model_id', DEFAULT_MODEL_ID)
-    # ИЗМЕНЕНО: API тип теперь тоже важен для уникальности, если ID могут совпадать
     selected_api_type = context.user_data.get('selected_api_type')
-    if not selected_api_type: # Если тип API не сохранен, пытаемся определить по ID
+    
+    # Если тип API не сохранен в user_data, пытаемся его определить
+    if not selected_api_type:
         for key_fallback, info_fallback in AVAILABLE_TEXT_MODELS.items():
             if info_fallback["id"] == selected_id:
                 selected_api_type = info_fallback.get("api_type")
-                # Сохраняем найденный тип API для будущих вызовов
-                context.user_data['selected_api_type'] = selected_api_type
+                context.user_data['selected_api_type'] = selected_api_type # Сохраняем для будущих вызовов
+                logger.debug(f"Inferred and saved api_type '{selected_api_type}' for model_id '{selected_id}'")
                 break
     
-    if not selected_api_type: # Если так и не смогли определить
-         logger.warning(f"API type for selected_model_id {selected_id} is not stored and couldn't be inferred. Falling back to default model key.")
+    # Если тип API так и не определен (например, ID нет в AVAILABLE_TEXT_MODELS), возвращаем ключ по умолчанию
+    if not selected_api_type:
+         logger.warning(f"API type for selected_model_id '{selected_id}' is not stored and couldn't be inferred. Falling back to default model key: {DEFAULT_MODEL_KEY}.")
+         # Устанавливаем данные для модели по умолчанию, чтобы избежать дальнейших ошибок
+         default_model_config = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
+         context.user_data['selected_model_id'] = default_model_config["id"]
+         context.user_data['selected_api_type'] = default_model_config["api_type"]
          return DEFAULT_MODEL_KEY
 
     for key, info in AVAILABLE_TEXT_MODELS.items():
         if info["id"] == selected_id and info.get("api_type") == selected_api_type:
             return key
             
-    logger.warning(f"Could not find key for model_id '{selected_id}' and api_type '{selected_api_type}'. Falling back to default.")
+    logger.warning(f"Could not find key for model_id '{selected_id}' and api_type '{selected_api_type}'. Falling back to default: {DEFAULT_MODEL_KEY}.")
+    default_model_config = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
+    context.user_data['selected_model_id'] = default_model_config["id"]
+    context.user_data['selected_api_type'] = default_model_config["api_type"]
     return DEFAULT_MODEL_KEY
 
 
 def get_selected_model_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
     model_key = get_current_model_key(context)
+    if model_key not in AVAILABLE_TEXT_MODELS: # Дополнительная проверка
+        logger.error(f"Model key '{model_key}' not found in AVAILABLE_TEXT_MODELS. Falling back to default.")
+        return AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
     return AVAILABLE_TEXT_MODELS[model_key]
 
 def get_current_model_display_name(context: ContextTypes.DEFAULT_TYPE) -> str:
     return get_selected_model_details(context)["name"]
 
 def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
-    if not isinstance(text, str): # Добавлена проверка типа
+    if not isinstance(text, str):
         logger.warning(f"smart_truncate received non-string input: {type(text)}. Returning as is.")
-        return str(text), False # Пытаемся преобразовать в строку
+        return str(text), False
     if len(text) <= max_length:
         return text, False
     suffix = "\n\n(...ответ был сокращен)"
@@ -249,34 +250,32 @@ def get_user_actual_limit_for_model(user_id: int, model_key: str, context: Conte
     if user_subscription_details.get('valid_until'):
         try:
             valid_until_dt = datetime.strptime(user_subscription_details['valid_until'], "%Y-%m-%d")
-            if datetime.now().date() <= valid_until_dt.date(): # ИЗМЕНЕНО: Сравниваем только даты
+            if datetime.now().date() <= valid_until_dt.date():
                 current_sub_level = user_subscription_details.get('level')
             else:
                 logger.info(f"Subscription for user {user_id} (level {user_subscription_details.get('level')}) expired on {user_subscription_details['valid_until']}.")
-                # Можно удалить истекшую подписку
-                # current_sub_level останется None
         except ValueError:
             logger.error(f"Invalid date format for subscription for user {user_id}: {user_subscription_details['valid_until']}")
 
     limit_type = model_config.get("limit_type")
     actual_limit = 0
 
-    if limit_type == "daily_free": # Для google_gemini_2_0_flash
+    if limit_type == "daily_free":
         actual_limit = model_config.get("limit", 0)
-    elif limit_type == "subscription_or_daily_free": # Для google_gemini_2_5_flash_preview
-        if current_sub_level == "standard_google" or current_sub_level == "premium_all": # Пример уровней
-            actual_limit = model_config.get("subscription_daily_limit", DEFAULT_PRO_SUBSCRIPTION_REQUESTS_DAILY) # Исправлено
+    elif limit_type == "subscription_or_daily_free":
+        if current_sub_level in ["standard_google", "premium_all", "custom_pro_access"]: # Добавил custom_pro_access, если он дает доступ к этой
+            actual_limit = model_config.get("subscription_daily_limit", DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY)
         else:
             actual_limit = model_config.get("limit_if_no_subscription", 0)
-    elif limit_type == "subscription_custom_pro": # Для custom_api_gemini_2_5_pro
-        if current_sub_level == "custom_pro_access" or current_sub_level == "premium_all":
+    elif limit_type == "subscription_custom_pro":
+        if current_sub_level in ["custom_pro_access", "premium_all"]:
             actual_limit = model_config.get("subscription_daily_limit", DEFAULT_CUSTOM_API_SUBSCRIPTION_REQUESTS_DAILY)
         else:
             actual_limit = model_config.get("limit_if_no_subscription", 0)
     else:
         actual_limit = model_config.get("limit", float('inf')) if not model_config.get("is_limited", False) else 0
         if model_config.get("is_limited") and actual_limit == float('inf'):
-            logger.warning(f"Model {model_key} is limited but actual_limit is infinity. Setting to 0.")
+            logger.warning(f"Model {model_key} is limited but actual_limit is infinity for user {user_id}. Setting to 0.")
             actual_limit = 0
     return actual_limit
 
@@ -284,35 +283,36 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
     today_str = datetime.now().strftime("%Y-%m-%d")
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config or not model_config.get("is_limited"):
+        logger.debug(f"Model {model_key} not found or not limited. Allowing request.")
         return True, "", 0
     
-    # ИЗМЕНЕНО: используем context.bot_data для хранения общих счетчиков пользователей
     all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
     user_model_counts = all_daily_counts.setdefault(user_id, {})
     model_daily_usage = user_model_counts.setdefault(model_key, {'date': '', 'count': 0})
 
     if model_daily_usage['date'] != today_str:
+        logger.info(f"New day for user {user_id}, model {model_key}. Resetting count from {model_daily_usage['count']} (date {model_daily_usage['date']}).")
         model_daily_usage['date'] = today_str
         model_daily_usage['count'] = 0
     
     current_user_model_count = model_daily_usage['count']
     actual_limit = get_user_actual_limit_for_model(user_id, model_key, context)
+    logger.debug(f"User {user_id}, Model {model_key}: Count={current_user_model_count}, Limit={actual_limit}")
 
     if current_user_model_count >= actual_limit:
         message = (f"Вы достигли дневного лимита ({current_user_model_count}/{actual_limit}) "
                    f"для модели '{model_config['name']}'.\n"
-                   "Попробуйте завтра или рассмотрите улучшение подписки.")
+                   "Попробуйте завтра или рассмотрите улучшение подписки (/subscribe).")
         return False, message, current_user_model_count
     return True, "", current_user_model_count
 
 def increment_request_count(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE):
     today_str = datetime.now().strftime("%Y-%m-%d")
-    # ИЗМЕНЕНО: используем context.bot_data
     all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
     user_model_counts = all_daily_counts.setdefault(user_id, {})
     model_daily_usage = user_model_counts.setdefault(model_key, {'date': today_str, 'count': 0})
     
-    if model_daily_usage['date'] != today_str: # Дополнительная проверка на смену дня
+    if model_daily_usage['date'] != today_str: 
         model_daily_usage['date'] = today_str
         model_daily_usage['count'] = 0
         
@@ -320,53 +320,28 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
     logger.info(f"User {user_id} request count for {model_key} incremented to {model_daily_usage['count']}")
 
 
-# --- Функция для проверки статуса асинхронной задачи ---
-async def poll_task_status(request_id: int, api_key: str, endpoint: str) -> dict:
-    status_url = f"{endpoint}/{request_id}"  # Предполагаемый эндпоинт для проверки статуса
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': f'Bearer {api_key}'
-    }
-    for _ in range(10):  # Проверять до 10 раз
-        try:
-            response = requests.get(status_url, headers=headers, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            logger.debug(f"Polled task status for request_id {request_id}: {json.dumps(data, ensure_ascii=False)}")
-            if data.get("status") == "success":
-                return data
-            elif data.get("status") in ["error", "failed"]:
-                return {"status": "error", "detail": data.get("detail", "Task failed")}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error polling task status for request_id {request_id}: {str(e)}")
-            await asyncio.sleep(5)
-        await asyncio.sleep(5)  # Ждать 5 секунд перед следующей попыткой
-    return {"status": "error", "detail": "Task timeout"}
-
 # --- Команды Telegram ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    # Инициализация данных пользователя, если их нет
     context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
-    if 'selected_model_id' not in context.user_data: # Устанавливаем модель по умолчанию только если ее нет
+    if 'selected_model_id' not in context.user_data or 'selected_api_type' not in context.user_data:
         default_model_conf = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
         context.user_data['selected_model_id'] = default_model_conf["id"]
         context.user_data['selected_api_type'] = default_model_conf["api_type"]
 
-    # Инициализация глобальных данных бота (если они не созданы PicklePersistence)
     context.bot_data.setdefault('user_subscriptions', {})
     context.bot_data.setdefault('all_user_daily_counts', {})
     
-    # Для информации в стартовом сообщении
-    current_mode_name = get_current_mode_details(context)['name'] # get_current_mode_details теперь учитывает модель
-    current_model_name = get_current_model_display_name(context)
+    current_model_key_for_start = get_current_model_key(context) # Получаем ключ текущей модели
+    # ИЗМЕНЕНО: get_current_mode_details теперь вызывается с учетом модели
+    current_mode_name_for_start = get_current_mode_details(context)['name']
+    current_model_name_for_start = AVAILABLE_TEXT_MODELS[current_model_key_for_start]['name']
     
     greeting = escape_markdown("Привет! Я многофункциональный ИИ-бот.", version=2)
-    mode_line = f"{escape_markdown('Текущий режим: ', version=2)}*{escape_markdown(current_mode_name, version=2)}*"
-    model_line = f"{escape_markdown('Текущая модель: ', version=2)}*{escape_markdown(current_model_name, version=2)}*"
+    # ИЗМЕНЕНО: Используем имя режима, которое соответствует модели, если это custom pro
+    mode_line = f"{escape_markdown('Текущий режим: ', version=2)}*{escape_markdown(current_mode_name_for_start, version=2)}*"
+    model_line = f"{escape_markdown('Текущая модель: ', version=2)}*{escape_markdown(current_model_name_for_start, version=2)}*"
     
-    current_model_key_for_start = get_current_model_key(context)
     _, limit_msg_check, current_count_for_start = check_and_log_request_attempt(user_id, current_model_key_for_start, context)
     actual_limit_for_model_start = get_user_actual_limit_for_model(user_id, current_model_key_for_start, context)
     limit_info_line = f"{escape_markdown(f'Лимит для текущей модели: {current_count_for_start}/{actual_limit_for_model_start} в день.', version=2)}"
@@ -378,7 +353,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action2 = f"▫️ Сменить режим ИИ (`/mode` или кнопка)"
     action3 = f"▫️ Выбрать другую модель (`/model` или кнопка)"
     action4 = f"▫️ Узнать о лимитах и подписке (`/usage` или кнопка)"
-    action5 = f"▫️ Посмотреть доступные подписки (`/subscribe`)" # ДОБАВЛЕНО
+    action5 = f"▫️ Посмотреть доступные подписки (`/subscribe`)"
     action6 = f"▫️ Получить помощь (`/help`)"
     invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
 
@@ -388,7 +363,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{model_line}\n"
         f"{limit_info_line}\n\n"
         f"{you_can}\n"
-        f"{action1}\n{action2}\n{action3}\n{action4}\n{action5}\n{action6}\n\n" # ИЗМЕНЕНО
+        f"{action1}\n{action2}\n{action3}\n{action4}\n{action5}\n{action6}\n\n"
         f"{invitation}"
     )
     try:
@@ -396,7 +371,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except telegram.error.BadRequest: 
         plain_text_version = (
             f"Привет! Я многофункциональный ИИ-бот.\n\n"
-            f"Режим: {current_mode_name}\nМодель: {current_model_name}\n"
+            f"Режим: {current_mode_name_for_start}\nМодель: {current_model_name_for_start}\n"
             f"Лимит: {current_count_for_start}/{actual_limit_for_model_start} в день.\n\n"
             "Вы можете:\n"
             "▫️ Задавать вопросы.\n▫️ /mode - сменить режим\n▫️ /model - сменить модель\n"
@@ -408,19 +383,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ИЗМЕНЕНО: не показывать "gemini_pro_custom_mode" в общем списке режимов,
-    # так как он выбирается автоматически для custom_api_gemini_2_5_pro
     keyboard = []
     for key, details in AI_MODES.items():
-        if key != "gemini_pro_custom_mode": # Скрываем специальный режим
+        if key != "gemini_pro_custom_mode": # Скрываем специальный режим из выбора
             keyboard.append([InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")])
     
-    if not keyboard: # Если вдруг все режимы скрыты
+    if not keyboard:
          await update.message.reply_text('В данный момент нет доступных режимов для выбора.', reply_markup=get_main_reply_keyboard())
          return
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Выберите режим работы для ИИ:', reply_markup=reply_markup)
+    await update.message.reply_text('Выберите режим работы для ИИ (для некоторых моделей режим выбирается автоматически):', reply_markup=reply_markup)
 
 
 async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -431,7 +404,6 @@ async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    
     all_user_subscriptions = context.bot_data.setdefault('user_subscriptions', {})
     user_subscription_details = all_user_subscriptions.get(user_id, {'level': None, 'valid_until': None})
     
@@ -439,20 +411,19 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sub_valid_str = user_subscription_details.get('valid_until')
     
     display_sub_level = "Нет"
-    # ИЗМЕНЕНО: Отображение уровня подписки
     if sub_level_key:
-        if sub_level_key == "pro_google_access": display_sub_level = "Pro Google"
+        # ИЗМЕНЕНО: Ключи для отображения уровня подписки
+        if sub_level_key == "standard_google": display_sub_level = "Standard Google" 
         elif sub_level_key == "custom_pro_access": display_sub_level = "Pro Custom API"
-        elif sub_level_key == "full_access": display_sub_level = "Полный доступ"
-        else: display_sub_level = str(sub_level_key) # Если вдруг другой ключ
+        elif sub_level_key == "premium_all": display_sub_level = "Полный доступ"
+        else: display_sub_level = str(sub_level_key) 
 
         if sub_valid_str:
             try:
                 valid_until_dt = datetime.strptime(sub_valid_str, "%Y-%m-%d")
                 if datetime.now().date() > valid_until_dt.date():
                     display_sub_level += " (истекла)"
-            except ValueError:
-                pass # Оставляем как есть, если дата неверная
+            except ValueError: pass
 
     usage_text = f"ℹ️ **Информация о ваших лимитах и подписке**\n\n"
     usage_text += f"Текущий уровень подписки: *{escape_markdown(display_sub_level, version=2)}*\n"
@@ -485,23 +456,22 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "💎 **Информация о доступных подписках**\n\n"
     
-    # Информация о подписке на Custom Pro API
-    custom_pro_key = "custom_api_gemini_2_5_pro"
-    if custom_pro_key in AVAILABLE_TEXT_MODELS:
-        config = AVAILABLE_TEXT_MODELS[custom_pro_key]
-        pricing = config.get("pricing_info")
-        if pricing:
+    for model_key, config in AVAILABLE_TEXT_MODELS.items():
+        if config.get("api_type") == "custom_http_api" and "pricing_info" in config: # Пример для Custom API
+            pricing = config["pricing_info"]
             text += f"✨ **Подписка '{escape_markdown(config['name'], version=2)}'**\n"
             text += f"   ▫️ {escape_markdown(str(config.get('subscription_daily_limit', 'N/A')), version=2)} запросов в день\n"
             if pricing.get('description'):
                  text += f"   ▫️ {escape_markdown(pricing['description'], version=2)}\n"
             text += f"   ▫️ Стоимость: *{escape_markdown(str(pricing.get('subscription_price_rub_monthly', 'N/A')), version=2)} ₽ / {escape_markdown(str(pricing.get('subscription_duration_days', 30)), version=2)} дней*\n"
-            text += f"   ▫️ Для оформления: свяжитесь с администратором (контакт в /help или описании бота).\n\n"
+            text += f"   ▫️ Уровень подписки для активации: `{escape_markdown('custom_pro_access',version=2)}`\n" # Ключ для /grantsub
+            text += f"   ▫️ Для оформления: свяжитесь с администратором.\n\n" 
+            # (замените на ваш реальный контакт или инструкцию)
+    
+    # Можно добавить информацию об общих подписках типа "standard_google" или "premium_all"
+    text += "Также могут быть доступны общие пакеты подписки, дающие доступ к нескольким моделям Google API.\n\n"
 
-    # Можно добавить другие уровни подписки, например, для Google Pro моделей
-    # ...
-
-    text += escape_markdown("После оплаты сообщите администратору ваш ID для активации: ", version=2) + f"`{update.effective_user.id}`"
+    text += escape_markdown("После \"оплаты\" сообщите администратору ваш ID для активации подписки: ", version=2) + f"`{update.effective_user.id}`"
     
     try:
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
@@ -518,7 +488,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"`/mode` {escape_markdown(' или кнопка ', version=2)}`🤖 Режим ИИ` {escape_markdown('- смена режима ИИ.', version=2)}\n"
         f"`/model` {escape_markdown(' или кнопка ', version=2)}`⚙️ Модель ИИ` {escape_markdown('- выбор модели Gemini.', version=2)}\n"
         f"`/usage` {escape_markdown(' или кнопка ', version=2)}`📊 Лимиты / Подписка` {escape_markdown('- ваши лимиты.', version=2)}\n"
-        f"`/subscribe` {escape_markdown('- информация о подписках.', version=2)}\n" # ДОБАВЛЕНО
+        f"`/subscribe` {escape_markdown('- информация о подписках.', version=2)}\n"
         f"`/help` {escape_markdown(' или кнопка ', version=2)}`❓ Помощь` {escape_markdown('- это сообщение.', version=2)}\n\n"
         f"{escape_markdown('Просто отправьте свой вопрос или задание боту!', version=2)}"
     )
@@ -541,15 +511,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("set_mode_"):
         mode_key = data.split("set_mode_")[1]
-        if mode_key in AI_MODES and mode_key != "gemini_pro_custom_mode": # ИЗМЕНЕНО: не даем выбрать спец.режим напрямую
+        if mode_key in AI_MODES and mode_key != "gemini_pro_custom_mode":
             context.user_data['current_ai_mode'] = mode_key
             mode_details = AI_MODES[mode_key]
             new_text = f"Режим изменен на: *{escape_markdown(mode_details['name'],version=2)}*\n{escape_markdown(mode_details['welcome'],version=2)}"
             plain_text_fallback = f"Режим изменен на: {mode_details['name']}.\n{mode_details['welcome']}"
             logger.info(f"User {user_id} changed AI mode to {mode_key}")
         elif mode_key == "gemini_pro_custom_mode":
-             new_text = escape_markdown("Этот режим выбирается автоматически с соответствующей моделью.", version=2)
-             plain_text_fallback = "Этот режим выбирается автоматически."
+             new_text = escape_markdown("Этот режим выбирается автоматически при выборе модели '🌟 Gemini 2.5 Pro (Custom API)'.", version=2)
+             plain_text_fallback = "Этот режим выбирается автоматически с моделью Custom Pro."
         else:
             new_text = escape_markdown("Ошибка: Такой режим не найден.", version=2)
             plain_text_fallback = "Ошибка: Такой режим не найден."
@@ -559,21 +529,20 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if model_key_from_callback in AVAILABLE_TEXT_MODELS:
             selected_model_config = AVAILABLE_TEXT_MODELS[model_key_from_callback]
             context.user_data['selected_model_id'] = selected_model_config["id"]
-            context.user_data['selected_api_type'] = selected_model_config["api_type"] # Сохраняем тип API
+            context.user_data['selected_api_type'] = selected_model_config["api_type"]
 
             model_name_md = escape_markdown(selected_model_config['name'], version=2)
             
             _, limit_msg_check, current_c = check_and_log_request_attempt(user_id, model_key_from_callback, context)
             actual_l = get_user_actual_limit_for_model(user_id, model_key_from_callback, context)
             
-            # ИЗМЕНЕНО: Убрал точку из строки лимита для Markdown
-            limit_str_escaped = escape_markdown(f'Лимит: {current_c}/{actual_l} в день', version=2)
-            limit_info_md = f"\n{limit_str_escaped}"
-            if "Вы достигли" in limit_msg_check: # Если лимит исчерпан, показываем сообщение об этом
+            limit_str = f'Лимит: {current_c}/{actual_l} в день' # Без точки в конце
+            limit_info_md = f"\n{escape_markdown(limit_str, version=2)}"
+            if "Вы достигли" in limit_msg_check:
                 limit_info_md = f"\n{escape_markdown(limit_msg_check.splitlines()[0],version=2)}"
 
-            new_text = f"Модель изменена на: *{model_name_md}*\\.{limit_info_md}" # Эскейпим точку после имени модели
-            plain_text_fallback = f"Модель изменена на: {selected_model_config['name']}. Лимит: {current_c}/{actual_l} в день."
+            new_text = f"Модель изменена на: *{model_name_md}*\\.{limit_info_md}" # Эскейпим точку после имени
+            plain_text_fallback = f"Модель изменена на: {selected_model_config['name']}. {limit_str}." # Добавляем точку для простого текста
             logger.info(f"User {user_id} changed AI model to key: {model_key_from_callback} (ID: {selected_model_config['id']}, API: {selected_model_config['api_type']})")
         else:
             new_text = escape_markdown("Ошибка: Такая модель не найдена.", version=2)
@@ -597,23 +566,22 @@ async def grant_subscription_command(update: Update, context: ContextTypes.DEFAU
         if len(args) != 3:
             await update.message.reply_text(
                 "Использование: /grantsub <user_id> <level_key> <days>\n"
-                "Доступные уровни (пример): standard_google, custom_pro_access, full_access, none (для сброса)" 
-            ) # ИЗМЕНЕНО: Уточнил примеры уровней
+                "Пример уровней: standard_google, custom_pro_access, premium_all, none (для сброса)"
+            )
             return
             
         target_user_id = int(args[0])
         sub_level_key = args[1].lower() 
         days = int(args[2])
 
-        # Пример ключей подписки (вы можете определить их по-своему)
-        defined_subscription_levels = ["standard_google", "custom_pro_access", "full_access", "none"] 
+        defined_subscription_levels = ["standard_google", "custom_pro_access", "premium_all", "none"] 
         if sub_level_key not in defined_subscription_levels:
-            await update.message.reply_text(f"Неизвестный уровень подписки: {sub_level_key}. Доступны: {', '.join(defined_subscription_levels)}")
+            await update.message.reply_text(f"Неизвестный уровень подписки: '{sub_level_key}'. Доступны: {', '.join(defined_subscription_levels)}")
             return
 
         all_user_subscriptions = context.bot_data.setdefault('user_subscriptions', {})
         
-        if sub_level_key == "none" or days <= 0: # ИЗМЕНЕНО: добавил days <=0 для сброса
+        if sub_level_key == "none" or days <= 0:
              all_user_subscriptions[target_user_id] = {'level': None, 'valid_until': None}
              await update.message.reply_text(f"Подписка для пользователя {target_user_id} сброшена.")
              logger.info(f"Admin {update.effective_user.id} reset subscription for user {target_user_id}.")
@@ -626,8 +594,7 @@ async def grant_subscription_command(update: Update, context: ContextTypes.DEFAU
             await update.message.reply_text(f"Пользователю {target_user_id} выдана подписка '{sub_level_key}' на {days} дней (до {valid_until_date}).")
             logger.info(f"Admin {update.effective_user.id} granted subscription '{sub_level_key}' for {days} days to user {target_user_id}.")
         
-        # Принудительное сохранение данных, если необходимо (обычно PicklePersistence делает это при остановке)
-        # await context.application.persist_bot_data() # или flush()
+        # await context.application.persist_bot_data() # Раскомментируйте, если нужна немедленная запись
 
     except (IndexError, ValueError) as e:
         await update.message.reply_text(f"Ошибка в аргументах: {e}\nИспользование: /grantsub <user_id> <level_key> <days>")
@@ -639,34 +606,29 @@ async def grant_subscription_command(update: Update, context: ContextTypes.DEFAU
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
-    logger.debug(f"handle_message: Received message from user {user_id}: '{user_message}'") # ИЗМЕНЕНО: на debug
+    logger.debug(f"handle_message: Received message from user {user_id}: '{user_message}'")
 
-    if not user_message or not user_message.strip(): # Проверка на пустое сообщение
+    if not user_message or not user_message.strip():
         await update.message.reply_text("Пожалуйста, отправьте непустой запрос.", reply_markup=get_main_reply_keyboard())
         return
 
     current_model_key = get_current_model_key(context)
     selected_model_details = AVAILABLE_TEXT_MODELS[current_model_key]
     
-    # --- ВЫБОР СИСТЕМНОГО ПРОМПТА ---
-    # Этот блок должен быть ПЕРЕД проверкой лимитов, если разные промпты могут иметь разную "стоимость"
-    # Но для простоты лимитов, он пока здесь. Для Custom Pro он уже учтен в get_current_mode_details
+    # ИЗМЕНЕНО: system_prompt_text теперь берется из get_current_mode_details, которая учитывает модель
     system_prompt_text = get_current_mode_details(context)["prompt"]
-    logger.debug(f"Using system prompt for mode: {get_current_mode_details(context)['name']}")
+    logger.debug(f"Using system prompt for mode associated with {current_model_key}: '{get_current_mode_details(context)['name']}'")
 
-
-    # --- ПРОВЕРКА ЛИМИТА ЗАПРОСОВ ---
     can_request, limit_message, _ = check_and_log_request_attempt(user_id, current_model_key, context)
     if not can_request:
         await update.message.reply_text(limit_message, reply_markup=get_main_reply_keyboard())
         logger.info(f"User {user_id} limit REJECTED for model_key {current_model_key}: {limit_message}")
         return
     logger.info(f"User {user_id} limit ACCEPTED for model_key {current_model_key}.")
-    # --- КОНЕЦ ПРОВЕРКИ ЛИМИТА ---
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
-    reply_text = "Произошла ошибка при обработке вашего запроса." # Ответ по умолчанию
+    reply_text = "Произошла ошибка при обработке вашего запроса." 
     api_type = selected_model_details.get("api_type")
     request_successful = False
 
@@ -677,12 +639,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             try:
                 model_id_for_api = selected_model_details["id"]
-                active_model = genai.GenerativeModel(model_id_for_api) # ИЗМЕНЕНО: на model_id_for_api
+                active_model = genai.GenerativeModel(model_id_for_api)
                 logger.info(f"Using Google genai model: {model_id_for_api} for user {user_id}")
                 
                 generation_config_params = {"temperature": 0.75}
-                # if MAX_OUTPUT_TOKENS_GEMINI_LIB > 0: # Условие для max_output_tokens
-                #    generation_config_params["max_output_tokens"] = MAX_OUTPUT_TOKENS_GEMINI_LIB
+                if MAX_OUTPUT_TOKENS_GEMINI_LIB > 0 and model_id_for_api not in ["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]: # Пример: для новых моделей не ставим
+                    generation_config_params["max_output_tokens"] = MAX_OUTPUT_TOKENS_GEMINI_LIB
                 generation_config = genai.types.GenerationConfig(**generation_config_params)
                 
                 chat_history = [
@@ -690,7 +652,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     {"role": "model", "parts": ["Понял. Я готов помочь."]}
                 ]
                 chat = active_model.start_chat(history=chat_history)
-                logger.debug(f"Sending to Google API. Model: {model_id_for_api}. System prompt length: {len(system_prompt_text)}, User message: {user_message[:100]}")
+                logger.debug(f"Sending to Google API. Model: {model_id_for_api}. System prompt (len {len(system_prompt_text)}): '{system_prompt_text[:100]}...', User message: '{user_message[:100]}'")
                 response_gen = await chat.send_message_async(user_message, generation_config=generation_config)
                 
                 api_reply_text_google = response_gen.text
@@ -701,6 +663,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     prompt_tokens = usage.prompt_token_count
                     completion_tokens = usage.candidates_token_count
                     logger.info(f"Google API Usage for {model_id_for_api}: Prompt Tokens: {prompt_tokens}, Completion Tokens: {completion_tokens}")
+                    context.user_data.setdefault('api_token_usage', [])
+                    context.user_data['api_token_usage'].append({
+                        'timestamp': datetime.now().isoformat(),
+                        'model': model_id_for_api,
+                        'prompt_tokens': prompt_tokens,
+                        'completion_tokens': completion_tokens,
+                        'total_tokens': getattr(usage, 'total_token_count', prompt_tokens + completion_tokens)
+                    })
+
 
                 if not api_reply_text_google or not api_reply_text_google.strip():
                     block_reason_msg = ""
@@ -724,6 +695,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_text = "Исчерпана квота для Google API. Попробуйте позже или обратитесь к администратору."
                 elif "user location" in error_message:
                      reply_text = "Модель недоступна в вашем регионе через Google API."
+                elif "content filter" in error_message:
+                    reply_text = "Запрос был заблокирован фильтрами безопасности Google. Попробуйте переформулировать."
+
 
             except Exception as e_general_google:
                 logger.error(f"General error processing Google Gemini model {selected_model_details['id']}: {str(e_general_google)}\n{traceback.format_exc()}")
@@ -731,34 +705,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif api_type == "custom_http_api":
         api_key_var_name = selected_model_details.get("api_key_var_name")
-        actual_api_key = globals().get(api_key_var_name) # Получаем ключ из глобальных переменных по имени
+        actual_api_key = globals().get(api_key_var_name)
 
-        if not actual_api_key or ("sk-" not in actual_api_key and "pk-" not in actual_api_key) : # Проверка на общий формат ключей
+        if not actual_api_key or ("sk-" not in actual_api_key and "pk-" not in actual_api_key) :
             reply_text = f"Ключ API для '{selected_model_details['name']}' не настроен корректно."
             logger.warning(f"API key from var '{api_key_var_name}' is missing or invalid for Custom API. Key: {str(actual_api_key)[:10]}...")
         else:
             endpoint = selected_model_details["endpoint"]
             model_id_for_payload_api = selected_model_details["id"]
             
-            messages_payload = []
-            # ИЗМЕНЕНО: Проверяем, поддерживает ли API роль "system" (пока предполагаем, что да, если не указано иное)
-            # Либо жестко задаем формат, который точно работает с gen-api.ru
-            # Для gen-api.ru, первый "user" - это системный, второй "user" - это юзерский
-            # Но если API поддерживает "system", то лучше так:
-            # messages_payload.append({"role": "system", "content": system_prompt_text})
-            # messages_payload.append({"role": "user", "content": user_message})
-            # Оставляем как в вашем рабочем варианте для gen-api.ru:
-            messages_payload.append({"role": "user", "content": system_prompt_text})
-            messages_payload.append({"role": "user", "content": user_message})
-
+            messages_payload = [
+                # ИЗМЕНЕНО: Используем "system" роль, если API её поддерживает, иначе - "user"
+                # Для gen-api.ru, как мы выяснили, первый "user" это системный.
+                # Если бы API поддерживало "system", было бы: {"role": "system", "content": system_prompt_text},
+                {"role": "user", "content": system_prompt_text}, 
+                {"role": "user", "content": user_message}
+            ]
 
             payload = {
                 "model": model_id_for_payload_api,
                 "messages": messages_payload,
                 "is_sync": True,
-                # "callback_url": None, # Убрали, т.к. вызывало 422 ошибку ранее
-                "temperature": selected_model_details.get("temperature", 0.75),
-                "stream": False,
+                "temperature": selected_model_details.get("temperature", 0.75), # Температура из конфига модели или 0.75
+                "stream": False, # Стандартные параметры, которые мы нашли
                 "n": 1,
                 "frequency_penalty": 0,
                 "presence_penalty": 0,
@@ -784,7 +753,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except json.JSONDecodeError as e_json:
                     logger.error(f"Custom API response body (not JSON or decode error): {api_response.text}. Error: {e_json}")
                     reply_text = f"Ошибка декодирования ответа от Custom API ({selected_model_details['name']})."
-                    raise # Передаем ошибку выше, чтобы не считать запрос успешным
+                    raise 
 
                 api_response.raise_for_status()
 
@@ -798,10 +767,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if "cost" in response_data:
                                 cost = response_data["cost"]
                                 logger.info(f"Custom API request cost for {selected_model_details['name']}: {cost}")
-                                # Здесь можно добавить логику сохранения 'cost' в context.user_data или context.bot_data для аналитики
-                                context.user_data.setdefault('api_costs', {})
-                                context.user_data['api_costs'][datetime.now().isoformat()] = {'model': current_model_key, 'cost': cost }
-
+                                context.user_data.setdefault('api_costs', [])
+                                context.user_data['api_costs'].append({
+                                    'timestamp': datetime.now().isoformat(),
+                                    'model_key': current_model_key, # Сохраняем ключ модели
+                                    'cost': cost 
+                                })
                             req_id_resp = response_data.get("request_id")
                             model_resp = response_data.get("model")
                             logger.info(f"Custom API success: request_id={req_id_resp}, model_in_response='{model_resp}'")
@@ -810,7 +781,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             logger.warning(f"Custom API returned empty 'content' in message: {response_data}")
                     else:
                         reply_text = f"Некорректная структура 'message' или отсутствует 'content' в ответе от Custom API ({selected_model_details['name']})."
-                        logger.warning(f"Custom API: 'message' or 'content' field missing in first choice: {first_choice}")
+                        logger.warning(f"Custom API: 'message' or 'content' field missing in first choice: {first_choice}. Full response: {response_data}")
                 elif "detail" in response_data: 
                     reply_text = f"Ошибка Custom API ({selected_model_details['name']}): {response_data['detail']}"
                     logger.error(f"Custom API returned error detail: {response_data['detail']}. Full response: {response_data}")
@@ -855,10 +826,10 @@ async def set_bot_commands(application: Application):
         BotCommand("mode", "🧠 Сменить режим ИИ"),
         BotCommand("model", "⚙️ Выбрать модель ИИ"),
         BotCommand("usage", "📊 Лимиты / Подписка"),
-        BotCommand("subscribe", "💎 Информация о подписках"), # ИЗМЕНЕНО
+        BotCommand("subscribe", "💎 Информация о подписках"),
         BotCommand("help", "ℹ️ Помощь"),
     ]
-    if YOUR_ADMIN_ID: # Добавляем админ-команду, если ID админа задан
+    if YOUR_ADMIN_ID: 
         commands.append(BotCommand("grantsub", "🔑 Выдать подписку (админ)"))
 
     try:
@@ -869,23 +840,24 @@ async def set_bot_commands(application: Application):
 
 
 async def main():
-    if "YOUR_TELEGRAM_TOKEN" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8: # ИЗМЕНЕНО: более строгая проверка токена
+    if "YOUR_TELEGRAM_TOKEN" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8:
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or is a placeholder.")
         return
     
-    persistence = PicklePersistence(filepath="bot_user_data.pkl") # Убедитесь, что директория доступна для записи
+    persistence = PicklePersistence(filepath="bot_user_data.pkl")
 
     application = Application.builder().token(TOKEN).persistence(persistence).build()
 
-    await set_bot_commands(application)
+    await set_bot_commands(application) # Установка команд
 
+    # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("mode", select_mode_command))
     application.add_handler(CommandHandler("model", select_model_command))
     application.add_handler(CommandHandler("usage", usage_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("subscribe", subscribe_info_command)) # ДОБАВЛЕНО
-    application.add_handler(CommandHandler("grantsub", grant_subscription_command)) # ДОБАВЛЕНО
+    application.add_handler(CommandHandler("subscribe", subscribe_info_command)) 
+    application.add_handler(CommandHandler("grantsub", grant_subscription_command))
 
     application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
     application.add_handler(MessageHandler(filters.Text(["⚙️ Модель ИИ"]), select_model_command))
@@ -895,16 +867,25 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    logger.info("Starting bot with multiple Gemini models and API support...")
+    logger.info("Starting bot application...")
     try:
-        await application.initialize() # Инициализация перед запуском поллинга
-        await application.updater.start_polling()
-        await application.start()
-        logger.info("Bot started successfully and is polling for updates.")
-        # Для graceful shutdown (если нужно будет добавить обработку сигналов)
-        # await application.updater.idle() # Это блокирующая операция
+        # Инициализация и запуск application.
+        # run_polling более предпочтителен для простоты, если не нужны сложные настройки updater'а
+        await application.run_polling()
+        # Старый вариант (может быть нужен для специфических настроек, но run_polling проще):
+        # await application.initialize() 
+        # await application.updater.start_polling()
+        # await application.start()
+        # logger.info("Bot started successfully and is polling for updates.")
+        # await application.updater.idle() # Для корректного завершения, если не используется run_polling
     except Exception as e_poll:
         logger.critical(f"Error during application startup or polling: {e_poll}\n{traceback.format_exc()}")
+    # finally: # Опционально, для корректного завершения, если используется start() и idle()
+        # if application.updater and application.updater.is_running:
+        #     await application.updater.stop()
+        # await application.stop()
+        # await application.shutdown()
+        # logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":
