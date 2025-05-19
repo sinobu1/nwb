@@ -293,7 +293,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message_to_edit.edit_text(text=plain_text_fallback, reply_markup=message_to_edit.reply_markup)
 
 # --- НОВЫЙ ОБРАБОТЧИК ДЛЯ /imagine ---
+
 async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"IMAGINE_COMMAND_HANDLER TRIGGERED for user {update.effective_user.id if update.effective_user else 'Unknown'} with args: {context.args}")
     if not context.args:
         await update.message.reply_text(
             "🎨 Чтобы сгенерировать изображение, введите описание после команды.\n"
@@ -389,6 +391,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.info(f"HANDLE_MESSAGE_HANDLER TRIGGERED for user {update.effective_user.id if update.effective_user else 'Unknown'} with text: '{update.message.text}'")
     user_message = update.message.text
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
     logger.info(f"Received message from {user_id}: '{user_message}'")
