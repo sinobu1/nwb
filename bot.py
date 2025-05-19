@@ -145,21 +145,34 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
     context.user_data.setdefault('selected_model_id', DEFAULT_MODEL_ID)
-    current_mode = get_current_mode_details(context)
-    current_model_name = get_current_model_display_name(context)
-    await update.message.reply_text(
-        f"Привет! Я многофункциональный ИИ-бот.\n\n"
-        f"Текущий режим: *{current_mode['name']}*\n"
-        f"Текущая модель: *{current_model_name}*\n\n"
+    
+    current_mode_details = get_current_mode_details(context)
+    current_model_display_name_text = get_current_model_display_name(context)
+
+    # Экранируем части, которые могут содержать спецсимволы, но не являются частью Markdown разметки от нас
+    escaped_mode_name = escape_markdown(current_mode_details['name'], version=2)
+    escaped_model_name = escape_markdown(current_model_display_name_text, version=2)
+
+    # Собираем текст, экранируя литералы, но сохраняя Markdown для выделения
+    # \!, \. - это экранированные символы для MarkdownV2
+    text_to_send = (
+        f"Привет\\! Я многофункциональный ИИ-бот\\.\n\n"
+        f"Текущий режим: *{escaped_mode_name}*\n"
+        f"Текущая модель: *{escaped_model_name}*\n\n"
         "Вы можете:\n"
-        "▫️ Задавать мне вопросы или давать задания.\n"
+        "▫️ Задавать мне вопросы или давать задания\\.\n" 
         "▫️ Сменить режим работы: /mode\n"
         "▫️ Выбрать другую модель ИИ: /model\n\n"
-        "Просто напишите ваш запрос!",
-        parse_mode=ParseMode.MARKDOWN_V2 # Используем MarkdownV2
+        "Просто напишите ваш запрос\\!" 
     )
+    await update.message.reply_text(text_to_send, parse_mode=ParseMode.MARKDOWN_V2)
+    logger.info(f"Start command processed for user {update.message.from_user.id}")
+
 
 async def select_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Имена режимов в кнопках (details["name"]) УЖЕ содержат эмодзи, которые не надо экранировать для отображения
+    # Но если бы они содержали Markdown символы, которые мы ХОТИМ отобразить как Markdown, пришлось бы сложнее.
+    # Здесь мы просто отображаем текст "как есть" в кнопке.
     keyboard = [[InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")] for key, details in AI_MODES.items()]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите режим работы для ИИ:', reply_markup=reply_markup)
@@ -173,24 +186,46 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+
     if data.startswith("set_mode_"):
         mode_key = data.split("set_mode_")[1]
         if mode_key in AI_MODES:
             context.user_data['current_ai_mode'] = mode_key
             mode_details = AI_MODES[mode_key]
+            
+            # Экранируем динамические части текста перед вставкой в Markdown строку
+            escaped_mode_name = escape_markdown(mode_details['name'], version=2)
+            escaped_welcome_message = escape_markdown(mode_details['welcome'], version=2)
+            
+            text_to_send = f"Режим изменен на: *{escaped_mode_name}*\\.\n{escaped_welcome_message}"
             await query.edit_message_text(
-                text=f"Режим изменен на: *{mode_details['name']}*\n{telegram.helpers.escape_markdown(mode_details['welcome'], version=2)}", # Экранируем Markdown в welcome сообщении
+                text=text_to_send,
                 parse_mode=ParseMode.MARKDOWN_V2
             )
+            logger.info(f"User {query.from_user.id} changed AI mode to {mode_key}")
+        else:
+            await query.edit_message_text(text="Ошибка: Такой режим не найден\\.") # Тоже экранируем точку
+
     elif data.startswith("set_model_"):
         model_key_in_dict = data.split("set_model_")[1]
         if model_key_in_dict in AVAILABLE_TEXT_MODELS:
             selected_model_info = AVAILABLE_TEXT_MODELS[model_key_in_dict]
             context.user_data['selected_model_id'] = selected_model_info["id"]
+            
+            escaped_model_name = escape_markdown(selected_model_info['name'], version=2)
+            text_to_send = f"Модель изменена на: *{escaped_model_name}*\\." # Экранируем точку
+            
             await query.edit_message_text(
-                text=f"Модель изменена на: *{selected_model_info['name']}*",
+                text=text_to_send,
                 parse_mode=ParseMode.MARKDOWN_V2
             )
+            logger.info(f"User {query.from_user.id} changed AI model to {selected_model_info['id']}")
+        else:
+            await query.edit_message_text(text="Ошибка: Такая модель не найдена\\.") # Экранируем точку
+
+# --- handle_message остается таким же, как в предыдущем варианте ---
+# (с умной обрезкой и попыткой отправки MarkdownV2, а затем plain text)
+# ... (остальной код функции handle_message) ...
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
@@ -201,17 +236,37 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     system_prompt = current_mode_details["prompt"]
     selected_model_id = get_current_model_id(context)
 
+    # Пример: если нужно обработать команду /help или подобное статически
+    if user_message.lower() == "/help":
+        help_text = (
+            "Это бот для взаимодействия с ИИ Gemini\\.\n\n"
+            "Доступные команды:\n"
+            "`/start` \\- начало работы, информация о текущих настройках\n"
+            "`/mode` \\- выбрать режим работы ИИ\n"
+            "`/model` \\- выбрать модель ИИ\n\n"
+            "Просто напишите ваш вопрос или задание после выбора режима и модели\\."
+        )
+        await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2)
+        return
+
     if context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY) == "universal_ai":
-        # ... (логика для Яндекс.Карт и статических ответов, если нужна)
-        pass # Убрал для краткости, можно вернуть или доработать
+        # Убрана логика Яндекс.Карт и статических ответов для краткости,
+        # но ее можно вернуть, если нужно, и также адаптировать под Markdown
+        pass
 
     if "расскажи шутку" in user_message.lower():
-        # ... (код для шутки)
-        response_text = "Почему компьютеры не любят ходить на пляж? Боятся, что у них сядет *батарейка* или попадет *песок* в порты! 😄"
+        # Для примера, если шутка содержит Markdown символы
+        response_text = "Почему компьютеры не любят ходить на пляж? Боятся, что у них сядет *батарейка* или попадет *песок* в порты\\! 😄"
+        # Обратите внимание на экранированный '!' в конце шутки
         try:
             await update.message.reply_text(response_text, parse_mode=ParseMode.MARKDOWN_V2)
         except telegram.error.BadRequest:
-            await update.message.reply_text(telegram.helpers.escape_markdown(response_text, version=2)) # Отправляем как обычный текст, если Markdown не удался
+            # Если Markdown не удался, отправляем текст как есть (но без Markdown символов, которые могли вызвать ошибку)
+            # Лучше всего использовать escape_markdown для всего текста, если он не должен содержать разметку
+            safe_text = escape_markdown(response_text, version=2) # Это удалит наши * и \!
+            # Поэтому для таких случаев, где мы сами контролируем Markdown, лучше иметь plain-text версию
+            plain_joke = "Почему компьютеры не любят ходить на пляж? Боятся, что у них сядет батарейка или попадет песок в порты! 😄"
+            await update.message.reply_text(plain_joke)
         return
 
     try:
@@ -222,15 +277,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             max_output_tokens=MAX_OUTPUT_TOKENS_GEMINI,
             temperature=0.75
         )
+        # Приветственное сообщение для истории чата НЕ ДОЛЖНО содержать Markdown, который сломает API Gemini.
+        # Оно для модели, а не для пользователя. Поэтому убираем escape_markdown отсюда.
+        # Если welcome сообщение из AI_MODES содержит Markdown, его нужно очистить или использовать версию без Markdown.
+        # Для простоты, пусть welcome для модели будет простым.
+        model_welcome_text = "Я готов помочь." # Простой текст для истории модели
+        # Или если хотите использовать из AI_MODES, но без Markdown:
+        # model_welcome_text = AI_MODES[context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)]['welcome'].split('\n')[0] # Берем первую строку как пример
+
         chat_history = [
             {"role": "user", "parts": [system_prompt]},
-            {"role": "model", "parts": [telegram.helpers.escape_markdown(current_mode_details.get("welcome", "Хорошо, я готов."), version=2)]} # Экранируем Markdown в "welcome" для истории
+            {"role": "model", "parts": [model_welcome_text]} 
         ]
         chat = active_gemini_model.start_chat(history=chat_history)
         response_gen = await chat.send_message_async(user_message, generation_config=generation_config)
 
-        logger.debug(f"Raw Gemini response object: {response_gen}")
-        # ... (детальное логирование ответа Gemini, если нужно для отладки)
+        # logger.debug(f"Raw Gemini response object: {response_gen}")
+        # ... (детальное логирование, если нужно)
 
         reply_text = response_gen.text
         
@@ -238,33 +301,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"Gemini returned empty text. Model: {selected_model_id}, User msg: '{user_message}'. Finish_reason: {response_gen.candidates[0].finish_reason if response_gen.candidates else 'N/A'}")
             reply_text = "ИИ не смог сформировать ответ или он был отфильтрован. Попробуйте переформулировать запрос."
         
-        # --- ПРИМЕНЕНИЕ УМНОЙ ОБРЕЗКИ ---
-        reply_text, was_truncated = smart_truncate(reply_text, MAX_MESSAGE_LENGTH_TELEGRAM)
+        reply_text_for_sending, was_truncated = smart_truncate(reply_text, MAX_MESSAGE_LENGTH_TELEGRAM)
         if was_truncated:
-            logger.info(f"Gemini response was smartly truncated. Original length: {len(response_gen.text)}, Truncated length: {len(reply_text)}")
+            logger.info(f"Gemini response was smartly truncated. Original length: {len(reply_text)}, Truncated length: {len(reply_text_for_sending)}")
 
-        # --- ОТПРАВКА С MARKDOWN ---
         try:
-            await update.message.reply_text(reply_text, parse_mode=ParseMode.MARKDOWN_V2)
-            logger.info(f"Sent Gemini response with MarkdownV2 (model: {selected_model_id}, length: {len(reply_text)})")
+            await update.message.reply_text(reply_text_for_sending, parse_mode=ParseMode.MARKDOWN_V2)
+            logger.info(f"Sent Gemini response with MarkdownV2 (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
         except telegram.error.BadRequest as e_markdown:
-            logger.warning(f"Failed to send message with MarkdownV2: {e_markdown}. Sending as plain text.")
-            # Попытка отправить как обычный текст, предварительно экранировав потенциально "опасные" для Markdown символы,
-            # которые могли быть сгенерированы моделью, но неверно интерпретированы Telegram.
-            # Или просто отправить reply_text без parse_mode, если модель НЕ должна была генерировать Markdown.
-            # Если модель ДОЛЖНА генерировать Markdown, то экранирование убьет его.
-            # Лучше отправить исходный reply_text без parse_mode.
-            plain_text_reply = response_gen.text # Берем исходный текст от Gemini
-            plain_text_reply, _ = smart_truncate(plain_text_reply, MAX_MESSAGE_LENGTH_TELEGRAM) # Обрезаем его тоже
-            await update.message.reply_text(plain_text_reply) # Отправляем без parse_mode
-            logger.info(f"Sent Gemini response as plain text after Markdown failure (model: {selected_model_id}, length: {len(plain_text_reply)})")
+            logger.warning(f"Failed to send message with MarkdownV2: {e_markdown}. Sending as plain text. Reply was: {reply_text_for_sending}")
+            # Если модель должна была генерировать Markdown, но он оказался невалидным,
+            # то отправка reply_text_for_sending без parse_mode покажет пользователю "сырой" Markdown.
+            # Это может быть полезно для отладки промпта модели.
+            await update.message.reply_text(reply_text_for_sending)
+            logger.info(f"Sent Gemini response as plain text after Markdown failure (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
 
     except Exception as e:
         logger.error(f"Error during Gemini interaction or message handling: {str(e)}\n{traceback.format_exc()}")
+        # Экранируем имя модели на случай, если оно содержит Markdown-опасные символы
+        escaped_display_name = escape_markdown(get_current_model_display_name(context), version=2)
         await update.message.reply_text(
-            f"К сожалению, произошла ошибка при обработке вашего запроса с моделью {get_current_model_display_name(context)}. Пожалуйста, попробуйте позже или смените модель/режим."
+            f"К сожалению, произошла ошибка при обработке вашего запроса с моделью {escaped_display_name}\\. Пожалуйста, попробуйте позже или смените модель/режим\\.",
+            parse_mode=ParseMode.MARKDOWN_V2
         )
 
+# ... (main и if __name__ == "__main__": остаются такими же) ...
 async def main():
     if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN: # etc.
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set or uses a placeholder.")
@@ -280,7 +341,7 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    logger.info("Starting bot with enhanced formatting and truncation...")
+    logger.info("Starting bot with enhanced formatting, truncation, and Markdown V2 escaping...")
     await application.run_polling()
 
 if __name__ == "__main__":
