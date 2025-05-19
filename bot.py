@@ -145,29 +145,60 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY) # Пока можно закомментировать для теста
-    # context.user_data.setdefault('selected_model_id', DEFAULT_MODEL_ID)
-    # current_mode_details = get_current_mode_details(context)
-    # current_model_display_name_text = get_current_model_display_name(context)
-    # escaped_mode_name = escape_markdown(current_mode_details['name'], version=2)
-    # escaped_model_name = escape_markdown(current_model_display_name_text, version=2)
-
-    # ---- НАЧАЛО ВРЕМЕННОГО ТЕСТА ----
-    test_text = "Это *тестовое* сообщение с _MarkdownV2_\\! Всё должно работать\\."
-    try:
-        await update.message.reply_text(test_text, parse_mode=ParseMode.MARKDOWN_V2)
-        logger.info("Simple MarkdownV2 test message sent successfully.")
-    except Exception as e:
-        logger.error(f"Error sending simple MarkdownV2 test message: {e}\n{traceback.format_exc()}")
-    # ---- КОНЕЦ ВРЕМЕННОГО ТЕСТА ----
+    context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    context.user_data.setdefault('selected_model_id', DEFAULT_MODEL_ID)
     
-    # Закомментируйте или удалите оригинальный код отправки на время теста:
-    # text_to_send = (
-    #     f"Привет\\! Я многофункциональный ИИ-бот\\.\n\n"
-    #     # ... и так далее ...
-    # )
-    # await update.message.reply_text(text_to_send, parse_mode=ParseMode.MARKDOWN_V2)
-    # logger.info(f"Start command processed for user {update.message.from_user.id}")
+    current_mode_details = get_current_mode_details(context)
+    current_model_display_name_text = get_current_model_display_name(context)
+
+    # Экранируем ВСЕ части, которые будут вставлены в f-string, КРОМЕ самих Markdown символов типа '*'
+    greeting = escape_markdown("Привет! Я многофункциональный ИИ-бот.", version=2)
+    
+    # Для частей, которые мы хотим сделать жирными, сначала экранируем их содержимое, ПОТОМ обрамляем звездочками
+    mode_name_content = escape_markdown(current_mode_details['name'], version=2)
+    mode_line = f"{escape_markdown('Текущий режим: ', version=2)}*{mode_name_content}*"
+
+    model_name_content = escape_markdown(current_model_display_name_text, version=2)
+    model_line = f"{escape_markdown('Текущая модель: ', version=2)}*{model_name_content}*"
+
+    you_can = escape_markdown("Вы можете:", version=2)
+    # Для строк списка, если они не содержат Markdown который мы хотим применить, экранируем целиком
+    # Символ ▫️ не является спецсимволом Markdown. Команды /mode /model тоже не являются активной разметкой здесь.
+    action1 = escape_markdown("▫️ Задавать мне вопросы или давать задания.", version=2)
+    # Оставляем команды как есть, escape_markdown превратит / в \/ , что не всегда желательно для отображения команд
+    action2 = "▫️ Сменить режим работы: /mode" 
+    action3 = "▫️ Выбрать другую модель ИИ: /model" 
+    invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
+
+    text_to_send = (
+        f"{greeting}\n\n"
+        f"{mode_line}\n"
+        f"{model_line}\n\n"
+        f"{you_can}\n"
+        f"{action1}\n"
+        f"{action2}\n"
+        f"{action3}\n\n"
+        f"{invitation}"
+    )
+    
+    try:
+        await update.message.reply_text(text_to_send, parse_mode=ParseMode.MARKDOWN_V2)
+        logger.info(f"Start command processed for user {update.message.from_user.id} with new escaping.")
+    except telegram.error.BadRequest as e:
+        logger.error(f"Error sending /start message with MarkdownV2: {e}\nText was: {text_to_send}\n{traceback.format_exc()}")
+        # Отправляем как обычный текст в случае ошибки Markdown
+        plain_text_version = ( # Создаем версию без Markdown символов форматирования
+            f"Привет! Я многофункциональный ИИ-бот.\n\n"
+            f"Текущий режим: {current_mode_details['name']}\n"
+            f"Текущая модель: {current_model_display_name_text}\n\n"
+            "Вы можете:\n"
+            "▫️ Задавать мне вопросы или давать задания.\n"
+            "▫️ Сменить режим работы: /mode\n"
+            "▫️ Выбрать другую модель ИИ: /model\n\n"
+            "Просто напишите ваш запрос!"
+        )
+        await update.message.reply_text(plain_text_version)
+        logger.info("Sent /start message as plain text after MarkdownV2 failure.")
 
 
 async def select_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
