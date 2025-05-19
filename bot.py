@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 # Telegram Bot Token from BotFather
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
 # Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI ")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
 # Yandex Maps API Key
 YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY")
 
 # Initialize Gemini client
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+    gemini_model = genai.GenerativeModel("gemini-2.0-flash")
     logger.info("Gemini client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Gemini client: {str(e)}")
@@ -30,13 +30,24 @@ except Exception as e:
 async def start(update, context):
     try:
         await update.message.reply_text(
-            "Привет! Я NeuroPal — умный бот для Москвы. Задавай вопросы, проси советы или развлечения! 😄\n"
-            "Пример: 'Где поесть на Таганке?' или 'Расскажи шутку'."
+            "Привет! Я NeuroPal — умный бот для Москвы на Gemini 2.0. Задавай вопросы, проси советы или развлечения! 😄\n"
+            "Пример: 'Где поесть на Таганке?' или 'Расскажи шутку'. Хочешь больше? Попробуй /premium!"
         )
         logger.info(f"Start command received from {update.message.from_user.id}")
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
         await update.message.reply_text("Произошла ошибка. Попробуй снова.")
+
+# Premium command
+async def premium(update, context):
+    try:
+        await update.message.reply_text(
+            "Премиум за 150 ₽/мес.: больше функций, быстрые ответы! Оплати: [ЮKassa URL]"
+        )
+        logger.info(f"Premium command received from {update.message.from_user.id}")
+    except Exception as e:
+        logger.error(f"Error in premium command: {str(e)}")
+        await update.message.reply_text("Ошибка. Попробуй снова.")
 
 # Handle text messages
 async def handle_message(update, context):
@@ -56,6 +67,16 @@ async def handle_message(update, context):
         return
     elif "что поесть" in user_message.lower():
         response = "Зависит от настроения! Хочешь быстро — бери шаурму в ларьке (150–200 ₽). Для уюта — 'Кофемания' на Тверской, чек 1000 ₽."
+        await update.message.reply_text(response)
+        logger.info(f"Sent static response: {response}")
+        return
+    elif "что делать в москве вечером" in user_message.lower():
+        response = "Прогуляйся по Красной площади или загляни в бар 'Time Out' на Тверской — коктейли от 500 ₽!"
+        await update.message.reply_text(response)
+        logger.info(f"Sent static response: {response}")
+        return
+    elif "где выпить в москве" in user_message.lower():
+        response = "Зайди в 'Noor Bar' на Тверской — коктейли от 600 ₽, крутая атмосфера!"
         await update.message.reply_text(response)
         logger.info(f"Sent static response: {response}")
         return
@@ -106,6 +127,7 @@ async def main():
     try:
         application = Application.builder().token(TOKEN).build()
         application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("premium", premium))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         logger.info("Starting bot...")
         await application.run_polling()
