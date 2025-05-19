@@ -3,7 +3,7 @@ from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup, Update,
     ReplyKeyboardMarkup, KeyboardButton, BotCommand # Добавлены импорты
 )
-from telegram.constants import ParseMode
+from telegram.constants import ParseMode, ChatAction # Добавили ChatAction
 from telegram.helpers import escape_markdown
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters, 
@@ -292,6 +292,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Статические ответы (если нужны)
     # ...
+    
+# --- НАЧАЛО: Отправка действия "печатает..." ---
+        try:
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id,
+                action=ChatAction.TYPING  # Используем импортированный ChatAction
+            )
+            logger.debug(f"Sent 'typing' action to chat {update.effective_chat.id}")
+        except Exception as e_typing:
+            # Если не удалось отправить действие, не страшно, просто логируем
+            logger.warning(f"Could not send 'typing' action: {e_typing}")
+        # --- КОНЕЦ: Отправка действия "печатает..." ---
 
     try:
         active_gemini_model = genai.GenerativeModel(selected_model_id)
