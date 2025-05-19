@@ -340,16 +340,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if was_truncated:
             logger.info(f"Gemini response was smartly truncated. Original length: {len(reply_text)}, Truncated length: {len(reply_text_for_sending)}")
 
-        try:
-            await update.message.reply_text(reply_text_for_sending, parse_mode=ParseMode.MARKDOWN_V2)
-            logger.info(f"Sent Gemini response with MarkdownV2 (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
-        except telegram.error.BadRequest as e_markdown:
-            logger.warning(f"Failed to send message with MarkdownV2: {e_markdown}. Sending as plain text. Reply was: {reply_text_for_sending}")
-            # Если модель должна была генерировать Markdown, но он оказался невалидным,
-            # то отправка reply_text_for_sending без parse_mode покажет пользователю "сырой" Markdown.
-            # Это может быть полезно для отладки промпта модели.
-            await update.message.reply_text(reply_text_for_sending)
-            logger.info(f"Sent Gemini response as plain text after Markdown failure (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
+        # --- ОТПРАВКА ОТВЕТА ИИ КАК ПРОСТОГО ТЕКСТА ---
+        await update.message.reply_text(reply_text_for_sending) # Отправляем без parse_mode
+        logger.info(f"Sent Gemini response as plain text (model: {selected_model_id}, length: {len(reply_text_for_sending)})")
 
     except Exception as e:
         logger.error(f"Error during Gemini interaction or message handling: {str(e)}\n{traceback.format_exc()}")
