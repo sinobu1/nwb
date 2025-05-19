@@ -569,37 +569,64 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif api_type == "custom_http_api":
         api_key_var_name = selected_model_details.get("api_key_var_name")
-        actual_api_key = globals().get(api_key_var_name) # Получаем значение ключа по имени переменной
+        actual_api_key = globals().get(api_key_var_name)
 
-        if not actual_api_key or "sk-" not in actual_api_key: # Простая проверка формата "sk-"
+        if not actual_api_key or "sk-" not in actual_api_key:
             reply_text = f"Ключ API для '{selected_model_details['name']}' не настроен корректно."
             logger.warning(f"API key from var '{api_key_var_name}' is missing or invalid for Custom API.")
         else:
             endpoint = selected_model_details["endpoint"]
-            model_id_for_payload = selected_model_details["id"]
+            # ID модели для передачи в JSON payload (например, "gemini-2.5-pro-preview-03-25")
+            # Это значение берется из поля "id" в конфигурации этой модели в AVAILABLE_TEXT_MODELS
+            model_id_for_payload_api = selected_model_details["id"]
 
             messages_payload = [
-                {"role": "user", "content": system_prompt_text},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": system_prompt_text}, # Системный промпт
+                {"role": "user", "content": user_message}      # Запрос пользователя
             ]
+
             payload = {
-                "model": model_id_for_payload,
+                # Используем ID из конфигурации модели, который должен быть точным именем для API
+                "model": model_id_for_payload_api,
                 "messages": messages_payload,
-                "is_sync": True,
-                "temperature": 0.75
+                "is_sync": True, # Для синхронного ответа
+                "callback_url": None, # Добавим на всякий случай, как в примере документации
+                "temperature": selected_model_details.get("temperature", 0.75), # Можно сделать температуру настраиваемой
+                "stream": False, # Явно указываем, так как есть в документации
+                # Другие параметры можно добавить из документации gen-api.ru, если нужно:
+                # "n": 1,
+                # "frequency_penalty": 0,
+                # "presence_penalty": 0,
+                # "top_p": 1,
+                # "response_format": "{\"type\":\"text\"}" # Если API требует это в строковом виде
             }
+            # Убедимся, что response_format, если используется, передается как объект, если API ожидает объект,
+            # или как строка, если API ожидает строку (в документации gen-api.ru он указан как "array_or_string",
+            # а в примере JSON он строка: "{\"type\":\"text\"}" )
+            # Если API ожидает строку для response_format:
+            # payload["response_format"] = json.dumps({"type":"text"})
+            # Если объект:
+            # payload["response_format"] = {"type":"text"}
+            # Пока не будем добавлять response_format, чтобы не усложнять, если он не обязателен.
+
             headers = {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'Authorization': f'Bearer {actual_api_key}'
             }
-            logger.info(f"Sending request to Custom HTTP API. Endpoint: {endpoint}, Model: {model_id_for_payload}")
+            logger.info(f"Sending request to Custom HTTP API. Endpoint: {endpoint}, Payload: {json.dumps(payload, ensure_ascii=False)}") # Логируем payload
 
             try:
                 api_response = requests.post(endpoint, json=payload, headers=headers, timeout=90)
-                api_response.raise_for_status()
+                # Логируем статус и тело ответа ДО raise_for_status, чтобы увидеть детали ошибки 422
+                logger.debug(f"Custom API response status: {api_response.status_code}")
+                try:
+                    logger.debug(f"Custom API response body: {api_response.json()}")
+                except json.JSONDecodeError:
+                    logger.debug(f"Custom API response body (not JSON): {api_response.text}")
+
+                api_response.raise_for_status() # Это вызовет исключение для 422
                 response_data = api_response.json()
-                logger.debug(f"Custom API raw response: {json.dumps(response_data, ensure_ascii=False, indent=2)}")
 
                 # Адаптируйте парсинг под ваш Custom API. Этот пример предполагает структуру как у gen-api.ru
                 if response_data.get("status") == "success" and "output" in response_data:
