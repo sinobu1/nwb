@@ -64,6 +64,19 @@ AI_MODES = {
         ),
         "welcome": "Активирован режим 'Универсальный ИИ'. Какой у вас запрос?"
     },
+    "gemini_pro_direct": { # Новый специальный режим/промпт для вашей Pro модели
+        "name": "🤖 Продвинутый Ассистент (Gemini 2.5 Pro)", # Это имя можно не показывать пользователю в выборе режимов
+        "prompt": (
+            "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент от Google. "
+            "Твоя задача — предоставлять точные, развернутые и полезные ответы на запросы пользователя. "
+            "Соблюдай вежливость и объективность. "
+            "Формулируй ответы ясно и структурированно, используя абзацы и списки при необходимости. "
+            "Избегай излишнего форматирования (Markdown и т.п.), если это не требуется для ясности (например, для блоков кода). "
+            "Если твои знания ограничены по времени, указывай это."
+            # Можно добавить 1-2 ключевых пункта по стилю, если нужно, но стараемся быть краткими.
+        ),
+        "welcome": "Активирован режим 'Продвинутый Ассистент'. Какой у вас запрос?" # Это сообщение тоже можно кастомизировать
+    },
     "creative_helper": {
         "name": "✍️ Творческий Помощник",
         "prompt": (
@@ -105,31 +118,38 @@ AVAILABLE_TEXT_MODELS = {
         "subscription_daily_limit": DEFAULT_PRO_SUBSCRIPTION_REQUESTS_DAILY,
         "cost_category": "google_flash_preview_flex"
     },
-    "google_gemini_2_5_pro_preview": {
-        "name": "👑 Gemini 2.5 Pro Preview (Google)",
-        "id": "gemini-2.5-pro-preview-05-06",
-        "api_type": "google_genai",
-        "is_limited": True,
-        "limit_type": "subscription_daily_pro",
-        "limit_if_no_subscription": 1,
-        "subscription_daily_limit_pro": DEFAULT_PRO_SUBSCRIPTION_REQUESTS_DAILY,
-        "subscription_daily_limit_advanced": DEFAULT_ADVANCED_SUBSCRIPTION_REQUESTS_DAILY,
-        "cost_category": "google_pro_paid"
-    },
-    "custom_api_gemini_2_5_pro": {
+    # ЗАКОММЕНТИРУЙТЕ ИЛИ УДАЛИТЕ ЭТОТ БЛОК:
+    # "google_gemini_2_5_pro_preview": {
+    #     "name": "👑 Gemini 2.5 Pro Preview (Google)",
+    #     "id": "gemini-2.5-pro-preview-05-06",
+    #     "api_type": "google_genai",
+    #     "is_limited": True,
+    #     "limit_type": "subscription_daily_pro",
+    #     "limit_if_no_subscription": 1,
+    #     "subscription_daily_limit_pro": DEFAULT_PRO_SUBSCRIPTION_REQUESTS_DAILY,
+    #     "subscription_daily_limit_advanced": DEFAULT_ADVANCED_SUBSCRIPTION_REQUESTS_DAILY,
+    #     "cost_category": "google_pro_paid"
+    # },
+    "custom_api_gemini_2_5_pro": { # Это ваша "🌟 Gemini 2.5 Pro (Custom API)"
         "name": "🌟 Gemini 2.5 Pro (Custom API)",
-        "id": "gemini-2.5-pro-preview-03-25",
+        "id": "gemini-2.5-pro-preview-03-25", # ID для кастомного API, который ожидает API
         "api_type": "custom_http_api",
         "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
         "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True,
-        "limit_type": "subscription_daily_custom",
-        "limit_if_no_subscription": 2,
-        "subscription_daily_limit": DEFAULT_CUSTOM_API_SUBSCRIPTION_REQUESTS_DAILY,
-        "cost_category": "custom_api_pro_premium"
+        "limit_type": "subscription_daily_custom", # Для нее будет отдельная логика подписки
+        "limit_if_no_subscription": 2, # Количество бесплатных пробных запросов
+        "subscription_daily_limit": DEFAULT_CUSTOM_API_SUBSCRIPTION_REQUESTS_DAILY, # 25 для подписчиков
+        "cost_category": "custom_api_pro_premium",
+        "pricing_info": { # Информация для расчета себестоимости (если известна)
+            # "input_per_1k_tokens_rub": 0.25, # Пример, если знаете цены GenAPI
+            # "output_per_1k_tokens_rub": 2.00
+             "cost_per_request_rub_approx": 2.33 # Примерная стоимость на основе вашего лога ("cost": 2.3243)
+        }
     }
 }
-DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
+# Если DEFAULT_MODEL_KEY или DEFAULT_MODEL_ID ссылались на удаленную модель, обновите их:
+DEFAULT_MODEL_KEY = "google_gemini_2_0_flash" # Или другая доступная модель
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
 
 # --- Конфигурация API Google Gemini ---
@@ -453,6 +473,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     current_model_key = get_current_model_key(context)
     selected_model_details = AVAILABLE_TEXT_MODELS[current_model_key]
+     # --- Выбор системного промпта ---
+    system_prompt_text = ""
+    if current_model_key == "custom_api_gemini_2_5_pro": # Если выбрана наша специальная Pro модель
+        # Пытаемся получить специальный промпт для нее, если нет - используем текущий режим пользователя
+        pro_mode_details = AI_MODES.get("gemini_pro_direct")
+        if pro_mode_details:
+            system_prompt_text = pro_mode_details["prompt"]
+            # Можно также временно изменить "отображаемый" режим для пользователя, если это нужно
+            # logger.info(f"Using dedicated prompt for {current_model_key}")
+        else: # Фоллбэк на текущий выбранный пользователем режим
+            current_mode_details = get_current_mode_details(context)
+            system_prompt_text = current_mode_details["prompt"]
+            logger.warning(f"Dedicated prompt 'gemini_pro_direct' not found for {current_model_key}. Using user's current mode prompt.")
+    else: # Для всех остальных моделей используем текущий выбранный пользователем режим
+        current_mode_details = get_current_mode_details(context)
+        system_prompt_text = current_mode_details["prompt"]
+        
     can_request, limit_message, _ = check_and_log_request_attempt(user_id, current_model_key, context)
     if not can_request:
         await update.message.reply_text(limit_message, reply_markup=get_main_reply_keyboard())
