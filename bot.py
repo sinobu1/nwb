@@ -130,7 +130,7 @@ AVAILABLE_TEXT_MODELS = {
         "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY", # Имя переменной с ключом
         "is_limited": True,
         "limit_type": "subscription_daily_custom", # Требует специальной подписки или высшего уровня
-        "limit_if_no_subscription": 0, # Нет бесплатных запросов (или 1 пробный)
+        "limit_if_no_subscription": 2, # Нет бесплатных запросов (или 1 пробный)
         "subscription_daily_limit": DEFAULT_CUSTOM_API_SUBSCRIPTION_REQUESTS_DAILY, # 25 для подписчиков этого API
         "cost_category": "custom_api_pro_premium"
     }
