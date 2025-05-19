@@ -33,7 +33,7 @@ MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
 # --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "imagen-3.0-generate-002" # !!! НОВОЕ ИМЯ МОДЕЛИ ДЛЯ ТЕСТА !!!
+IMAGE_MODEL_NAME = "gemini-2.0-flash-preview-image-generation" 
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
@@ -282,45 +282,52 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     escaped_prompt_for_msg = escape_markdown(prompt_text, version=2)
     preliminary_message_text = f"✨ Генерирую изображение для запроса: \"_{escaped_prompt_for_msg}_\"\\.\\.\\."
-    
-    prelim_message_sent = False
     try:
         await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
         await update.message.reply_text(preliminary_message_text, parse_mode=ParseMode.MARKDOWN_V2)
-        prelim_message_sent = True
     except telegram.error.BadRequest:
         logger.warning(f"Failed to send preliminary Markdown message for /imagine. Sending plain.")
         try:
             await update.message.reply_text(f"✨ Генерирую изображение для запроса: \"{prompt_text}\"...")
-            prelim_message_sent = True
         except Exception as e_plain_prelim:
             logger.error(f"Failed to send even plain preliminary message for /imagine: {e_plain_prelim}")
-    except Exception as e_prelim_action: # Отлавливаем другие ошибки при отправке действия/сообщения
+    except Exception as e_prelim_action:
         logger.warning(f"Could not send preliminary message or chat action for /imagine: {e_prelim_action}")
 
-    # Основной блок try-except для генерации изображения
     try:
         logger.info(f"User {user_id} requesting image generation with model {IMAGE_MODEL_NAME} for prompt: '{prompt_text}'")
         image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
         
-        # Используем прямой промпт пользователя для модели изображений
-        generation_prompt = prompt_text 
-        
-        logger.warning(f"!!!! Sending to IMAGE MODEL {IMAGE_MODEL_NAME} with prompt: '{generation_prompt}'")
+        generation_input_for_api = [genai.types.Part(text=prompt_text)] # Как мы пробовали в прошлый раз
+
+        # --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ИЗ ДОКУМЕНТАЦИИ ---
+        image_gen_config = genai.types.GenerationConfig(
+            response_modalities=['TEXT', 'IMAGE'] # Указываем, что ожидаем и текст, и картинку
+            # candidate_count=1 # Можно добавить, если хотим только одного кандидата
+        )
+        # --- КОНЕЦ КЛЮЧЕВОГО ИЗМЕНЕНИЯ ---
+
+        logger.warning(f"!!!! Sending to IMAGE MODEL {IMAGE_MODEL_NAME} with input: '{generation_input_for_api}' and config: {image_gen_config}")
         response = await image_model.generate_content_async(
-    contents=[genai.types.Part(text=generation_prompt)]
-)
+            contents=generation_input_for_api,
+            generation_config=image_gen_config # Передаем новую конфигурацию
+        )
         logger.warning(f"!!!! RAW IMAGE RESPONSE !!!! from model {IMAGE_MODEL_NAME}: {response}")
 
         text_part_content = None
+        # ВАЖНО: Документация показывает доступ к тексту и картинке через response.candidates[0].content.parts
+        # А также response.text может быть доступен. Будем проверять оба.
+
+        # Сначала пробуем извлечь текст, если он есть напрямую в response.text
         if response.text and response.text.strip():
             text_part_content = response.text.strip()
-            logger.info(f"Image model also returned text: '{text_part_content}'")
+            logger.info(f"Image model (via .text directly) returned text: '{text_part_content}'")
 
+        # Проверка на блокировку ответа (важно делать до извлечения частей)
         if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
             block_reason_val = response.prompt_feedback.block_reason
             block_reason_name = getattr(block_reason_val, 'name', str(block_reason_val))
-            if block_reason_val != 0:
+            if block_reason_val != 0: # 0 = BLOCK_REASON_UNSPECIFIED или не заблокировано
                 logger.warning(f"Image generation blocked for prompt '{prompt_text}'. Reason: {block_reason_name} ({block_reason_val})")
                 escaped_reason = escape_markdown(str(block_reason_name).replace("_"," ").title(), version=2)
                 await update.message.reply_text(
@@ -330,58 +337,74 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
         image_found = False
-        if response.parts:
-            for part in response.parts:
-                if hasattr(part, 'mime_type') and part.mime_type and part.mime_type.startswith("image/"):
-                    if hasattr(part, 'inline_data') and hasattr(part.inline_data, 'data'):
-                        image_bytes = part.inline_data.data
-                        photo_to_send = io.BytesIO(image_bytes)
-                        escaped_caption_prompt = escape_markdown(prompt_text, version=2)
-                        caption_text = f"🖼️ Ваше изображение для: \"_{escaped_caption_prompt}_\""
-                        try:
-                            await update.message.reply_photo(photo=photo_to_send, caption=caption_text, parse_mode=ParseMode.MARKDOWN_V2)
-                        except telegram.error.BadRequest:
-                            logger.warning(f"Failed to send photo with MarkdownV2 caption. Sending with plain caption.")
-                            await update.message.reply_photo(photo=io.BytesIO(image_bytes), caption=f"🖼️ Ваше изображение для: \"{prompt_text}\"")
-                        image_found = True
-                        logger.info(f"Image sent successfully for prompt: '{prompt_text}'")
-                        break
-                    else:
-                        logger.warning(f"Image part found but no inline_data.data for prompt '{prompt_text}'. Part: {part}")
-                elif hasattr(part, 'text') and part.text and part.text.strip():
-                    if not text_part_content: text_part_content = ""
-                    text_part_content += part.text.strip() + "\n"
+        # Извлекаем данные из response.candidates[0].content.parts согласно документации
+        generated_text_parts = [] # Будем собирать все текстовые части
+
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0] # Обычно работаем с первым кандидатом
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                for part in candidate.content.parts:
+                    if hasattr(part, 'text') and part.text and part.text.strip():
+                        generated_text_parts.append(part.text.strip())
+                        logger.info(f"Found text part in candidate: '{part.text.strip()}'")
+                    elif hasattr(part, 'mime_type') and part.mime_type and part.mime_type.startswith("image/"):
+                        if hasattr(part, 'inline_data') and hasattr(part.inline_data, 'data') and part.inline_data.data:
+                            image_bytes = part.inline_data.data
+                            photo_to_send = io.BytesIO(image_bytes)
+                            escaped_caption_prompt = escape_markdown(prompt_text, version=2)
+                            caption_text = f"🖼️ Ваше изображение для: \"_{escaped_caption_prompt}_\""
+                            try:
+                                await update.message.reply_photo(photo=photo_to_send, caption=caption_text, parse_mode=ParseMode.MARKDOWN_V2)
+                            except telegram.error.BadRequest:
+                                await update.message.reply_photo(photo=io.BytesIO(image_bytes), caption=f"🖼️ Ваше изображение для: \"{prompt_text}\"")
+                            image_found = True
+                            logger.info(f"Image sent successfully from candidate.content.parts for prompt: '{prompt_text}'")
+                            # Не делаем break, если хотим собрать и текстовые части тоже
+                        else:
+                             logger.warning(f"Image part in candidate.content.parts found but no inline_data.data. Part: {part}")
+            else:
+                logger.warning(f"Response candidate has no 'content' or 'parts' attribute: {candidate}")
+        else:
+            logger.warning(f"Response has no 'candidates' or candidates list is empty: {response}")
+            # Если нет candidates, но есть response.parts (как мы проверяли раньше), это может быть запасным вариантом,
+            # но документация явно указывает на candidates[0].content.parts.
+            # Можно добавить сюда старую проверку response.parts, если нужно.
+
+
+        # Объединяем текстовые части, если они были
+        if generated_text_parts:
+            text_part_content = "\n".join(generated_text_parts)
+        elif text_part_content: # Если текст был взят из response.text
+            pass # Уже есть
+        else: # Если текст не нашелся ни там, ни там
+            text_part_content = None
+
 
         if image_found:
-            if text_part_content and len(text_part_content.strip()) > 5:
-                escaped_text_part = escape_markdown(text_part_content.strip(), version=2)
-                try:
-                    await update.message.reply_text(f"Сопутствующий текст от модели изображений:\n{escaped_text_part}", parse_mode=ParseMode.MARKDOWN_V2)
-                except telegram.error.BadRequest:
-                    await update.message.reply_text(f"Сопутствующий текст от модели изображений:\n{text_part_content.strip()}")
-        elif text_part_content and len(text_part_content.strip()) > 0:
+            if text_part_content and len(text_part_content) > 0: # Отправляем непустой сопутствующий текст
+                logger.info(f"Accompanying text from image model: {text_part_content}")
+                # Отправляем как простой текст, чтобы избежать проблем с Markdown от модели
+                await update.message.reply_text(f"Сопутствующий текст от модели изображений:\n{text_part_content}")
+        elif text_part_content and len(text_part_content) > 0: # Картинки нет, но есть текст
             logger.warning(f"No image part found, but text was returned: '{text_part_content}' for prompt: '{prompt_text}'")
-            escaped_text_part = escape_markdown(text_part_content.strip(), version=2)
-            try:
-                await update.message.reply_text(f"Модель изображений вернула следующий текст (но не изображение):\n{escaped_text_part}", parse_mode=ParseMode.MARKDOWN_V2)
-            except telegram.error.BadRequest:
-                await update.message.reply_text(f"Модель изображений вернула следующий текст (но не изображение):\n{text_part_content.strip()}")
-        elif not image_found:
-            logger.warning(f"No image part and no significant text found in response for prompt: '{prompt_text}'. Full response: {response}")
+            await update.message.reply_text(f"Модель изображений вернула следующий текст (но не изображение):\n{text_part_content}")
+        elif not image_found: # И картинки нет, и текста нет
+            logger.warning(f"No image part and no text found in response for prompt: '{prompt_text}'. Full response: {response}")
             await update.message.reply_text("Не удалось извлечь изображение или какой-либо текст из ответа модели изображений. Попробуйте еще раз или измените запрос.")
 
-    # Обработка ошибок API Google и других исключений
     except google.api_core.exceptions.InvalidArgument as e_invalid_arg:
-        logger.error(f"InvalidArgument for image generation '{prompt_text}': {e_invalid_arg}\n{traceback.format_exc()}")
-        await update.message.reply_text(f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {e_invalid_arg}. Возможно, промпт не соответствует ожиданиям модели или модель не может вернуть только изображение.")
+        logger.error(f"InvalidArgument for image generation with {IMAGE_MODEL_NAME} for prompt '{prompt_text}': {e_invalid_arg}\n{traceback.format_exc()}")
+        await update.message.reply_text(f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e_invalid_arg)}. Модель ожидает или возвращает комбинацию TEXT и IMAGE. Возможно, промпт или способ вызова не соответствует этому.")
     except google.api_core.exceptions.GoogleAPIError as e_google_api:
-        logger.error(f"Google API error during image generation for prompt '{prompt_text}': {e_google_api}\n{traceback.format_exc()}")
-        error_message_for_user = f"Произошла ошибка API Google при генерации изображения ({type(e_google_api).__name__}). Пожалуйста, попробуйте позже."
+        logger.error(f"Google API error during image generation with {IMAGE_MODEL_NAME} for prompt '{prompt_text}': {e_google_api}\n{traceback.format_exc()}")
+        error_message_for_user = f"Произошла ошибка API Google при генерации изображения c {IMAGE_MODEL_NAME} ({type(e_google_api).__name__}). Пожалуйста, попробуйте позже."
         str_error_lower = str(e_google_api).lower()
         if "api key not valid" in str_error_lower:
             error_message_for_user = "Ошибка API Google: Ключ API недействителен. Пожалуйста, проверьте настройки."
         elif "model" in str_error_lower and ("not found" in str_error_lower or "permission denied" in str_error_lower):
             error_message_for_user = f"Ошибка API Google: Модель '{IMAGE_MODEL_NAME}' не найдена или к ней нет доступа. Пожалуйста, проверьте имя модели и разрешения ключа API."
+        elif "resource has been exhausted" in str_error_lower:
+            error_message_for_user = "Достигнут лимит запросов к API Google. Пожалуйста, попробуйте позже."
         await update.message.reply_text(error_message_for_user)
     except AttributeError as e_attr:
         logger.error(f"AttributeError parsing image response for prompt '{prompt_text}': {e_attr}\n{traceback.format_exc()}")
@@ -391,6 +414,8 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Произошла непредвиденная ошибка при генерации изображения.")
 
 
+# --- handle_message, set_bot_commands, main остаются такими же, как в ответе 49 ---
+# (Убедитесь, что в main у вас TOKEN и GEMINI_API_KEY заменены на реальные значения)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
@@ -483,11 +508,12 @@ async def set_bot_commands(application: Application):
         logger.error(f"Failed to set bot commands: {e}")
 
 async def main():
-    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN :
-        logger.critical("CRITICAL: TELEGRAM_TOKEN is not set or uses a placeholder. Please set your actual token in the code or as an environment variable.")
+    # Проверка токенов при запуске
+    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) not in [8,9,10,11] : # Более гибкая проверка длины ID бота
+        logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or uses a placeholder. Please set your actual token.")
         return
-    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY:
-        logger.critical("CRITICAL: GEMINI_API_KEY is not set or uses a placeholder. Please set your actual key in the code or as an environment variable.")
+    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY or len(GEMINI_API_KEY) < 30:
+        logger.critical("CRITICAL: GEMINI_API_KEY is not set correctly or uses a placeholder. Please set your actual key.")
         return
         
     application = Application.builder().token(TOKEN).build()
