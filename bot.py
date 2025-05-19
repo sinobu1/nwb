@@ -3,39 +3,36 @@ from telegram import (
     InlineKeyboardButton, InlineKeyboardMarkup, Update,
     ReplyKeyboardMarkup, KeyboardButton, BotCommand
 )
-from telegram.constants import ParseMode, ChatAction
+from telegram.constants import ParseMode, ChatAction # ChatAction все еще полезен для "печатает..."
 from telegram.helpers import escape_markdown
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ContextTypes, CallbackQueryHandler
 )
 import google.generativeai as genai
-import google.api_core.exceptions # Импортируем для явного отлова ошибок API
+import google.api_core.exceptions # Оставим на случай специфических ошибок API
 import requests
 import logging
 import traceback
 import os
 import asyncio
 import nest_asyncio
-import io # Для генерации изображений
+# import io # Больше не нужен, если нет генерации изображений
 
 nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG) # DEBUG для подробных логов
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO) # Вернем INFO, DEBUG был для imagine
 logger = logging.getLogger(__name__)
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
-TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY")
+TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТЕЛЕГРАМ_ТОКЕН") # ЗАМЕНИТЕ!!
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "ВАШ_GEMINI_API_КЛЮЧ") # ЗАМЕНИТЕ!!
+YANDEX_API_KEY = os.getenv("YANDEX_API_KEY", "YOUR_YANDEX_API_KEY") # Опционально
 
 # --- КОНФИГУРАЦИЯ БОТА ---
 MAX_OUTPUT_TOKENS_GEMINI = 1500
 MAX_MESSAGE_LENGTH_TELEGRAM = 2500
 
-# --- ИМЕНА МОДЕЛЕЙ ---
-IMAGE_MODEL_NAME = "imagen-3.0-generate-002" 
-
-# --- РЕЖИМЫ РАБОТЫ ИИ ---
+# --- РЕЖИМЫ РАБОТЫ ИИ (остаются как есть, с промтами для простого структурированного текста) ---
 AI_MODES = {
     "universal_ai": {
         "name": "🤖 Универсальный ИИ",
@@ -107,7 +104,7 @@ def get_current_model_display_name(context: ContextTypes.DEFAULT_TYPE) -> str:
 def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
     if len(text) <= max_length:
         return text, False
-    suffix = "\n\n(...ответ был сокращен)"
+    suffix = "\n\n(...ответ был сокращен)" # Простой текстовый суффикс
     adjusted_max_length = max_length - len(suffix)
     if adjusted_max_length <= 0: return text[:max_length-len("...")] + "...", True
     truncated_text = text[:adjusted_max_length]
@@ -142,13 +139,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mode_name_content = escape_markdown(current_mode_details['name'], version=2)
     mode_line = f"{escape_markdown('Текущий режим: ', version=2)}*{mode_name_content}*"
     model_name_content = escape_markdown(current_model_display_name_text, version=2)
-    model_line = f"{escape_markdown('Текущая модель: ', version=2)}*{model_name_content}*"
+    model_line = f"{escape_markdown('Текущая текстовая модель: ', version=2)}*{model_name_content}*" # Уточнили, что модель текстовая
     you_can = escape_markdown("Вы можете:", version=2)
     action1 = escape_markdown("▫️ Задавать мне вопросы или давать задания.", version=2)
     action2 = "▫️ Сменить режим работы (кнопка или `/mode`)" 
-    action3 = "▫️ Выбрать другую модель ИИ (кнопка или `/model`)" 
-    action4 = "▫️ Сгенерировать изображение (команда `/imagine`)"
-    action5 = "▫️ Получить помощь (кнопка или `/help`)"
+    action3 = "▫️ Выбрать другую текстовую модель ИИ (кнопка или `/model`)" # Уточнили
+    action4 = "▫️ Получить помощь (кнопка или `/help`)" # Убрали /imagine
     invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
     text_to_send = (
         f"{greeting}\n\n"
@@ -158,8 +154,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{action1}\n"
         f"{action2}\n"
         f"{action3}\n"
-        f"{action4}\n" 
-        f"{action5}\n\n"
+        f"{action4}\n\n" # Убрали action5, так как action4 стал последним перед приглашением
         f"{invitation}"
     )
     try:
@@ -171,15 +166,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Start command processed for user {update.message.from_user.id if update.effective_user else 'Unknown'}.")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending /start message with MarkdownV2: {e}\nText was: {text_to_send}\n{traceback.format_exc()}")
-        plain_text_version = (
+        plain_text_version = ( # Упрощенная версия без /imagine
             f"Привет! Я многофункциональный ИИ-бот.\n\n"
             f"Текущий режим: {current_mode_details['name']}\n"
-            f"Текущая модель: {current_model_display_name_text}\n\n"
+            f"Текущая текстовая модель: {current_model_display_name_text}\n\n"
             "Вы можете:\n"
             "▫️ Задавать мне вопросы или давать задания.\n"
             "▫️ Сменить режим работы (кнопка или /mode)\n"
-            "▫️ Выбрать другую модель ИИ (кнопка или /model)\n"
-            "▫️ Сгенерировать изображение (команда /imagine)\n"
+            "▫️ Выбрать другую текстовую модель ИИ (кнопка или /model)\n"
             "▫️ Получить помощь (кнопка или /help)\n\n"
             "Просто напишите ваш запрос!"
         )
@@ -194,16 +188,15 @@ async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(details["name"], callback_data=f"set_model_{key}")] for key, details in AVAILABLE_TEXT_MODELS.items()]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Выберите модель ИИ для использования (для текстовых запросов):', reply_markup=reply_markup)
+    await update.message.reply_text('Выберите текстовую модель ИИ для использования:', reply_markup=reply_markup) # Уточнили
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_mode_details = get_current_mode_details(context)
     current_model_display_name_text = get_current_model_display_name(context)
     mode_name_content = escape_markdown(current_mode_details['name'], version=2)
     model_name_content = escape_markdown(current_model_display_name_text, version=2)
-    # escaped_image_model_name = escape_markdown(IMAGE_MODEL_NAME, version=2) # Не используется напрямую в help_text так
     help_text = (
-        f"{escape_markdown('🤖 Это многофункциональный ИИ-бот на базе Gemini от Google.', version=2)}\n\n"
+        f"{escape_markdown('🤖 Это многофункциональный ИИ-бот на базе Gemini от Google для текстовых задач.', version=2)}\n\n" # Уточнили
         f"{escape_markdown('Текущие настройки для текста:', version=2)}\n"
         f"  » {escape_markdown('Режим ИИ: ', version=2)}*{mode_name_content}*\n"
         f"  » {escape_markdown('Текстовая модель ИИ: ', version=2)}*{model_name_content}*\n\n"
@@ -211,19 +204,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"`/start` {escape_markdown('- это сообщение и основные настройки.', version=2)}\n"
         f"`/mode` {escape_markdown(' или кнопка ', version=2)}`🤖 Режим ИИ` {escape_markdown('- позволяет сменить текущий режим (специализацию) ИИ для текстовых ответов.', version=2)}\n"
         f"`/model` {escape_markdown(' или кнопка ', version=2)}`⚙️ Модель ИИ` {escape_markdown('- позволяет выбрать одну из доступных текстовых моделей Gemini.', version=2)}\n"
-        f"`/imagine <описание>` {escape_markdown(f'- генерирует изображение по вашему текстовому описанию (использует модель {IMAGE_MODEL_NAME}).', version=2)}\n"
+        # Убрали /imagine
         f"`/help` {escape_markdown(' или кнопка ', version=2)}`❓ Помощь` {escape_markdown('- это сообщение помощи.', version=2)}\n\n"
-        f"{escape_markdown('После выбора режима и модели (для текста) просто отправьте свой вопрос или задание боту.', version=2)}\n\n"
+        f"{escape_markdown('После выбора режима и модели просто отправьте свой вопрос или задание боту.', version=2)}\n\n"
         f"{escape_markdown('Подсказка: вы можете скрыть/показать клавиатуру с кнопками с помощью иконки клавиатуры в вашем клиенте Telegram.', version=2)}"
     )
     try:
         await update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending /help message with MarkdownV2: {e}\nText was: {help_text}\n{traceback.format_exc()}")
-        plain_help_text = (
-             "Это ИИ-бот.\n"
+        plain_help_text = ( # Упрощенная версия без /imagine
+             "Это ИИ-бот для текстовых задач.\n"
              f"Режим: {current_mode_details['name']}, Текстовая модель: {current_model_display_name_text}\n"
-             f"Команды: /start, /mode, /model, /imagine <описание>, /help. Используйте кнопки ниже."
+             "Команды: /start, /mode, /model, /help. Используйте кнопки ниже."
         )
         await update.message.reply_text(plain_help_text, reply_markup=get_main_reply_keyboard())
 
@@ -266,115 +259,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"Failed to edit message with MarkdownV2 in button_callback: {e}. Sending plain text. Text was: {new_text}")
             await message_to_edit.edit_text(text=plain_text_fallback, reply_markup=message_to_edit.reply_markup)
 
-async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"IMAGINE_COMMAND triggered for user {update.effective_user.id if update.effective_user else 'Unknown'} with args: {context.args}")
-    
-    if not context.args:
-        await update.message.reply_text(
-            "🎨 Чтобы сгенерировать изображение, введите описание после команды.\n"
-            "Пример: `/imagine яркий тропический закат над океаном`",
-            reply_markup=get_main_reply_keyboard()
-        )
-        return
+# --- УДАЛЯЕМ ФУНКЦИЮ imagine_command ---
 
-    prompt_text = " ".join(context.args)
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id if update.effective_user else "UnknownUser"
-    logger.debug(f"Prompt text: '{prompt_text}', Chat ID: {chat_id}")
-
-    # Предварительное сообщение
-    escaped_prompt = escape_markdown(prompt_text, version=2)
-    preliminary_message = f"✨ Генерирую изображение для: \"_{escaped_prompt}_\"..."
-    try:
-        logger.debug("Sending chat action: UPLOAD_PHOTO")
-        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
-        logger.debug("Sending preliminary message")
-        await update.message.reply_text(preliminary_message, parse_mode=ParseMode.MARKDOWN_V2)
-    except Exception as e:
-        logger.error(f"Failed to send preliminary message/action: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text(f"✨ Генерирую изображение для: \"{prompt_text}\"...")
-
-    try:
-        logger.info(f"Attempting to initialize Imagen model: imagen-3.0-generate-001")
-        imagen = genai.ImageGenerationModel("imagen-3.0-generate-001")
-        logger.debug("Imagen model initialized successfully")
-
-        # Генерация изображения
-        logger.info(f"Sending image generation request for prompt: '{prompt_text}'")
-        result = await imagen.generate_images_async(
-            prompt=prompt_text,
-            number_of_images=1,
-            safety_filter_level="block_only_high",
-            person_generation="dont_allow",
-            aspect_ratio="1:1"
-        )
-        logger.debug(f"Image generation result received: {result}")
-
-        # Извлечение изображения
-        image_found = False
-        if hasattr(result, 'images') and result.images:
-            image = result.images[0]
-            photo = io.BytesIO(image._pil_image.tobytes())
-            caption = f"🖼️ Изображение для: \"_{escaped_prompt}_\""
-            try:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=caption,
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-                image_found = True
-                logger.info(f"Image sent for prompt: '{prompt_text}'")
-            except telegram.error.BadRequest:
-                await update.message.reply_photo(
-                    photo=io.BytesIO(image._pil_image.tobytes()),
-                    caption=f"🖼️ Изображение для: \"{prompt_text}\""
-                )
-                image_found = True
-                logger.info(f"Image sent as plain text caption for prompt: '{prompt_text}'")
-        else:
-            logger.warning(f"No images in result: {result}")
-
-        if not image_found:
-            logger.error(f"No image found in result for prompt: '{prompt_text}'")
-            await update.message.reply_text(
-                "Не удалось сгенерировать изображение. Возможно, модель не вернула изображение."
-            )
-
-    except google.api_core.exceptions.PermissionDenied:
-        logger.error(f"Permission denied for model imagen-3.0-generate-001")
-        await update.message.reply_text(
-            "Нет доступа к модели 'imagen-3.0-generate-001'. Проверьте настройки API или подайте запрос на доступ."
-        )
-    except google.api_core.exceptions.NotFound:
-        logger.error(f"Model imagen-3.0-generate-001 not found")
-        await update.message.reply_text(
-            "Модель 'imagen-3.0-generate-001' не найдена. Проверьте доступность модели в вашем регионе."
-        )
-    except google.api_core.exceptions.QuotaExceeded:
-        logger.error(f"Quota exceeded for model imagen-3.0-generate-001")
-        await update.message.reply_text(
-            "Достигнут лимит запросов к API. Попробуйте позже."
-        )
-    except google.api_core.exceptions.InvalidArgument as e:
-        logger.error(f"Invalid argument for model imagen-3.0-generate-001: {e}")
-        await update.message.reply_text(
-            f"Ошибка в запросе к модели: {str(e)}."
-        )
-    except google.api_core.exceptions.GoogleAPIError as e:
-        logger.error(f"Google API error: {e}\n{traceback.format_exc()}")
-        error_msg = "Ошибка API Google. Попробуйте позже."
-        if "api key not valid" in str(e).lower():
-            error_msg = "Недействительный API-ключ."
-        await update.message.reply_text(error_msg)
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text(
-            "Непредвиденная ошибка при генерации изображения."
-        )
-
-
-# --- handle_message, set_bot_commands, main остаются такими же, как в ответе 49 ---
-# (Убедитесь, что в main у вас TOKEN и GEMINI_API_KEY заменены на реальные значения)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
@@ -384,9 +270,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     system_prompt = current_mode_details["prompt"]
     selected_model_id = get_current_model_id(context)
 
-    if user_message.lower() == "/help":
-        await help_command(update, context)
-        return
+    if user_message.lower() == "/help": # Позволяем /help обрабатываться через CommandHandler
+        # Если CommandHandler для /help не сработает первым, этот if может быть нужен.
+        # Но лучше полагаться на CommandHandler. Оставим для совместимости или уберем, если CommandHandler всегда первый.
+        # await help_command(update, context) 
+        return # Если /help, то дальше не идем в этом обработчике
 
     try:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -457,7 +345,7 @@ async def set_bot_commands(application: Application):
         BotCommand("start", "🚀 Перезапуск / Настройки"),
         BotCommand("mode", "🧠 Сменить режим ИИ"),
         BotCommand("model", "⚙️ Выбрать текстовую модель ИИ"),
-        BotCommand("imagine", "🎨 Сгенерировать изображение"),
+        # Убрали /imagine
         BotCommand("help", "ℹ️ Помощь"),
     ]
     try:
@@ -467,11 +355,10 @@ async def set_bot_commands(application: Application):
         logger.error(f"Failed to set bot commands: {e}")
 
 async def main():
-    # Проверка токенов при запуске
-    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) not in [8,9,10] : # Простая проверка формата токена
+    if "ВАШ_ТЕЛЕГРАМ_ТОКЕН" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8 : # Более общая проверка формата токена
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or uses a placeholder. Please set your actual token.")
         return
-    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY or len(GEMINI_API_KEY) < 30: # Простая проверка длины ключа
+    if "ВАШ_GEMINI_API_КЛЮЧ" in GEMINI_API_KEY or not GEMINI_API_KEY or len(GEMINI_API_KEY) < 30:
         logger.critical("CRITICAL: GEMINI_API_KEY is not set correctly or uses a placeholder. Please set your actual key.")
         return
         
@@ -485,7 +372,7 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("mode", select_mode_command))
     application.add_handler(CommandHandler("model", select_model_command))
-    application.add_handler(CommandHandler("imagine", imagine_command))
+    # Убрали CommandHandler("imagine", imagine_command)
     application.add_handler(CommandHandler("help", help_command))
 
     application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
@@ -495,7 +382,7 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    logger.info("Starting bot with Image Generation, UI enhancements, and plain text AI responses...")
+    logger.info("Starting bot with UI enhancements and plain text AI responses...") # Убрали Image Generation из лога
     await application.run_polling()
 
 if __name__ == "__main__":
