@@ -282,7 +282,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id if update.effective_user else "UnknownUser"
     logger.debug(f"Prompt text: '{prompt_text}', Chat ID: {chat_id}")
 
-    # Send preliminary message and typing action
+    # Preliminary message
     escaped_prompt = escape_markdown(prompt_text, version=2)
     preliminary_message = f"✨ Генерирую изображение для: \"_{escaped_prompt}_\"..."
     try:
@@ -290,31 +290,32 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
         logger.debug("Sending preliminary message")
         await update.message.reply_text(preliminary_message, parse_mode=ParseMode.MARKDOWN_V2)
-    except telegram.error.BadRequest as e:
-        logger.warning(f"Failed to send preliminary message with Markdown: {e}")
-        await update.message.reply_text(f"✨ Генерирую изображение для: \"{prompt_text}\"...")
     except Exception as e:
         logger.error(f"Failed to send preliminary message/action: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text("Ошибка при отправке предварительного сообщения.")
+        await update.message.reply_text(f"✨ Генерирую изображение для: \"{prompt_text}\"...")
 
     try:
         logger.info(f"Initializing image model: {IMAGE_MODEL_NAME}")
         image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
-        logger.debug("Image model initialized successfully")
-        
+        logger.debug("Image model initialized")
+
+        # Configure generation with explicit modalities
         generation_config = genai.types.GenerationConfig(
-            temperature=0.9
+            temperature=0.9,
+            response_modalities=["TEXT", "IMAGE"]  # Explicitly set modalities
         )
         logger.debug(f"Generation config: {generation_config}")
 
+        # Structure the prompt as a Part
+        prompt_part = genai.types.Part(text=prompt_text)
         logger.info(f"Sending image generation request for prompt: '{prompt_text}'")
         response = await image_model.generate_content_async(
-            contents=prompt_text,
+            contents=[prompt_part],
             generation_config=generation_config
         )
         logger.debug(f"Image generation response: {response}")
 
-        # Check for prompt feedback
+        # Check prompt feedback
         if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
             block_reason = response.prompt_feedback.block_reason
             block_reason_name = getattr(block_reason, 'name', str(block_reason))
@@ -360,12 +361,14 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not image_found:
             logger.error(f"No image found in response for prompt: '{prompt_text}'")
             await update.message.reply_text(
-                "Не удалось сгенерировать изображение. Проверьте модель или запрос."
+                "Не удалось сгенерировать изображение. Возможно, модель не вернула изображение."
             )
 
     except google.api_core.exceptions.InvalidArgument as e:
         logger.error(f"InvalidArgument: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text(f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e)}.")
+        await update.message.reply_text(
+            f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e)}."
+        )
     except google.api_core.exceptions.GoogleAPIError as e:
         logger.error(f"Google API error: {e}\n{traceback.format_exc()}")
         error_msg = "Ошибка API Google. Попробуйте позже."
