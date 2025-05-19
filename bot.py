@@ -124,7 +124,7 @@ AVAILABLE_TEXT_MODELS = {
     },
     "custom_api_gemini_2_5_pro": {
         "name": "🌟 Gemini 2.5 Pro (Custom API)",
-        "id": "gemini-2-5-pro", # ID для кастомного API
+        "id": "gemini-2.5-pro-preview-03-25", # ID для кастомного API
         "api_type": "custom_http_api",
         "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
         "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY", # Имя переменной с ключом
