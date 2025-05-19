@@ -539,42 +539,57 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'Authorization': f'Bearer {actual_api_key}'
             }
             logger.info(f"Sending request to Custom HTTP API. Endpoint: {endpoint}, Payload: {json.dumps(payload, ensure_ascii=False)}")
+            # Внутри handle_message, для api_type == "custom_http_api"
+# ... (код до try-except блока для requests.post) ...
             try:
                 api_response = requests.post(endpoint, json=payload, headers=headers, timeout=90)
                 logger.debug(f"Custom API response status: {api_response.status_code}")
+                response_data = {} # Инициализируем на случай ошибки декодирования
                 try:
                     response_data = api_response.json()
-                    logger.debug(f"Custom API response body: {json.dumps(response_data, ensure_ascii=False)}")
-                except json.JSONDecodeError:
-                    logger.debug(f"Custom API response body (not JSON): {api_response.text}")
-                    response_data = {}
-                api_response.raise_for_status()
-                if response_data.get("status") == "starting":
-                    request_id = response_data.get("request_id")
-                    logger.info(f"Task started, polling for request_id: {request_id}")
-                    result = await poll_task_status(request_id, actual_api_key, endpoint)
-                    if result.get("status") == "success" and "output" in result:
-                        reply_text = result["output"]
-                        request_successful = True
+                    logger.debug(f"Custom API response body: {json.dumps(response_data, ensure_ascii=False, indent=2)}")
+                except json.JSONDecodeError as e_json_decode:
+                    logger.error(f"Custom API response body (not JSON, or JSON decode error): {api_response.text}. Error: {e_json_decode}")
+                    reply_text = f"Ошибка декодирования ответа от Custom API ({selected_model_details['name']})."
+                    # Выходим из try, так как дальше работать с response_data нет смысла
+                    raise # Перевыбрасываем исключение, чтобы попасть в общий except и не инкрементировать счетчик
+
+                api_response.raise_for_status() # Проверяем на HTTP ошибки (4xx, 5xx)
+
+                # ИЗМЕНЕННЫЙ ПАРСИНГ ОТВЕТА:
+                if "response" in response_data and isinstance(response_data["response"], list) and len(response_data["response"]) > 0:
+                    first_choice = response_data["response"][0]
+                    if "message" in first_choice and "content" in first_choice["message"]:
+                        api_reply_text_custom = first_choice["message"]["content"]
+                        if api_reply_text_custom and api_reply_text_custom.strip():
+                            reply_text = api_reply_text_custom
+                            request_successful = True
+                            
+                            # Логирование стоимости, если есть
+                            if "cost" in response_data:
+                                cost = response_data["cost"]
+                                logger.info(f"Custom API request cost for {selected_model_details['name']}: {cost}")
+                                # Здесь можно сохранить стоимость для аналитики или биллинга пользователя
+                            
+                            # Логирование request_id и модели из ответа
+                            req_id_resp = response_data.get("request_id")
+                            model_resp = response_data.get("model")
+                            logger.info(f"Custom API success: request_id={req_id_resp}, model_in_response='{model_resp}'")
+
+                        else:
+                            reply_text = f"ИИ ({selected_model_details['name']}) вернул пустой ответ в 'content'."
+                            logger.warning(f"Custom API returned empty 'content' in message: {response_data}")
                     else:
-                        reply_text = f"Ошибка: Не удалось получить результат задачи. {result.get('detail', 'Нет деталей')}"
-                elif response_data.get("status") == "success" and "output" in response_data:
-                    api_reply_text_custom = response_data.get("output")
-                    if not api_reply_text_custom or not api_reply_text_custom.strip():
-                        reply_text = f"ИИ ({selected_model_details['name']}) вернул пустой ответ."
-                    else:
-                        reply_text = api_reply_text_custom
-                        request_successful = True
-                elif "detail" in response_data:
+                        reply_text = f"Некорректная структура 'message' или отсутствует 'content' в ответе от Custom API ({selected_model_details['name']})."
+                        logger.warning(f"Custom API: 'message' or 'content' field missing: {response_data}")
+                elif "detail" in response_data: # Обработка ошибок, если API их так возвращает
                     reply_text = f"Ошибка Custom API ({selected_model_details['name']}): {response_data['detail']}"
-                else:
-                    possible_text = response_data.get("text") or response_data.get("message") or response_data.get("completion")
-                    if isinstance(possible_text, str) and possible_text.strip():
-                        reply_text = possible_text
-                        request_successful = True
-                        logger.info("Extracted text from custom API response from a non-standard field.")
-                    else:
-                        reply_text = f"Некорректный или пустой ответ от Custom API ({selected_model_details['name']}). Структура: {json.dumps(response_data, ensure_ascii=False)}"
+                    logger.error(f"Custom API returned error detail: {response_data['detail']}. Full response: {response_data}")
+                else: # Если ни одна из известных структур не подошла
+                    reply_text = f"Неожиданная структура ответа от Custom API ({selected_model_details['name']}). Ответ получен, но не распознан."
+                    logger.warning(f"Unexpected response structure from Custom API. Full response: {json.dumps(response_data, ensure_ascii=False)}")
+
+            # ... (остальные блоки except: HTTPError, RequestException, Exception) ...
             except requests.exceptions.HTTPError as e_http:
                 error_content = "No details in response."
                 try:
