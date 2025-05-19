@@ -114,7 +114,7 @@ AVAILABLE_TEXT_MODELS = {
     },
     "google_gemini_2_5_pro_preview": {
         "name": "👑 Gemini 2.5 Pro Preview (Google)",
-        "id": "gemini-2.5-pro-preview-05-06",
+        "id": "gemini-2-5-pro",
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "subscription_daily_pro", # Требует подписки уровня "Pro" или "Advanced"
