@@ -81,14 +81,15 @@ AVAILABLE_TEXT_MODELS = {
     "gemini_2_5_flash_preview": {
         "name": "💎 G-2.5 Flash Preview (Лимит: 20)",
         "id": "gemini-2.5-flash-preview-04-17",
-        "is_limited": True, # Эта модель будет иметь лимит
-        "limit": DEFAULT_FREE_REQUEST_LIMIT # Используем общий лимит
+        "is_limited": True,
+        "limit": DEFAULT_FREE_REQUEST_LIMIT
     },
     "gemini_2_0_flash": {
-        "name": "⚡️ G-2.0 Flash (Бесплатный)", # Название модели теперь отражает лимит
+        "name": "⚡️ G-2.0 Flash (Бесплатный)",
         "id": "gemini-2.0-flash",
-        "is_limited": False # Эта модель без лимита
-    }
+        "is_limited": False
+    } # Закрыли последний элемент словаря
+} # <--- ВОТ ЭТА ЗАКРЫВАЮЩАЯ СКОБКА БЫЛА ПРОПУЩЕНА
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS["gemini_2_5_flash_preview"]["id"]
 
 try:
