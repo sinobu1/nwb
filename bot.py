@@ -9,7 +9,8 @@ from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
     ContextTypes, CallbackQueryHandler
 )
-import google.generativeai as genai
+import google.genai as genai
+from google.genai.types import GenerateContentConfig, Modality
 import google.api_core.exceptions # Импортируем для явного отлова ошибок API
 import requests
 import logging
@@ -296,27 +297,26 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         logger.info(f"Initializing image model: {IMAGE_MODEL_NAME}")
-        image_model = genai.GenerativeModel(IMAGE_MODEL_NAME)
-        logger.debug("Image model initialized")
+        client = genai.Client()  # Инициализация клиента
+        logger.debug("Client initialized")
 
-        # Configure generation with explicit modalities
-        generation_config = genai.types.GenerationConfig(
+        # Конфигурация генерации
+        config = GenerateContentConfig(
             temperature=0.9,
-            response_modalities=["TEXT", "IMAGE"]  # Explicitly set modalities
+            response_modalities=[Modality.TEXT, Modality.IMAGE]  # Явно указываем модальности
         )
-        logger.debug(f"Generation config: {generation_config}")
+        logger.debug(f"Generation config: {config}")
 
-        # Structure the prompt as a Part
-        prompt_part = genai.types.Part(text=prompt_text)
         logger.info(f"Sending image generation request for prompt: '{prompt_text}'")
-        response = await image_model.generate_content_async(
-            contents=[prompt_part],
-            generation_config=generation_config
+        response = await client.models.generate_content_async(
+            model=IMAGE_MODEL_NAME,
+            contents=prompt_text,  # Простая строка для промпта
+            config=config
         )
         logger.debug(f"Image generation response: {response}")
 
-        # Check prompt feedback
-        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason != 0:
+        # Проверка блокировки промпта
+        if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason:
             block_reason = response.prompt_feedback.block_reason
             block_reason_name = getattr(block_reason, 'name', str(block_reason))
             logger.warning(f"Image generation blocked. Reason: {block_reason_name}")
@@ -326,7 +326,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Extract image
+        # Извлечение изображения
         image_found = False
         if hasattr(response, 'candidates') and response.candidates:
             candidate = response.candidates[0]
@@ -364,12 +364,7 @@ async def imagine_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Не удалось сгенерировать изображение. Возможно, модель не вернула изображение."
             )
 
-    except google.api_core.exceptions.InvalidArgument as e:
-        logger.error(f"InvalidArgument: {e}\n{traceback.format_exc()}")
-        await update.message.reply_text(
-            f"Ошибка конфигурации модели ({IMAGE_MODEL_NAME}): {str(e)}."
-        )
-    except google.api_core.exceptions.GoogleAPIError as e:
+    except genai.APIError as e:
         logger.error(f"Google API error: {e}\n{traceback.format_exc()}")
         error_msg = "Ошибка API Google. Попробуйте позже."
         if "api key not valid" in str(e).lower():
