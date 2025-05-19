@@ -21,7 +21,8 @@ import json # Для отладки и работы с JSON ответами
 from datetime import datetime # Для управления ежедневными лимитами
 
 nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# В самом начале файла, где logging.basicConfig
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
@@ -589,16 +590,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "model": model_id_for_payload_api,
                 "messages": messages_payload,
                 "is_sync": True,
-                "callback_url": None,
-                "temperature": selected_model_details.get("temperature", 0.75), # Можно брать из конфига модели
+                # "callback_url": None, # УБИРАЕМ ЭТУ СТРОКУ
+                "temperature": selected_model_details.get("temperature", 0.75),
                 "stream": False,
-                # Добавляем параметры из примера документации gen-api.ru
                 "n": 1,
                 "frequency_penalty": 0,
                 "presence_penalty": 0,
                 "top_p": 1,
-                # response_format как строка, содержащая JSON
-                "response_format": json.dumps({"type": "text"}) # Используем json.dumps для корректного формирования строки
+                "response_format": json.dumps({"type": "text"})
             }
             # Убедимся, что response_format, если используется, передается как объект, если API ожидает объект,
             # или как строка, если API ожидает строку (в документации gen-api.ru он указан как "array_or_string",
