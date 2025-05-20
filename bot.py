@@ -635,25 +635,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "buy_profi_2days":
         await buy_button_handler(update, context) 
         return
-    
-    # Если есть другие обработчики elif, они остаются здесь
-    # Если data не соответствует ни одному из условий, функция просто завершится
-    # (после query.answer() в начале).
-    # Можно добавить логгирование для необработанных callback_data, если нужно:
-    # else:
-    #     logger.warning(f"Unhandled callback_data: {data} from user {user_id}")
-
-# --- Остальные обработчики команд и сообщений (из bot (22).py) ---
-async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = []
-    for key, details in AI_MODES.items():
-        if key != "gemini_pro_custom_mode":
-            keyboard.append([InlineKeyboardButton(details["name"], callback_data=f"set_mode_{key}")])
-    if not keyboard:
-         await update.message.reply_text('В данный момент нет доступных режимов для выбора.', reply_markup=get_main_reply_keyboard())
-         return
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Выберите режим работы для ИИ (для модели Gemini 2.5 Pro режим выбирается автоматически):', reply_markup=reply_markup)
 
 async def select_model_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
