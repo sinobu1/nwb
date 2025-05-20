@@ -1,13 +1,13 @@
 import telegram
 from telegram import (
-    InlineKeyboardButton, InlineKeyboardMarkup, Update,
-    ReplyKeyboardMarkup, KeyboardButton, BotCommand
+    ReplyKeyboardMarkup, KeyboardButton, Update,
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 )
 from telegram.constants import ParseMode, ChatAction
 from telegram.helpers import escape_markdown
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, CallbackQueryHandler, PicklePersistence
+    ContextTypes, PicklePersistence, PreCheckoutQueryHandler
 )
 import google.generativeai as genai
 import google.api_core.exceptions
@@ -20,7 +20,6 @@ import nest_asyncio
 import json
 from datetime import datetime, timedelta
 from telegram import LabeledPrice
-from telegram.ext import PreCheckoutQueryHandler
 from typing import Optional
 import uuid
 
@@ -170,7 +169,7 @@ AVAILABLE_TEXT_MODELS = {
 DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
 
-# --- НОВАЯ СТРУКТУРА МЕНЮ ---
+# --- НОВАЯ СТРУКТУРА МЕНЮ ДЛЯ КЛАВИАТУРЫ ---
 MENU_STRUCTURE = {
     "main_menu": {
         "title": "📋 Главное меню",
@@ -182,7 +181,8 @@ MENU_STRUCTURE = {
             {"text": "💎 Подписка Профи", "action": "submenu", "target": "subscription_submenu"},
             {"text": "❓ Помощь", "action": "submenu", "target": "help_submenu"}
         ],
-        "parent": None
+        "parent": None,
+        "is_submenu": False
     },
     "ai_modes_submenu": {
         "title": "Выберите режим ИИ",
@@ -191,7 +191,8 @@ MENU_STRUCTURE = {
             for key, mode in AI_MODES.items()
             if key != "gemini_pro_custom_mode"
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     },
     "models_submenu": {
         "title": "Выберите модель ИИ",
@@ -199,35 +200,40 @@ MENU_STRUCTURE = {
             {"text": model["name"], "action": "set_model", "target": key}
             for key, model in AVAILABLE_TEXT_MODELS.items()
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     },
     "limits_submenu": {
         "title": "Ваши лимиты",
         "items": [
             {"text": "📊 Показать лимиты", "action": "show_limits", "target": "usage"}
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     },
     "bonus_submenu": {
         "title": "Бонус за подписку",
         "items": [
             {"text": "🎁 Получить бонус", "action": "check_bonus", "target": "news_bonus"}
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     },
     "subscription_submenu": {
         "title": "Подписка Профи",
         "items": [
             {"text": "💎 Информация и покупка", "action": "show_subscription", "target": "subscribe"}
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     },
     "help_submenu": {
         "title": "Помощь",
         "items": [
             {"text": "❓ Показать помощь", "action": "show_help", "target": "help"}
         ],
-        "parent": "main_menu"
+        "parent": "main_menu",
+        "is_submenu": True
     }
 }
 
@@ -305,10 +311,6 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
         if cut_at > adjusted_max_length * 0.3:
              return text[:cut_at].strip() + suffix, True
     return text[:adjusted_max_length].strip() + suffix, True
-
-def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
-    keyboard = [[KeyboardButton("📋 Меню")]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 def get_user_actual_limit_for_model(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
@@ -400,45 +402,33 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
     model_daily_usage['count'] += 1
     logger.info(f"User {user_id} daily request count for {model_key} incremented to {model_daily_usage['count']}")
 
-# --- Функции для многоуровневых меню ---
-def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+# --- Функции для меню на клавиатуре ---
+def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> ReplyKeyboardMarkup:
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
-        return InlineKeyboardMarkup([])
+        return ReplyKeyboardMarkup([[]], resize_keyboard=True, one_time_keyboard=False)
     
-    keyboard = []
-    for item in menu["items"]:
-        callback_data = f"menu_{item['action']}_{item['target']}"
-        keyboard.append([InlineKeyboardButton(item["text"], callback_data=callback_data)])
+    keyboard = [[KeyboardButton(item["text"]) for item in menu["items"]]]
+    if menu["is_submenu"]:
+        nav_row = []
+        if menu["parent"]:
+            nav_row.append(KeyboardButton("⬅️ Назад"))
+        nav_row.append(KeyboardButton("🏠 Главное меню"))
+        keyboard.append(nav_row)
     
-    nav_buttons = []
-    if menu["parent"]:
-        nav_buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data=f"menu_back_{menu['parent']}"))
-    if menu_key != "main_menu":
-        nav_buttons.append(InlineKeyboardButton("🏠 Главное меню", callback_data="menu_goto_main_menu"))
-    if nav_buttons:
-        keyboard.append(nav_buttons)
-    
-    return InlineKeyboardMarkup(keyboard)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key: str, message_to_edit: Optional[telegram.Message] = None):
+async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key: str):
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
-        text = "Ошибка: Меню не найдено."
-        if message_to_edit:
-            await message_to_edit.edit_text(text, reply_markup=None)
-        else:
-            await update.message.reply_text(text, reply_markup=get_main_reply_keyboard())
+        await update.message.reply_text("Ошибка: Меню не найдено.", reply_markup=generate_menu_keyboard("main_menu", context))
         return
     
     context.user_data['current_menu'] = menu_key
     text = escape_markdown(menu["title"], version=2)
     reply_markup = generate_menu_keyboard(menu_key, context)
     
-    if message_to_edit:
-        await message_to_edit.edit_text(text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
 
 # --- Обработчики команд ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -453,19 +443,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_mode_name = get_current_mode_details(context)['name']
     current_model_name = AVAILABLE_TEXT_MODELS[current_model_key]['name']
 
-    greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.\n🧠 Агент: *{escape_markdown(current_mode_name, version=2)}*\n⚙️ Модель: *{escape_markdown(current_model_name, version=2)}*\n\n💬 Задавайте вопросы или используйте *Меню* ниже!"
+    greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.\n🧠 Агент: *{escape_markdown(current_mode_name, version=2)}*\n⚙️ Модель: *{escape_markdown(current_model_name, version=2)}*\n\n💬 Задавайте вопросы или используйте меню ниже!"
     try:
         await update.message.reply_text(
             greeting,
             parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=get_main_reply_keyboard(),
+            reply_markup=generate_menu_keyboard("main_menu", context),
             disable_web_page_preview=True
         )
-        await show_menu(update, context, "main_menu")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending /start message: {e}")
-        plain_text = f"Привет! Я ИИ-бот Gemini.\nАгент: {current_mode_name}\nМодель: {current_model_name}\n\nЗадавайте вопросы или используйте Меню!"
-        await update.message.reply_text(plain_text, reply_markup=get_main_reply_keyboard())
+        plain_text = f"Привет! Я ИИ-бот Gemini.\nАгент: {current_mode_name}\nМодель: {current_model_name}\n\nЗадавайте вопросы или используйте меню!"
+        await update.message.reply_text(plain_text, reply_markup=generate_menu_keyboard("main_menu", context))
     logger.info(f"Start command processed for user {user_id}.")
 
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -483,30 +472,17 @@ async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFA
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_menu(update, context, "help_submenu")
 
-async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE,
-                                 called_from_button: bool = False, message_to_edit: Optional[telegram.Message] = None):
+async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    reply_chat_id = None
-    if called_from_button and update.callback_query:
-        reply_chat_id = update.callback_query.message.chat_id
-    elif update.message:
-        reply_chat_id = update.message.chat_id
-        message_to_edit = None
-    else:
-        logger.warning("claim_news_bonus_logic: Could not determine user or reply target.")
-        return
+    reply_chat_id = update.message.chat_id
 
     if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle":
-        error_message = "Функция бонуса не настроена."
-        if message_to_edit: await message_to_edit.edit_text(error_message, reply_markup=None, disable_web_page_preview=True)
-        else: await context.bot.send_message(chat_id=reply_chat_id, text=error_message, disable_web_page_preview=True)
+        await context.bot.send_message(chat_id=reply_chat_id, text="Функция бонуса не настроена.", disable_web_page_preview=True)
         return
 
     bonus_model_config = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY)
     if not bonus_model_config:
-        error_message = "Ошибка: Бонусная модель не найдена."
-        if message_to_edit: await message_to_edit.edit_text(error_message, reply_markup=None, disable_web_page_preview=True)
-        else: await context.bot.send_message(chat_id=reply_chat_id, text=error_message, disable_web_page_preview=True)
+        await context.bot.send_message(chat_id=reply_chat_id, text="Ошибка: Бонусная модель не найдена.", disable_web_page_preview=True)
         return
     bonus_model_name_md = escape_markdown(bonus_model_config['name'], version=2)
 
@@ -517,8 +493,7 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
             reply_text_claimed = (f"Вы уже активировали бонус\. У вас осталось *{uses_left}* бесплатных генераций для модели '{bonus_model_name_md}'\.\nНаш [канал]({NEWS_CHANNEL_LINK})\.")
         else:
             reply_text_claimed = (f"Вы уже получали и использовали бонус для модели '{bonus_model_name_md}'\.\nНаш [канал]({NEWS_CHANNEL_LINK})\.")
-        if message_to_edit: await message_to_edit.edit_text(reply_text_claimed, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-        else: await context.bot.send_message(chat_id=reply_chat_id, text=reply_text_claimed, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+        await context.bot.send_message(chat_id=reply_chat_id, text=reply_text_claimed, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
         return
 
     try:
@@ -527,17 +502,13 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
             context.user_data['claimed_news_bonus'] = True
             context.user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
             success_text = (f"🎉 Спасибо за подписку на [канал]({NEWS_CHANNEL_LINK})\!\nВам начислена *{NEWS_CHANNEL_BONUS_GENERATIONS}* бесплатная генерация для модели '{bonus_model_name_md}'\.")
-            if message_to_edit: await message_to_edit.edit_text(success_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-            else: await context.bot.send_message(chat_id=reply_chat_id, text=success_text, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+            await context.bot.send_message(chat_id=reply_chat_id, text=success_text, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
         else:
-            fail_text = (f"Подписка на [канал]({NEWS_CHANNEL_LINK}) не найдена\. Пожалуйста, убедитесь, что вы подписаны, и нажмите кнопку проверки еще раз\.")
-            reply_markup_after_fail = InlineKeyboardMarkup([
-                [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)],
-                [InlineKeyboardButton("✅ Я подписался, проверить снова!", callback_data="menu_check_bonus_news_bonus")]])
-            if message_to_edit:
-                await message_to_edit.edit_text(fail_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup_after_fail, disable_web_page_preview=True)
-            else:
-                await context.bot.send_message(chat_id=reply_chat_id, text=fail_text, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+            fail_text = (f"Подпишитесь на [канал]({NEWS_CHANNEL_LINK}) и нажмите «Получить бонус» снова\.")
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
+            ])
+            await context.bot.send_message(chat_id=reply_chat_id, text=fail_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
     except telegram.error.BadRequest as e:
         error_text_response = str(e).lower()
         reply_message_on_error = f"Ошибка проверки подписки: {escape_markdown(str(e), version=2)}\. Попробуйте позже\."
@@ -548,15 +519,13 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         elif "bot is not a member" in error_text_response:
             reply_message_on_error = f"Не удалось проверить подписку\. Если канал приватный, бот должен быть его участником\."
         logger.error(f"BadRequest error checking channel membership for user {user.id} in {NEWS_CHANNEL_USERNAME}: {e}")
-        if message_to_edit: await message_to_edit.edit_text(reply_message_on_error, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-        else: await context.bot.send_message(chat_id=reply_chat_id, text=reply_message_on_error, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+        await context.bot.send_message(chat_id=reply_chat_id, text=reply_message_on_error, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
     except Exception as e:
         logger.error(f"Unexpected error in claim_news_bonus_logic for user {user.id}: {e}\n{traceback.format_exc()}")
         error_message_general = "Произошла непредвиденная ошибка при попытке получить бонус\. Попробуйте позже\."
-        if message_to_edit: await message_to_edit.edit_text(error_message_general, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-        else: await context.bot.send_message(chat_id=reply_chat_id, text=error_message_general, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+        await context.bot.send_message(chat_id=reply_chat_id, text=error_message_general, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
 
-async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE, message_to_edit: Optional[telegram.Message] = None):
+async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
     display_sub_level = "Бесплатный доступ"
@@ -597,12 +566,9 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE, messag
         usage_text_parts.append(f"\nХотите больше лимитов? Перейдите в меню «Подписка Профи»\.")
 
     final_usage_text_md = "\n".join(usage_text_parts)
-    reply_markup = generate_menu_keyboard("limits_submenu", context)
+    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
     try:
-        if message_to_edit:
-            await message_to_edit.edit_text(final_usage_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
-        else:
-            await update.message.reply_text(final_usage_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text(final_usage_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending limits: {e}")
         plain_usage_parts = [f"Статус: {display_sub_level}", "Лимиты:"]
@@ -621,12 +587,9 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE, messag
             else: plain_usage_parts.append(f"\nБонус за {NEWS_CHANNEL_LINK} ({bonus_model_name_plain}) использован.")
         if not subscription_active: plain_usage_parts.append("\nПодписка Профи: Меню «Подписка Профи»")
         plain_text = "\n".join(plain_usage_parts)
-        if message_to_edit:
-            await message_to_edit.edit_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
-        else:
-            await update.message.reply_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
 
-async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE, message_to_edit: Optional[telegram.Message] = None):
+async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_parts = ["🌟 *Подписка Профи – Максимум возможностей Gemini\!* 🌟",
                   "\nПолучите расширенные дневные лимиты для самых мощных моделей:"]
     m_conf_flash = AVAILABLE_TEXT_MODELS['google_gemini_2_5_flash_preview']
@@ -638,22 +601,18 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     text_parts.extend(["\n✨ *Тариф Профи для теста:*", f"▫️ Тест-драйв \(2 дня\): `{escape_markdown('99 рублей', version=2)}`"])
     
     keyboard = [[InlineKeyboardButton("💳 Купить Профи (2 дня - 99 RUB)", callback_data="buy_profi_2days")]]
-    reply_markup = InlineKeyboardMarkup(keyboard + generate_menu_keyboard("subscription_submenu", context).inline_keyboard)
+    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'subscription_submenu'), context)
     final_text_subscribe = "\n".join(text_parts)
     
     try:
-        if message_to_edit:
-            await message_to_edit.edit_text(final_text_subscribe, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
-        else:
-            await update.message.reply_text(final_text_subscribe, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text(final_text_subscribe, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text("Для покупки нажмите кнопку ниже:", reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
     except telegram.error.BadRequest:
         plain_text = "Подписка Профи: ... (упрощенный текст)"
-        if message_to_edit:
-            await message_to_edit.edit_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
-        else:
-            await update.message.reply_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text(plain_text, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text("Для покупки нажмите кнопку ниже:", reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
 
-async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, message_to_edit: Optional[telegram.Message] = None):
+async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text_parts = [
         f"👋 Я многофункциональный ИИ-бот на базе моделей Gemini от Google\.",
         "\n*Используйте меню для взаимодействия:*",
@@ -665,112 +624,96 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE, message_
         "\n💡 Просто отправьте свой вопрос или задание боту\!"
     ]
     final_help_text_md = "\n".join([escape_markdown(part, version=2) if not part.startswith("`") and not NEWS_CHANNEL_LINK in part else part for part in help_text_parts])
-    reply_markup = generate_menu_keyboard("help_submenu", context)
+    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'help_submenu'), context)
     
     try:
-        if message_to_edit:
-            await message_to_edit.edit_text(final_help_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
-        else:
-            await update.message.reply_text(final_help_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text(final_help_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending help: {e}")
         plain_help_text = ["Я ИИ-бот Gemini. Используйте меню:", "- Режимы ИИ: Выберите агента.", "- Модели ИИ: Переключите модель.",
                            "- Лимиты: Проверьте запросы.", f"- Бонус: Генерации за подписку на {NEWS_CHANNEL_LINK}.", "- Подписка Профи: Увеличьте лимиты.", "\nНапишите ваш вопрос."]
-        if message_to_edit:
-            await message_to_edit.edit_text("\n".join(plain_help_text), reply_markup=reply_markup, disable_web_page_preview=True)
+        await update.message.reply_text("\n".join(plain_help_text), reply_markup=reply_markup, disable_web_page_preview=True)
+
+# --- Обработчик кнопок меню ---
+async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    button_text = update.message.text
+    current_menu_key = context.user_data.get('current_menu', 'main_menu')
+    current_menu = MENU_STRUCTURE.get(current_menu_key, MENU_STRUCTURE['main_menu'])
+
+    # Обработка навигационных кнопок
+    if button_text == "⬅️ Назад":
+        parent_menu = current_menu.get("parent")
+        if parent_menu:
+            await show_menu(update, context, parent_menu)
         else:
-            await update.message.reply_text("\n".join(plain_help_text), reply_markup=reply_markup, disable_web_page_preview=True)
-
-# --- Обработчик кнопок ---
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    user_id = query.from_user.id
-    message_to_edit = query.message
-    new_text = ""
-    plain_fallback = ""
-
-    if data.startswith("menu_"):
-        action = data.split("_")[1]
-        target = "_".join(data.split("_")[2:])
-        
-        if action == "submenu":
-            await show_menu(update, context, target, message_to_edit)
-            return
-        
-        elif action == "set_agent":
-            if target in AI_MODES and target != "gemini_pro_custom_mode":
-                context.user_data['current_ai_mode'] = target
-                details = AI_MODES[target]
-                new_text = f"🤖 Агент изменен на: *{escape_markdown(details['name'], version=2)}*\n\n{escape_markdown(details['welcome'], version=2)}"
-                plain_fallback = f"Агент: {details['name']}.\n{details['welcome']}"
-            elif target == "gemini_pro_custom_mode":
-                new_text = escape_markdown("Этот режим для Gemini 2.5 Pro выбирается автоматически.", version=2)
-                plain_fallback = "Режим для Gemini 2.5 Pro выбирается автоматически."
-            else:
-                new_text = plain_fallback = "⚠️ Ошибка: Агент не найден."
-            reply_markup = generate_menu_keyboard("ai_modes_submenu", context)
-        
-        elif action == "set_model":
-            if target in AVAILABLE_TEXT_MODELS:
-                config = AVAILABLE_TEXT_MODELS[target]
-                context.user_data['selected_model_id'] = config["id"]
-                context.user_data['selected_api_type'] = config["api_type"]
-                today_str = datetime.now().strftime("%Y-%m-%d")
-                user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
-                model_daily_usage = user_model_counts.get(target, {'date': '', 'count': 0})
-                current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
-                actual_l = get_user_actual_limit_for_model(user_id, target, context)
-                limit_str = f'Ваш лимит для этой модели: {current_c_display}/{actual_l} в день'
-                new_text = f"⚙️ Модель изменена на: *{escape_markdown(config['name'], version=2)}*\n{escape_markdown(limit_str, version=2)}"
-                plain_fallback = f"Модель: {config['name']}. {limit_str}."
-            else:
-                new_text = plain_fallback = "⚠️ Ошибка: Такая модель не найдена."
-            reply_markup = generate_menu_keyboard("models_submenu", context)
-        
-        elif action == "show_limits":
-            await show_limits(update, context, message_to_edit)
-            return
-        
-        elif action == "check_bonus":
-            await claim_news_bonus_logic(update, context, called_from_button=True, message_to_edit=message_to_edit)
-            return
-        
-        elif action == "show_subscription":
-            await show_subscription(update, context, message_to_edit)
-            return
-        
-        elif action == "show_help":
-            await show_help(update, context, message_to_edit)
-            return
-        
-        elif action == "back":
-            await show_menu(update, context, target, message_to_edit)
-            return
-        
-        elif action == "goto" and target == "main_menu":
-            await show_menu(update, context, "main_menu", message_to_edit)
-            return
-
-    elif data == "buy_profi_2days":
-        await buy_button_handler(update, context)
+            await show_menu(update, context, "main_menu")
+        return
+    elif button_text == "🏠 Главное меню":
+        await show_menu(update, context, "main_menu")
         return
 
-    if new_text and message_to_edit:
-        try:
-            await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup, disable_web_page_preview=True)
-        except telegram.error.BadRequest:
-            try:
-                await message_to_edit.edit_text(text=plain_fallback, reply_markup=reply_markup, disable_web_page_preview=True)
-            except Exception as e_pf:
-                logger.error(f"Fallback edit failed in button_callback: {e_pf}")
+    # Поиск кнопки в текущем меню
+    selected_item = next((item for item in current_menu["items"] if item["text"] == button_text), None)
+    if not selected_item:
+        await update.message.reply_text("Команда не распознана. Используйте кнопки меню.", reply_markup=generate_menu_keyboard(current_menu_key, context))
+        return
 
+    action = selected_item["action"]
+    target = selected_item["target"]
+
+    if action == "submenu":
+        await show_menu(update, context, target)
+    elif action == "set_agent":
+        if target in AI_MODES and target != "gemini_pro_custom_mode":
+            context.user_data['current_ai_mode'] = target
+            details = AI_MODES[target]
+            new_text = f"🤖 Агент изменен на: *{escape_markdown(details['name'], version=2)}*\n\n{escape_markdown(details['welcome'], version=2)}"
+            plain_fallback = f"Агент: {details['name']}.\n{details['welcome']}"
+        elif target == "gemini_pro_custom_mode":
+            new_text = escape_markdown("Этот режим для Gemini 2.5 Pro выбирается автоматически.", version=2)
+            plain_fallback = "Режим для Gemini 2.5 Pro выбирается автоматически."
+        else:
+            new_text = plain_fallback = "⚠️ Ошибка: Агент не найден."
+        try:
+            await update.message.reply_text(new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=generate_menu_keyboard(current_menu_key, context), disable_web_page_preview=True)
+        except telegram.error.BadRequest:
+            await update.message.reply_text(plain_fallback, reply_markup=generate_menu_keyboard(current_menu_key, context))
+    elif action == "set_model":
+        if target in AVAILABLE_TEXT_MODELS:
+            config = AVAILABLE_TEXT_MODELS[target]
+            context.user_data['selected_model_id'] = config["id"]
+            context.user_data['selected_api_type'] = config["api_type"]
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
+            model_daily_usage = user_model_counts.get(target, {'date': '', 'count': 0})
+            current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
+            actual_l = get_user_actual_limit_for_model(user_id, target, context)
+            limit_str = f'Ваш лимит для этой модели: {current_c_display}/{actual_l} в день'
+            new_text = f"⚙️ Модель изменена на: *{escape_markdown(config['name'], version=2)}*\n{escape_markdown(limit_str, version=2)}"
+            plain_fallback = f"Модель: {config['name']}. {limit_str}."
+        else:
+            new_text = plain_fallback = "⚠️ Ошибка: Такая модель не найдена."
+        try:
+            await update.message.reply_text(new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=generate_menu_keyboard(current_menu_key, context), disable_web_page_preview=True)
+        except telegram.error.BadRequest:
+            await update.message.reply_text(plain_fallback, reply_markup=generate_menu_keyboard(current_menu_key, context))
+    elif action == "show_limits":
+        await show_limits(update, context)
+    elif action == "check_bonus":
+        await claim_news_bonus_logic(update, context)
+    elif action == "show_subscription":
+        await show_subscription(update, context)
+    elif action == "show_help":
+        await show_help(update, context)
+
+# --- Обработчик покупки ---
 async def buy_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    await query.answer()
     user_id = query.from_user.id
     if not PAYMENT_PROVIDER_TOKEN or "YOUR_REAL_PAYMENT_PROVIDER_TOKEN_HERE" in PAYMENT_PROVIDER_TOKEN:
-        await query.message.reply_text("⚠️ Сервис оплаты временно недоступен.", reply_markup=get_main_reply_keyboard())
+        await query.message.reply_text("⚠️ Сервис оплаты временно недоступен.", reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
         return
     prices = [LabeledPrice(label="Подписка Профи (2 дня)", amount=99 * 100)]
     try:
@@ -781,7 +724,7 @@ async def buy_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_reply_markup(reply_markup=None)
     except Exception as e:
         logger.error(f"Error sending invoice to user {user_id}: {e}")
-        await query.message.reply_text("⚠️ Не удалось создать счет. Попробуйте позже.")
+        await query.message.reply_text("⚠️ Не удалось создать счет. Попробуйте позже.", reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
@@ -800,15 +743,15 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         }
         await update.message.reply_text(
             f"🎉 Оплата успешна! Подписка Профи активирована до {datetime.fromisoformat(valid_until):%Y-%m-%d %H:%M}\.\nТеперь вам доступны расширенные лимиты!",
-            parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
+            parse_mode=ParseMode.MARKDOWN_V2, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
     else:
-        await update.message.reply_text("Оплата прошла, но тип подписки не распознан.", reply_markup=get_main_reply_keyboard())
+        await update.message.reply_text("Оплата прошла, но тип подписки не распознан.", reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     user_id = update.effective_user.id
     if not user_message or not user_message.strip():
-        await update.message.reply_text("Пожалуйста, отправьте непустой запрос.", reply_markup=get_main_reply_keyboard())
+        await update.message.reply_text("Пожалуйста, отправьте непустой запрос.", reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
         return
 
     current_model_key = get_current_model_key(context)
@@ -817,7 +760,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     can_request, limit_message_text, _ = check_and_log_request_attempt(user_id, current_model_key, context)
     if not can_request:
-        await update.message.reply_text(limit_message_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard(), disable_web_page_preview=True)
+        await update.message.reply_text(limit_message_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context), disable_web_page_preview=True)
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
@@ -902,7 +845,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         increment_request_count(user_id, current_model_key, context)
             
     reply_text_final, _ = smart_truncate(reply_text, MAX_MESSAGE_LENGTH_TELEGRAM)
-    await update.message.reply_text(reply_text_final, reply_markup=get_main_reply_keyboard())
+    await update.message.reply_text(reply_text_final, reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context))
 
 async def set_bot_commands(application: Application):
     commands = [
@@ -931,10 +874,8 @@ async def main():
     application.add_handler(CommandHandler("subscribe", subscribe_info_command))
     application.add_handler(CommandHandler("get_news_bonus", get_news_bonus_info_command))
     application.add_handler(CommandHandler("help", help_command))
-
-    application.add_handler(MessageHandler(filters.Text(["📋 Меню"]), open_menu_command))
     
-    application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler))
 
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
