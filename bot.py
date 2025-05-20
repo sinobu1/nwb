@@ -105,7 +105,7 @@ DEFAULT_AI_MODE_KEY = "universal_ai_basic"
 AVAILABLE_TEXT_MODELS = {
     "google_gemini_2_0_flash": { # Пользователь называет "2.0"
         "name": "⚡️ Gemini 2.0 Flash (100/день)",
-        "id": "gemini-flash-1.5-latest", # Используем актуальный ID для Flash, если старый "gemini-2.0-flash" не существует или устарел
+        "id": "gemini-2.0-flash", # Используем актуальный ID для Flash, если старый "gemini-2.0-flash" не существует или устарел
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "daily_free",
@@ -114,7 +114,7 @@ AVAILABLE_TEXT_MODELS = {
     },
     "google_gemini_2_5_flash_preview": { # Пользователь называет "2.5 флэш"
         "name": "💨 Gemini 2.5 Flash Preview",
-        "id": "gemini-1.5-flash-preview-0514", # Пример актуального ID, проверьте доступность в API Gemini
+        "id": "gemini-2.5-flash-preview-04-17", # Пример актуального ID, проверьте доступность в API Gemini
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "subscription_or_daily_free",
