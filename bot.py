@@ -105,7 +105,7 @@ DEFAULT_AI_MODE_KEY = "universal_ai_basic"
 AVAILABLE_TEXT_MODELS = {
     "google_gemini_2_0_flash": { # Пользователь называет "2.0"
         "name": "⚡️ Gemini 2.0 Flash (100/день)",
-        "id": "gemini-2.0-flash", # Используем актуальный ID для Flash, если старый "gemini-2.0-flash" не существует или устарел
+        "id": "gemini-2.0-flash", # ПРОВЕРЬ АКТУАЛЬНОСТЬ ЭТОГО ID ДЛЯ GOOGLE GENAI! Может быть "gemini-1.5-flash-latest"
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "daily_free",
@@ -114,7 +114,7 @@ AVAILABLE_TEXT_MODELS = {
     },
     "google_gemini_2_5_flash_preview": { # Пользователь называет "2.5 флэш"
         "name": "💨 Gemini 2.5 Flash Preview",
-        "id": "gemini-2.5-flash-preview-04-17", # Пример актуального ID, проверьте доступность в API Gemini
+        "id": "gemini-2.5-flash-preview-04-17", # ПРОВЕРЬ АКТУАЛЬНОСТЬ ЭТОГО ID ДЛЯ GOOGLE GENAI! Может быть новее, напр. 'gemini-1.5-flash-preview-0514'
         "api_type": "google_genai",
         "is_limited": True,
         "limit_type": "subscription_or_daily_free",
@@ -124,19 +124,19 @@ AVAILABLE_TEXT_MODELS = {
     },
     "custom_api_gemini_2_5_pro": { # Пользователь называет "2.5 про"
         "name": "🌟 Gemini 2.5 Pro (Продвинутый)",
-        "id": "gemini-2.5-pro-preview-03-25", # ID для Custom API, как было
+        "id": "gemini-2.5-pro-preview-03-25", # ID для Custom API (gen-api.ru), проверь его актуальность у провайдера
         "api_type": "custom_http_api",
         "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
         "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True,
-        "limit_type": "subscription_custom_pro", # Этот тип подразумевает бесплатный лимит и лимит для подписчиков
+        "limit_type": "subscription_custom_pro", 
         "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY, # 2
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY, # 25
         "cost_category": "custom_api_pro_paid",
-        "pricing_info": {} # Информация о ценах теперь в /subscribe
+        "pricing_info": {} 
     }
 }
-DEFAULT_MODEL_KEY = "google_gemini_2_0_flash" # Стартовая модель
+DEFAULT_MODEL_KEY = "google_gemini_2_0_flash" 
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
 
 
@@ -237,7 +237,7 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
 def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton("🤖 Режим ИИ"), KeyboardButton("⚙️ Модель ИИ")],
-        [KeyboardButton("📊 Лимиты"), KeyboardButton("💎 Подписка Профи")], # Изменено "Лимиты / Подписка"
+        [KeyboardButton("📊 Лимиты"), KeyboardButton("💎 Подписка Профи")],
         [KeyboardButton("❓ Помощь")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
@@ -253,18 +253,13 @@ def get_user_actual_limit_for_model(user_id: int, model_key: str, context: Conte
     current_sub_level = None
     if user_subscription_details.get('valid_until'):
         try:
-            # Используем datetime.fromisoformat для большей гибкости с форматами дат, если они сохраняются с часовыми поясами
             valid_until_dt = datetime.fromisoformat(user_subscription_details['valid_until'])
-            # Убедимся, что сравнение происходит с учетом часового пояса, если он есть, или без него
             now_dt = datetime.now(valid_until_dt.tzinfo) 
 
             if now_dt.date() <= valid_until_dt.date():
                 current_sub_level = user_subscription_details.get('level')
             else:
                 logger.info(f"Subscription for user {user_id} (level {user_subscription_details.get('level')}) expired on {user_subscription_details['valid_until']}.")
-                # Опционально: автоматически удалять просроченную подписку
-                # user_subscription_details['level'] = None
-                # user_subscription_details['valid_until'] = None
         except ValueError:
             logger.error(f"Invalid date format for subscription for user {user_id}: {user_subscription_details['valid_until']}")
         except Exception as e_date:
@@ -277,18 +272,18 @@ def get_user_actual_limit_for_model(user_id: int, model_key: str, context: Conte
     if limit_type == "daily_free":
         actual_limit = model_config.get("limit", 0)
     elif limit_type == "subscription_or_daily_free":
-        if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY: # Проверяем наш единый ключ подписки
+        if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY: 
             actual_limit = model_config.get("subscription_daily_limit", 0)
         else:
             actual_limit = model_config.get("limit_if_no_subscription", 0)
     elif limit_type == "subscription_custom_pro":
-        if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY: # Проверяем наш единый ключ подписки
+        if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY: 
             actual_limit = model_config.get("subscription_daily_limit", 0)
         else:
             actual_limit = model_config.get("limit_if_no_subscription", 0)
-    else: # Для моделей без явного лимита или неограниченных (если такие будут)
+    else: 
         actual_limit = model_config.get("limit", float('inf')) if not model_config.get("is_limited", False) else 0
-        if model_config.get("is_limited") and actual_limit == float('inf'): # Санитизация: если is_limited, но лимит inf
+        if model_config.get("is_limited") and actual_limit == float('inf'): 
             logger.warning(f"Model {model_key} is limited but actual_limit is infinity for user {user_id} (sub: {current_sub_level}). Setting to 0.")
             actual_limit = 0
     return actual_limit
@@ -298,10 +293,10 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config or not model_config.get("is_limited"):
         logger.debug(f"Model {model_key} not found or not limited. Allowing request.")
-        return True, "", 0 # Возвращаем 0 как current_count, т.к. лимита нет
+        return True, "", 0 
     
     all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
-    user_model_counts = all_daily_counts.setdefault(user_id, {}) # {user_id: {model_key: {'date': '', 'count': 0}}}
+    user_model_counts = all_daily_counts.setdefault(user_id, {}) 
     model_daily_usage = user_model_counts.setdefault(model_key, {'date': '', 'count': 0})
 
     if model_daily_usage['date'] != today_str:
@@ -316,12 +311,6 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
     if current_user_model_count >= actual_limit:
         message = (f"Вы достигли дневного лимита ({current_user_model_count}/{actual_limit}) "
                    f"для модели '{model_config['name']}'.\n"
-                   f"Попробуйте завтра или рассмотрите <a href=\"tg://bot_command?command=subscribe\">💎 Подписку Профи</a> для увеличения лимитов.")
-        # Используем HTML для ссылки, если хотим так. Или просто /subscribe текстом.
-        # Для ParseMode.MARKDOWN_V2 ссылка будет `[💎 Подписку Профи](/command?command=subscribe)` но это не стандартная команда.
-        # Проще просто указать команду /subscribe.
-        message = (f"Вы достигли дневного лимита ({current_user_model_count}/{actual_limit}) "
-                   f"для модели '{model_config['name']}'.\n"
                    "Попробуйте завтра или рассмотрите подписку /subscribe для увеличения лимитов.")
 
         return False, message, current_user_model_count
@@ -329,7 +318,7 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
 
 def increment_request_count(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE):
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_config or not model_config.get("is_limited"): # Не увеличиваем счетчик для нелимитированных
+    if not model_config or not model_config.get("is_limited"): 
         return
 
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -339,7 +328,7 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
     
     if model_daily_usage['date'] != today_str: 
         model_daily_usage['date'] = today_str
-        model_daily_usage['count'] = 0 # На всякий случай, хотя это должно быть сделано в check_and_log_request_attempt
+        model_daily_usage['count'] = 0 
         
     model_daily_usage['count'] += 1
     logger.info(f"User {user_id} request count for {model_key} incremented to {model_daily_usage['count']}")
@@ -354,7 +343,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['selected_model_id'] = default_model_conf["id"]
         context.user_data['selected_api_type'] = default_model_conf["api_type"]
 
-    context.bot_data.setdefault('user_subscriptions', {}) # {user_id: {'level': 'profi_access_v1', 'valid_until': 'YYYY-MM-DDTHH:MM:SS'}}
+    context.bot_data.setdefault('user_subscriptions', {}) 
     context.bot_data.setdefault('all_user_daily_counts', {})
     
     current_model_key_for_start = get_current_model_key(context)
@@ -457,11 +446,7 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usage_text += "Ежедневные лимиты запросов по моделям:\n"
     for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
         if model_c.get("is_limited"):
-            # Передаем user_id и context для корректного определения лимита в check_and_log_request_attempt
-            _, _, current_c = check_and_log_request_attempt(user_id, model_k, context) # Получаем актуальный счетчик
-            # Сбрасываем счетчик для этого вызова, чтобы не инкрементировать его просто при просмотре
-            # Это делается внутри check_and_log_request_attempt если день сменился.
-            # Здесь нам нужен именно актуальный лимит, а не проверка возможности запроса.
+            _, _, current_c = check_and_log_request_attempt(user_id, model_k, context) 
             actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
             
             usage_text += f"▫️ {escape_markdown(model_c['name'], version=2)}: *{current_c}/{actual_l}*\n"
@@ -495,17 +480,16 @@ async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_T
     text += "Базовая модель всегда доступна с щедрым лимитом:\n"
     text += f"⚡️ {escape_markdown(AVAILABLE_TEXT_MODELS['google_gemini_2_0_flash']['name'], version=2)}: *{DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY} запросов/день* (бесплатно для всех)\n\n"
 
-    text += "✨ **Выберите свой тариф Профи:**\n"
+    text += "✨ **Доступный тариф Профи для теста:**\n" # ИЗМЕНЕН ЗАГОЛОВОК
     text += f"▫️ **Тест-драйв (2 дня):** `{escape_markdown('99 рублей', version=2)}`\n"
-    text += f"▫️ **Неделя с Gemini (7 дней):** `{escape_markdown('349 рублей', version=2)}`\n"
-    text += f"▫️ **Полный вперед (1 месяц):** `{escape_markdown('1499 рублей', version=2)}`\n\n"
+    # Закомментированы другие варианты подписки для временного упрощения
+    # text += f"▫️ **Неделя с Gemini (7 дней):** `{escape_markdown('349 рублей', version=2)}`\n"
+    # text += f"▫️ **Полный вперед (1 месяц):** `{escape_markdown('1499 рублей', version=2)}`\n\n"
+    text += "\n" # Добавил пустую строку для разделения
 
     text += "🚀 **Как оформить Подписку Профи?**\n"
     text += "Автоматическая система оплаты находится в разработке и будет доступна в ближайшее время\\!\n"
-    text += "Следите за обновлениями\\.\n\n" # Экранируем ! и . для MarkdownV2
-
-    # Опционально: если есть временный способ оплаты
-    # text += "А пока вы можете написать администратору @YourAdminUsername (если он есть) для оформления вручную.\n\n"
+    text += "Следите за обновлениями\\.\n\n" 
 
     text += f"{escape_markdown('Ваш Telegram User ID (может понадобиться для ручной активации в будущем):', version=2)} `{user_id}`"
     
@@ -513,17 +497,16 @@ async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest as e_br:
         logger.error(f"Error sending subscribe_info_command with Markdown: {e_br}. Text: {text}")
-        # Упрощенный текст без сложного форматирования
         plain_text = (
             "🌟 Подписка Профи – Максимум возможностей Gemini! 🌟\n\n"
             "С Подпиской Профи вы получаете:\n"
             f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_5_flash_preview']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY} запросов/день (бесплатно {DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY})\n"
             f"- {AVAILABLE_TEXT_MODELS['custom_api_gemini_2_5_pro']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY} запросов/день (бесплатно {DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY})\n"
             f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_0_flash']['name']}: {DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY} запросов/день (бесплатно для всех)\n\n"
-            "Тарифы:\n"
-            "- 2 дня: 99 руб.\n"
-            "- 1 неделя: 349 руб.\n"
-            "- 1 месяц: 1499 руб.\n\n"
+            "Тариф для теста:\n" # ИЗМЕНЕНО
+            "- 2 дня: 99 руб.\n\n"
+            # "- 1 неделя: 349 руб.\n" # ЗАКОММЕНТИРОВАНО
+            # "- 1 месяц: 1499 руб.\n\n" # ЗАКОММЕНТИРОВАНО
             "Автоматическая оплата скоро появится! Ваш ID: " + str(user_id)
         )
         await update.message.reply_text(plain_text, reply_markup=get_main_reply_keyboard())
@@ -552,23 +535,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # Важно ответить на коллбэк как можно скорее
+    await query.answer() 
     data = query.data
     user_id = query.from_user.id
-    message_to_edit = query.message # Сообщение, к которому прикреплены кнопки
+    message_to_edit = query.message 
     new_text = ""
     plain_text_fallback = ""
 
     if data.startswith("set_mode_"):
         mode_key = data.split("set_mode_")[1]
-        if mode_key in AI_MODES and mode_key != "gemini_pro_custom_mode": # Пользователь не должен напрямую выбирать этот спец.режим
+        if mode_key in AI_MODES and mode_key != "gemini_pro_custom_mode": 
             context.user_data['current_ai_mode'] = mode_key
             mode_details = AI_MODES[mode_key]
             new_text = f"🤖 Режим изменен на: *{escape_markdown(mode_details['name'],version=2)}*\n\n{escape_markdown(mode_details['welcome'],version=2)}"
             plain_text_fallback = f"Режим изменен на: {mode_details['name']}.\n{mode_details['welcome']}"
             logger.info(f"User {user_id} changed AI mode to {mode_key}")
         elif mode_key == "gemini_pro_custom_mode":
-             # Это сообщение не должно появляться, т.к. кнопка скрыта, но на всякий случай
              new_text = escape_markdown("Этот режим предназначен для модели Gemini 2.5 Pro и выбирается автоматически.", version=2)
              plain_text_fallback = "Этот режим выбирается автоматически с моделью Gemini 2.5 Pro."
         else:
@@ -584,7 +566,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             model_name_md = escape_markdown(selected_model_config['name'], version=2)
             
-            # Получаем актуальные лимиты для отображения
             _, _, current_c = check_and_log_request_attempt(user_id, model_key_from_callback, context)
             actual_l = get_user_actual_limit_for_model(user_id, model_key_from_callback, context)
             
@@ -600,8 +581,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     if new_text:
         try:
-            # Редактируем исходное сообщение с инлайн-кнопками
-            await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None) # Убираем кнопки после выбора
+            await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None) 
         except telegram.error.BadRequest as e_md:
             logger.warning(f"Failed to edit message with MarkdownV2 in button_callback: {e_md}. Sending plain text. Text was: {new_text}")
             try:
@@ -629,11 +609,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     can_request, limit_message, _ = check_and_log_request_attempt(user_id, current_model_key, context)
     if not can_request:
-        # Отправляем сообщение о лимите с HTML parse_mode, если ссылка была HTML, или без parse_mode
-        # В check_and_log_request_attempt сейчас сообщение без HTML, так что parse_mode не нужен или MARKDOWN_V2 если есть разметка.
-        # Убедимся, что сообщение о лимите не содержит Markdown, если отправляем без parse_mode.
-        # Если используется Markdown в limit_message, то нужен parse_mode=ParseMode.MARKDOWN_V2
-        await update.message.reply_text(limit_message, reply_markup=get_main_reply_keyboard()) #, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(limit_message, reply_markup=get_main_reply_keyboard()) 
         logger.info(f"User {user_id} limit REJECTED for model_key {current_model_key}: {limit_message}")
         return
     logger.info(f"User {user_id} limit ACCEPTED for model_key {current_model_key}.")
@@ -655,32 +631,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"Using Google genai model: {model_id_for_api} for user {user_id}")
                 
                 generation_config_params = {"temperature": 0.75}
-                # Для новых моделей типа 1.5 Pro/Flash Google может автоматически управлять токенами или иметь другие рекомендации
-                if MAX_OUTPUT_TOKENS_GEMINI_LIB > 0 and "1.5" not in model_id_for_api: 
+                if MAX_OUTPUT_TOKENS_GEMINI_LIB > 0 and "1.5" not in model_id_for_api and "2.0" not in model_id_for_api: 
                     generation_config_params["max_output_tokens"] = MAX_OUTPUT_TOKENS_GEMINI_LIB
                 generation_config = genai.types.GenerationConfig(**generation_config_params)
                 
-                # Создаем историю чата для более контекстных ответов, если нужно
-                # Пока что используем простой запрос-ответ без сохранения истории между запросами в самом Gemini API
-                # (бот сохраняет только выбранный режим/модель)
-                # Если нужна история, то ее надо будет собирать из context.user_data
-                
-                # Для простого запроса:
-                # response_gen = await active_model.generate_content_async(
-                #     f"{system_prompt_text}\n\nUser query: {user_message}", # Можно объединить промпт и запрос
-                #     generation_config=generation_config
-                # )
-
-                # Если используем ChatSession (предпочтительнее для system prompt):
                 chat_history = [
-                    {"role": "user", "parts": [system_prompt_text]}, # Системный промпт как первое сообщение от "user"
-                    {"role": "model", "parts": ["Понял. Я готов помочь."]} # Ответ модели на системный промпт
+                    {"role": "user", "parts": [system_prompt_text]}, 
+                    {"role": "model", "parts": ["Понял. Я готов помочь."]} 
                 ]
-                # Проверяем, есть ли сохраненная история для этого пользователя и режима/модели (если реализуем такую фичу)
-                # user_chat_history = context.user_data.get(f"chat_history_{current_model_key}", [])
-                # full_chat_history = chat_history + user_chat_history
 
-                chat = active_model.start_chat(history=chat_history) # Инициализируем чат с базовой историей (системный промпт)
+                chat = active_model.start_chat(history=chat_history) 
                 logger.debug(f"Sending to Google API. Model: {model_id_for_api}. System prompt (len {len(system_prompt_text)}): '{system_prompt_text[:100]}...', User message: '{user_message[:100]}'")
                 
                 response_gen = await chat.send_message_async(user_message, generation_config=generation_config)
@@ -706,9 +666,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     block_reason_msg = ""
                     if hasattr(response_gen, 'prompt_feedback') and response_gen.prompt_feedback and response_gen.prompt_feedback.block_reason:
                         block_reason_msg = f" Причина: {response_gen.prompt_feedback.block_reason}."
-                    if response_gen.candidates and not response_gen.text: # Проверяем, есть ли кандидаты, но нет текста (может быть из-за safety ratings)
+                    if response_gen.candidates and not response_gen.text: 
                          candidate = response_gen.candidates[0]
-                         if candidate.finish_reason != 1: # 1 = STOP, другие могут быть SAFETY, RECITATION и т.д.
+                         if candidate.finish_reason != 1: 
                               block_reason_msg += f" Finish reason: {candidate.finish_reason.name}."
                          if candidate.safety_ratings:
                              block_reason_msg += f" Safety ratings: {[(sr.category.name, sr.probability.name) for sr in candidate.safety_ratings]}."
@@ -718,11 +678,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     reply_text = api_reply_text_google
                     request_successful = True
-                    # Если бы мы сохраняли историю:
-                    # context.user_data.setdefault(f"chat_history_{current_model_key}", []).append({"role": "user", "parts": [user_message]})
-                    # context.user_data[f"chat_history_{current_model_key}"].append({"role": "model", "parts": [api_reply_text_google]})
-                    # Ограничить размер истории, если нужно context.user_data[f"chat_history_{current_model_key}"] = context.user_data[f"chat_history_{current_model_key}"][-MAX_HISTORY_TURNS*2:]
-
 
             except google.api_core.exceptions.GoogleAPIError as e_google_api:
                 error_message = str(e_google_api).lower()
@@ -739,7 +694,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 elif "content filter" in error_message or "safety" in error_message:
                     reply_text = "⚠️ Запрос был заблокирован фильтрами безопасности Google. Попробуйте переформулировать."
                 elif "model not found" in error_message or "could not find model" in error_message:
-                    reply_text = f"⚠️ Модель '{selected_model_details['id']}' не найдена или неверно указан ID в Google API."
+                    reply_text = f"⚠️ Модель '{selected_model_details['id']}' не найдена или неверно указан ID в Google API. Проверьте актуальность ID модели."
 
 
             except Exception as e_general_google:
@@ -748,28 +703,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif api_type == "custom_http_api":
         api_key_var_name = selected_model_details.get("api_key_var_name")
-        actual_api_key = globals().get(api_key_var_name) # Получаем ключ из глобальных переменных по имени
+        actual_api_key = globals().get(api_key_var_name) 
 
-        if not actual_api_key or ("sk-" not in actual_api_key and "pk-" not in actual_api_key) : # Простая проверка валидности ключа
+        if not actual_api_key or ("sk-" not in actual_api_key and "pk-" not in actual_api_key) : 
             reply_text = f"⚠️ Ключ API для '{selected_model_details['name']}' не настроен корректно."
             logger.warning(f"API key from var '{api_key_var_name}' is missing or invalid for Custom API. Key: {str(actual_api_key)[:10]}...")
         else:
             endpoint = selected_model_details["endpoint"]
-            model_id_for_payload_api = selected_model_details["id"] # ID модели для payload запроса
+            model_id_for_payload_api = selected_model_details["id"] 
             
             messages_payload = [
-                {"role": "user", "content": system_prompt_text}, # Системный промпт как первое сообщение "user" для gen-api.ru
-                # {"role": "assistant", "content": "Understood. I'm ready to help."}, # Можно добавить имитацию ответа на системный промпт
+                {"role": "user", "content": system_prompt_text}, 
                 {"role": "user", "content": user_message}
             ]
 
             payload = {
                 "model": model_id_for_payload_api,
                 "messages": messages_payload,
-                "is_sync": True, # gen-api.ru параметр
+                "is_sync": True, 
                 "temperature": selected_model_details.get("temperature", 0.75),
-                "stream": False, # Для простоты пока без стриминга
-                # "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB, # Если API поддерживает и нужно ограничить
+                "stream": False, 
             }
             
             headers = {
@@ -781,7 +734,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.debug(f"Custom API Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
             try:
-                api_response = requests.post(endpoint, json=payload, headers=headers, timeout=90) # Увеличил таймаут
+                api_response = requests.post(endpoint, json=payload, headers=headers, timeout=90) 
                 logger.debug(f"Custom API response status: {api_response.status_code}")
                 response_data = {}
                 try:
@@ -789,17 +742,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.debug(f"Custom API response body (JSON): {json.dumps(response_data, ensure_ascii=False, indent=2)}")
                 except json.JSONDecodeError as e_json:
                     logger.error(f"Custom API response body (not JSON or decode error for status {api_response.status_code}): {api_response.text}. Error: {e_json}")
-                    if api_response.status_code >= 400: # Если ошибка и не JSON, то берем текст ответа
+                    if api_response.status_code >= 400: 
                          reply_text = f"⚠️ Ошибка от Custom API ({selected_model_details['name']}): {api_response.status_code} - {api_response.text[:200]}"
-                    else: # Если успешный статус, но не JSON (маловероятно для API)
+                    else: 
                          reply_text = f"⚠️ Ошибка декодирования ответа от Custom API ({selected_model_details['name']})."
-                    # Не делаем raise, чтобы обработать ниже, если нужно
                 
-                api_response.raise_for_status() # Это вызовет HTTPError для статусов 4xx/5xx
+                api_response.raise_for_status() 
 
-                # Структура ответа gen-api.ru может отличаться, адаптируем под ожидаемый формат
-                # Пример для OpenAI-совместимого API: response_data["choices"][0]["message"]["content"]
-                # Пример для gen-api.ru (судя по предыдущему коду): response_data["response"][0]["message"]["content"]
                 if "response" in response_data and isinstance(response_data["response"], list) and len(response_data["response"]) > 0:
                     first_choice = response_data["response"][0]
                     if "message" in first_choice and "content" in first_choice["message"]:
@@ -807,7 +756,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if api_reply_text_custom and api_reply_text_custom.strip():
                             reply_text = api_reply_text_custom
                             request_successful = True
-                            # Логирование стоимости, если API возвращает
                             if "cost" in response_data:
                                 cost = response_data["cost"]
                                 logger.info(f"Custom API request cost for {selected_model_details['name']}: {cost}")
@@ -818,25 +766,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     'cost': cost 
                                 })
                             req_id_resp = response_data.get("request_id")
-                            model_resp = response_data.get("model") # Модель, которую API фактически использовало
+                            model_resp = response_data.get("model") 
                             logger.info(f"Custom API success: request_id={req_id_resp}, model_in_response='{model_resp}'")
                         else:
                             reply_text = f"⚠️ ИИ ({selected_model_details['name']}) вернул пустой ответ в 'content'."
                             logger.warning(f"Custom API returned empty 'content' in message: {response_data}")
-                    else: # Если структура другая
+                    else: 
                         reply_text = f"⚠️ Некорректная структура 'message' или отсутствует 'content' в ответе от Custom API ({selected_model_details['name']})."
                         logger.warning(f"Custom API: 'message' or 'content' field missing in first choice: {first_choice}. Full response: {response_data}")
-                elif "detail" in response_data: # Обработка ошибок, если API возвращает их в поле "detail"
+                elif "detail" in response_data: 
                     error_detail = response_data['detail']
                     if isinstance(error_detail, list) and error_detail and "msg" in error_detail[0]:
                         reply_text = f"⚠️ Ошибка Custom API ({selected_model_details['name']}): {error_detail[0]['msg']}"
                     else:
                         reply_text = f"⚠️ Ошибка Custom API ({selected_model_details['name']}): {str(error_detail)[:200]}"
                     logger.error(f"Custom API returned error detail: {error_detail}. Full response: {response_data}")
-                elif not response_data and api_response.status_code == 200: # Пустой JSON при успехе
+                elif not response_data and api_response.status_code == 200: 
                      reply_text = f"⚠️ Custom API ({selected_model_details['name']}) вернул успешный статус, но пустой ответ."
                      logger.warning(f"Custom API returned 200 OK with empty JSON response.")
-                else: # Если вообще нет ожидаемых полей
+                else: 
                     reply_text = f"⚠️ Неожиданная структура ответа от Custom API ({selected_model_details['name']}). Статус: {api_response.status_code}."
                     logger.warning(f"Unexpected response structure from Custom API ({api_response.status_code}). Full response: {json.dumps(response_data, ensure_ascii=False)}")
             
@@ -853,24 +801,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     else:
                          error_content_str = json.dumps(error_content_json)
                 except json.JSONDecodeError: 
-                    error_content_str = e_http.response.text[:200] # Берем часть текста ошибки
+                    error_content_str = e_http.response.text[:200] 
                 
                 logger.error(f"HTTPError for Custom API '{selected_model_details['name']}': {e_http}. Status: {e_http.response.status_code}. Content: {error_content_str}")
-                if e_http.response.status_code == 401: # Неавторизован (неверный ключ)
+                if e_http.response.status_code == 401: 
                     reply_text = f"⚠️ Ошибка 401: Неверный API ключ для Custom API ({selected_model_details['name']}). Проверьте ключ."
                 elif e_http.response.status_code == 402:
                     reply_text = f"⚠️ Ошибка 402: Проблема с оплатой для Custom API ({selected_model_details['name']}). Возможно, закончился баланс на стороне API провайдера."
-                elif e_http.response.status_code == 422: # Ошибка валидации данных
+                elif e_http.response.status_code == 422: 
                      reply_text = f"⚠️ Ошибка 422: Неверный формат запроса к Custom API. Детали: {error_content_str}"
-                elif e_http.response.status_code == 429: # Слишком много запросов
+                elif e_http.response.status_code == 429: 
                      reply_text = f"⚠️ Ошибка 429: Превышен лимит запросов к Custom API. Попробуйте позже."
                 else:
                     reply_text = f"⚠️ Ошибка сети ({e_http.response.status_code}) при обращении к '{selected_model_details['name']}'. Детали: {error_content_str}"
 
-            except requests.exceptions.RequestException as e_req_custom: # Таймауты, проблемы с соединением
+            except requests.exceptions.RequestException as e_req_custom: 
                 logger.error(f"RequestException for Custom API '{selected_model_details['name']}': {e_req_custom}")
                 reply_text = f"⚠️ Ошибка сети при обращении к '{selected_model_details['name']}'. Попробуйте позже."
-            except Exception as e_custom_proc: # Любые другие ошибки при обработке Custom API
+            except Exception as e_custom_proc: 
                 logger.error(f"Error processing Custom API response for '{selected_model_details['name']}': {e_custom_proc}\n{traceback.format_exc()}")
                 reply_text = f"⚠️ Ошибка обработки ответа от '{selected_model_details['name']}'."
     else:
@@ -881,7 +829,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         increment_request_count(user_id, current_model_key, context)
             
     reply_text_for_sending, was_truncated = smart_truncate(reply_text, MAX_MESSAGE_LENGTH_TELEGRAM)
-    # Убедимся, что отправляем с правильной клавиатурой
     await update.message.reply_text(reply_text_for_sending, reply_markup=get_main_reply_keyboard())
     if request_successful:
         logger.info(f"Sent successful response for model_key {current_model_key}. User: {user_id}. Truncated: {was_truncated}")
@@ -896,9 +843,6 @@ async def set_bot_commands(application: Application):
         BotCommand("subscribe", "💎 Подписка Профи"),
         BotCommand("help", "ℹ️ Помощь"),
     ]
-    # Команда grantsub удалена
-    # if YOUR_ADMIN_ID: 
-    #     commands.append(BotCommand("grantsub", "🔑 Выдать подписку (админ)"))
 
     try:
         await application.bot.set_my_commands(commands)
@@ -911,31 +855,27 @@ async def main():
     if "YOUR_TELEGRAM_TOKEN" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8:
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or is a placeholder.")
         return
-    if "YOUR_GOOGLE_GEMINI_API_KEY" in GOOGLE_GEMINI_API_KEY and "YOUR_CUSTOM_GEMINI_PRO_API_KEY" in CUSTOM_GEMINI_PRO_API_KEY:
-         logger.warning("WARNING: API keys seem to be placeholders. Please set them correctly.")
+    # Убрал проверку на плейсхолдеры для API ключей здесь, т.к. она есть при их использовании
+    # if "YOUR_GOOGLE_GEMINI_API_KEY" in GOOGLE_GEMINI_API_KEY and "YOUR_CUSTOM_GEMINI_PRO_API_KEY" in CUSTOM_GEMINI_PRO_API_KEY:
+    #      logger.warning("WARNING: API keys seem to be placeholders. Please set them correctly.")
     
-    # Файл для сохранения данных теперь называется bot_data.pkl, а не bot_user_data.pkl
-    # Это соответствует стандартному именованию PicklePersistence, если не указать chat_data=False, user_data=False
     persistence = PicklePersistence(filepath="bot_data.pkl") 
 
     application = Application.builder().token(TOKEN).persistence(persistence).build()
 
     await set_bot_commands(application)
 
-    # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("mode", select_mode_command))
     application.add_handler(CommandHandler("model", select_model_command))
     application.add_handler(CommandHandler("usage", usage_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("subscribe", subscribe_info_command)) 
-    # УДАЛЕНО: application.add_handler(CommandHandler("grantsub", grant_subscription_command))
 
-    # Обработчики для кнопок главного меню
     application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
     application.add_handler(MessageHandler(filters.Text(["⚙️ Модель ИИ"]), select_model_command))
-    application.add_handler(MessageHandler(filters.Text(["📊 Лимиты"]), usage_command)) # Изменен текст кнопки
-    application.add_handler(MessageHandler(filters.Text(["💎 Подписка Профи"]), subscribe_info_command)) # Изменен текст кнопки
+    application.add_handler(MessageHandler(filters.Text(["📊 Лимиты"]), usage_command)) 
+    application.add_handler(MessageHandler(filters.Text(["💎 Подписка Профи"]), subscribe_info_command)) 
     application.add_handler(MessageHandler(filters.Text(["❓ Помощь"]), help_command))
     
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
