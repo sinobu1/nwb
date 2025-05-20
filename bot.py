@@ -7,7 +7,7 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.helpers import escape_markdown
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, CallbackQueryHandler, PicklePersistence
+    ContextTypes, CallbackQueryHandler, PicklePersistence, ConversationHandler # Убедитесь, что ConversationHandler импортирован
 )
 import google.generativeai as genai
 import google.api_core.exceptions
@@ -27,6 +27,15 @@ nest_asyncio.apply()
 # Установите logging.INFO для обычного режима, logging.DEBUG для подробной отладки
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- СОСТОЯНИЯ ДЛЯ МЕНЮ РЕЖИМОВ ИИ ---
+SELECT_AI_CATEGORY, SELECT_AI_AGENT_FROM_CATEGORY = range(2)
+# Для callback_data кнопок категорий
+CALLBACK_DATA_AI_CATEGORY_COMMUNICATION = "ai_cat_comm"
+CALLBACK_DATA_AI_CATEGORY_CREATIVE = "ai_cat_creative"
+#CALLBACK_DATA_AI_CATEGORY_SPECIALIZED = "ai_cat_spec" # Если понадобится
+CALLBACK_DATA_AI_BACK_TO_CATEGORIES = "ai_back_to_cat"
+CALLBACK_DATA_AI_CANCEL_SELECTION = "ai_cancel_sel"
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
@@ -235,11 +244,63 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
 
 def get_main_reply_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        [KeyboardButton("🤖 Режим ИИ"), KeyboardButton("⚙️ Модель ИИ")],
+        [KeyboardButton("🤖 Режим ИИ"), KeyboardButton("⚙️ Модель ИИ")], # Оставим эту кнопку для входа в новое меню
         [KeyboardButton("📊 Лимиты"), KeyboardButton("💎 Подписка Профи")],
-        [KeyboardButton("🎁 Бонус"), KeyboardButton("❓ Помощь")] # Кнопка "Бонус"
+        [KeyboardButton("🎁 Бонус"), KeyboardButton("❓ Помощь")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+# --- НОВЫЕ ФУНКЦИИ ДЛЯ КЛАВИАТУР МЕНЮ РЕЖИМОВ ИИ ---
+async def get_ai_category_keyboard() -> InlineKeyboardMarkup:
+    """Генерирует клавиатуру для выбора категории ИИ-агентов."""
+    keyboard = [
+        [InlineKeyboardButton("🗣️ Общение и Помощь", callback_data=CALLBACK_DATA_AI_CATEGORY_COMMUNICATION)],
+        [InlineKeyboardButton("✍️ Творческие задачи", callback_data=CALLBACK_DATA_AI_CATEGORY_CREATIVE)],
+        # Добавьте сюда другие категории, если они появятся
+        # [InlineKeyboardButton("💡 Специализированные", callback_data=CALLBACK_DATA_AI_CATEGORY_SPECIALIZED)],
+        [InlineKeyboardButton("❌ Отмена", callback_data=CALLBACK_DATA_AI_CANCEL_SELECTION)]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def get_ai_agent_keyboard_for_category(category: str, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup:
+    """Генерирует клавиатуру для выбора ИИ-агента в указанной категории."""
+    keyboard_buttons = []
+    
+    # Фильтруем AI_MODES по "категориям" (это условное разделение, можно улучшить)
+    # Для примера, будем считать, что "universal_ai_basic" и "gemini_pro_custom_mode" - это "общение"
+    # А "creative_helper" - это "творчество".
+    # ВАЖНО: "gemini_pro_custom_mode" - это специальный режим, который выбирается автоматически для модели 2.5 Pro,
+    # так что его, возможно, не стоит явно предлагать для выбора пользователю как отдельный "режим" из этого меню.
+    # Вместо этого, он должен активироваться при выборе соответствующей модели.
+    # Пока оставим его для примера, но это нужно будет продумать.
+
+    if category == CALLBACK_DATA_AI_CATEGORY_COMMUNICATION:
+        if "universal_ai_basic" in AI_MODES:
+            keyboard_buttons.append(
+                InlineKeyboardButton(
+                    AI_MODES["universal_ai_basic"]["name"],
+                    callback_data=f"set_mode_{'universal_ai_basic'}" # Используем существующий формат callback_data
+                )
+            )
+        # Сюда можно добавить другие режимы для этой категории
+        # if "another_communication_mode" in AI_MODES:
+        #     keyboard_buttons.append(InlineKeyboardButton(AI_MODES["another_communication_mode"]["name"], callback_data=f"set_mode_{'another_communication_mode'}"))
+
+    elif category == CALLBACK_DATA_AI_CATEGORY_CREATIVE:
+        if "creative_helper" in AI_MODES:
+            keyboard_buttons.append(
+                InlineKeyboardButton(
+                    AI_MODES["creative_helper"]["name"],
+                    callback_data=f"set_mode_{'creative_helper'}"
+                )
+            )
+        # Сюда можно добавить другие творческие режимы
+
+    # Формируем ряды кнопок (по одной кнопке на ряд для простоты)
+    keyboard = [[btn] for btn in keyboard_buttons]
+    keyboard.append([InlineKeyboardButton("⬅️ Назад к категориям", callback_data=CALLBACK_DATA_AI_BACK_TO_CATEGORIES)])
+    keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data=CALLBACK_DATA_AI_CANCEL_SELECTION)])
+    return InlineKeyboardMarkup(keyboard)
+
 
 def get_user_actual_limit_for_model(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE) -> int:
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
