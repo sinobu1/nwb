@@ -444,52 +444,53 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action6 = f"❓ {escape_markdown('Получить помощь (`/help`)', version=2)}"
     invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
 
-news_channel_info_md = ""
-if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle": # Показываем, только если настроено
-    bonus_model_name_start = "продвинутой модели"
-    if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
-        bonus_model_name_start = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
+# ЭТОТ БЛОК ДОЛЖЕН БЫТЬ ВНУТРИ ФУНКЦИИ START, С ПРАВИЛЬНЫМ ОТСТУПОМ
+    news_channel_info_md = ""
+    if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+        bonus_model_name_start = "продвинутой модели"
+        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+            bonus_model_name_start = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
+        news_channel_info_md = (
+            f"📢 {escape_markdown(f'Подпишитесь на наш новостной канал, чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} бонусную генерацию для {bonus_model_name_start}: ', version=2)}"
+            f"{escape_markdown(NEWS_CHANNEL_LINK, version=2)}\n"
+            f"{escape_markdown('После подписки используйте команду ', version=2)} `/claim_news_bonus`\n\n"
+        )
 
-    news_channel_info_md = (
-        f"📢 {escape_markdown(f'Подпишитесь на наш новостной канал, чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} бонусную генерацию для {bonus_model_name_start}: ', version=2)}"
-        f"{escape_markdown(NEWS_CHANNEL_LINK, version=2)}\n"
-        f"{escape_markdown('После подписки используйте команду ', version=2)} `/claim_news_bonus`\n\n"
-    )
-    
     text_to_send = (
         f"{greeting}\n\n"
         f"{mode_line}\n"
         f"{model_line}\n"
         f"{limit_info_line}\n\n"
+        f"{news_channel_info_md}"  # Вот эта строка
         f"{you_can}\n"
-        f"{news_channel_info_md}" # ДОБАВЛЕНА ЭТА СТРОКА
         f"{action1}\n{action2}\n{action3}\n{action4}\n{action5}\n{action6}\n\n"
         f"{invitation}"
     )
     try:
         await update.message.reply_text(text_to_send, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
-    except telegram.error.BadRequest: 
-         plain_news_channel_info = ""
-    if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
-        bonus_model_name_plain = "продвинутой модели"
-        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
-             bonus_model_name_plain = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
-        plain_news_channel_info = (
-            f"Новости и бонус: Подпишитесь на {NEWS_CHANNEL_LINK} и введите /claim_news_bonus "
-            f"для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain}).\n\n"
-        )
+    except telegram.error.BadRequest:
+        # И ЭТОТ БЛОК ТОЖЕ С ПРАВИЛЬНЫМ ОТСТУПОМ
+        plain_news_channel_info = ""
+        if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+            bonus_model_name_plain = "продвинутой модели"
+            if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+                bonus_model_name_plain = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
+            plain_news_channel_info = (
+                f"Новости и бонус: Подпишитесь на {NEWS_CHANNEL_LINK} и введите /claim_news_bonus "
+                f"для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain}).\n\n"
+            )
 
-    plain_text_version = (
-        f"Привет! Я твой многофункциональный ИИ-бот.\n\n"
-        f"Режим: {current_mode_name_for_start}\nМодель: {current_model_name_for_start}\n"
-        f"Лимит: {current_count_for_start}/{actual_limit_for_model_start} в день.\n\n"
-        f"{plain_news_channel_info}" # ДОБАВЛЕНА ЭТА СТРОКА
-        "Вы можете:\n"
-        "▫️ Задавать вопросы.\n▫️ /mode - сменить режим\n▫️ /model - сменить модель\n"
-        "▫️ /usage - лимиты\n▫️ /subscribe - Подписка Профи\n▫️ /help - помощь\n\n"
-        "Ваш запрос?"
-    )
-        await update.message.reply_text(plain_text_version, reply_markup=get_main_reply_keyboard())
+        plain_text_version = (
+            f"Привет! Я твой многофункциональный ИИ-бот.\n\n"
+            f"Режим: {current_mode_name_for_start}\nМодель: {current_model_name_for_start}\n"
+            f"Лимит: {current_count_for_start}/{actual_limit_for_model_start} в день.\n\n"
+            f"{plain_news_channel_info}"
+            "Вы можете:\n"
+            "▫️ Задавать вопросы.\n▫️ /mode - сменить режим\n▫️ /model - сменить модель\n"
+            "▫️ /usage - лимиты\n▫️ /subscribe - Подписка Профи\n▫️ /help - помощь\n\n"
+            "Ваш запрос?"
+        )
+        await update.message.reply_text(plain_text_version, reply_markup=get_main_reply_keyboard()) # Правильный отступ
     logger.info(f"Start command processed for user {user_id}.")
 
 
@@ -545,71 +546,67 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usage_text += "Ежедневные лимиты запросов по моделям:\n"
     for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
         if model_c.get("is_limited"):
-            _, _, current_c = check_and_log_request_attempt(user_id, model_k, context) 
+            _, _, current_c = check_and_log_request_attempt(user_id, model_k, context)
             actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
-            
             usage_text += f"▫️ {escape_markdown(model_c['name'], version=2)}: *{current_c}/{actual_l}*\n"
-    
-    if not subscription_active:
+
+    # БЛОК ИНФОРМАЦИИ О БОНУСЕ - ПРАВИЛЬНЫЙ ОТСТУП
+    if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+        bonus_model_name_usage = "продвинутой модели"
+        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+            bonus_model_name_usage = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
+
+        claimed_bonus_usage = context.user_data.get('claimed_news_bonus', False)
+        bonus_uses_left_usage = context.user_data.get('news_bonus_uses_left', 0)
+
+        if not claimed_bonus_usage:
+            usage_text += (
+                f"\n🎁 {escape_markdown(f'Подпишитесь на {NEWS_CHANNEL_LINK} и используйте /claim_news_bonus, ', version=2)}"
+                f"{escape_markdown(f'чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} генерацию для {bonus_model_name_usage}!', version=2)}\n"
+            )
+        elif bonus_uses_left_usage > 0:
+            usage_text += (
+                f"\n🎁 {escape_markdown(f'У вас есть {bonus_uses_left_usage} бонусных генераций для {bonus_model_name_usage} ', version=2)}"
+                f"{escape_markdown(f'(за подписку на {NEWS_CHANNEL_LINK})', version=2)}.\n"
+            )
+        else:  # claimed_bonus_usage is True and bonus_uses_left_usage == 0
+            usage_text += (
+                f"\nℹ️ {escape_markdown(f'Бонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_usage}) уже использован.', version=2)}\n"
+            )
+    # КОНЕЦ БЛОКА ИНФОРМАЦИИ О БОНУСЕ
+
+    if not subscription_active: # Эта проверка должна быть здесь
         usage_text += f"\n{escape_markdown('Хотите больше лимитов? Ознакомьтесь с Подпиской Профи:', version=2)} /subscribe"
 
-if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
-    bonus_model_name_usage = "продвинутой модели"
-    if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
-        bonus_model_name_usage = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
-
-    claimed_bonus_usage = context.user_data.get('claimed_news_bonus', False)
-    bonus_uses_left_usage = context.user_data.get('news_bonus_uses_left', 0)
-
-    if not claimed_bonus_usage:
-        usage_text += (
-            f"\n🎁 {escape_markdown(f'Подпишитесь на {NEWS_CHANNEL_LINK} и используйте /claim_news_bonus, ', version=2)}"
-            f"{escape_markdown(f'чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} генерацию для {bonus_model_name_usage}!', version=2)}\n"
-        )
-    elif bonus_uses_left_usage > 0:
-        usage_text += (
-            f"\n🎁 {escape_markdown(f'У вас есть {bonus_uses_left_usage} бонусных генераций для {bonus_model_name_usage} ', version=2)}"
-            f"{escape_markdown(f'(за подписку на {NEWS_CHANNEL_LINK})', version=2)}.\n"
-        )
-    else: # claimed_bonus_usage is True and bonus_uses_left_usage == 0
-         usage_text += (
-            f"\nℹ️ {escape_markdown(f'Бонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_usage}) уже использован.', version=2)}\n"
-        )
-
-
-if not subscription_active:
-    
     try:
         await update.message.reply_text(usage_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest:
         plain_usage_text = f"Статус: {display_sub_level}\nЛимиты:\n"
         for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
-             if model_c.get("is_limited"):
+            if model_c.get("is_limited"):
                 _, _, current_c = check_and_log_request_attempt(user_id, model_k, context)
                 actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
                 plain_usage_text += f"- {model_c['name']}: {current_c}/{actual_l}\n"
-        if not subscription_active:
+
+        # БЛОК ИНФОРМАЦИИ О БОНУСЕ ДЛЯ PLAIN TEXT - ПРАВИЛЬНЫЙ ОТСТУП
+        if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+            bonus_model_name_plain_usage = "продвинутой модели"
+            if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+                bonus_model_name_plain_usage = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
+
+            claimed_bonus_plain_usage = context.user_data.get('claimed_news_bonus', False)
+            bonus_uses_left_plain_usage = context.user_data.get('news_bonus_uses_left', 0)
+            if not claimed_bonus_plain_usage:
+                plain_usage_text += f"\nБонус: Подпишитесь на {NEWS_CHANNEL_LINK}, команда /claim_news_bonus для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain_usage}).\n"
+            elif bonus_uses_left_plain_usage > 0:
+                plain_usage_text += f"\nБонус: У вас {bonus_uses_left_plain_usage} генераций для {bonus_model_name_plain_usage} (канал {NEWS_CHANNEL_LINK}).\n"
+            else:
+                plain_usage_text += f"\nБонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_plain_usage}) использован.\n"
+        # КОНЕЦ БЛОКА ИНФОРМАЦИИ О БОНУСЕ ДЛЯ PLAIN TEXT
+
+        if not subscription_active: # Эта проверка также здесь
             plain_usage_text += "\nПодписка Профи: /subscribe"
-        await update.message.reply_text(plain_usage_text, reply_markup=get_main_reply_keyboard())
-
-if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
-        bonus_model_name_plain_usage = "продвинутой модели"
-        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
-             bonus_model_name_plain_usage = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
-
-        claimed_bonus_plain_usage = context.user_data.get('claimed_news_bonus', False)
-        bonus_uses_left_plain_usage = context.user_data.get('news_bonus_uses_left', 0)
-        if not claimed_bonus_plain_usage:
-            plain_usage_text += f"\nБонус: Подпишитесь на {NEWS_CHANNEL_LINK}, команда /claim_news_bonus для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain_usage}).\n"
-        elif bonus_uses_left_plain_usage > 0:
-            plain_usage_text += f"\nБонус: У вас {bonus_uses_left_plain_usage} генераций для {bonus_model_name_plain_usage} (канал {NEWS_CHANNEL_LINK}).\n"
-        else:
-            plain_usage_text += f"\nБонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_plain_usage}) использован.\n"
-
-
-    if not subscription_active:
-        plain_usage_text += "\nПодписка Профи: /subscribe"
-    await update.message.reply_text(plain_usage_text, reply_markup=get_main_reply_keyboard())
+        await update.message.reply_text(plain_usage_text, reply_markup=get_main_reply_keyboard()) # Правильный отступ
 
 async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1109,7 +1106,7 @@ async def set_bot_commands(application: Application):
         BotCommand("model", "⚙️ Выбрать модель ИИ"),
         BotCommand("usage", "📊 Мои лимиты"),
         BotCommand("subscribe", "💎 Подписка Профи"),
-        BotCommand("claim_news_bonus", "🎁 Бонус за новости")
+        BotCommand("claim_news_bonus", "🎁 Бонус за новости"), # ДОБАВЛЕНА ЗАПЯТАЯ
         BotCommand("help", "ℹ️ Помощь"),
     ]
 
@@ -1230,7 +1227,8 @@ async def main():
     application.add_handler(CommandHandler("model", select_model_command))
     application.add_handler(CommandHandler("usage", usage_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("subscribe", subscribe_info_command)) 
+    application.add_handler(CommandHandler("subscribe", subscribe_info_command))
+    application.add_handler(CommandHandler("claim_news_bonus", claim_news_bonus_command)) # ПЕРЕМЕЩЕНО СЮДА
 
     application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
     application.add_handler(MessageHandler(filters.Text(["⚙️ Модель ИИ"]), select_model_command))
@@ -1241,8 +1239,6 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    
-application.add_handler(CommandHandler("claim_news_bonus", claim_news_bonus_command))
 
     logger.info("Starting bot application...")
     try:
