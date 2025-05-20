@@ -19,6 +19,9 @@ import asyncio
 import nest_asyncio
 import json
 from datetime import datetime, timedelta
+from telegram import LabeledPrice
+from telegram.ext import PreCheckoutQueryHandler # MessageHandler для SUCCESSFUL_PAYMENT уже есть в filters
+
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -29,6 +32,9 @@ TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAq
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI") # ЗАМЕНИ НА СВОЙ КЛЮЧ
 CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P") # ЗАМЕНИ НА СВОЙ КЛЮЧ
 CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
+
+# ВАЖНО: Получи этот токен от @BotFather после подключения платежного провайдера
+PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "YOUR_REAL_PAYMENT_PROVIDER_TOKEN_HERE")
 
 YOUR_ADMIN_ID = 489230152 # Этот ID больше не используется для /grantsub, но может быть полезен для других админских нужд в будущем
 
@@ -480,36 +486,158 @@ async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_T
     text += "Базовая модель всегда доступна с щедрым лимитом:\n"
     text += f"⚡️ {escape_markdown(AVAILABLE_TEXT_MODELS['google_gemini_2_0_flash']['name'], version=2)}: *{DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY} запросов/день* (бесплатно для всех)\n\n"
 
-    text += "✨ **Доступный тариф Профи для теста:**\n" # ИЗМЕНЕН ЗАГОЛОВОК
+    text += "✨ **Доступный тариф Профи для теста:**\n"
     text += f"▫️ **Тест-драйв (2 дня):** `{escape_markdown('99 рублей', version=2)}`\n"
-    # Закомментированы другие варианты подписки для временного упрощения
-    # text += f"▫️ **Неделя с Gemini (7 дней):** `{escape_markdown('349 рублей', version=2)}`\n"
-    # text += f"▫️ **Полный вперед (1 месяц):** `{escape_markdown('1499 рублей', version=2)}`\n\n"
-    text += "\n" # Добавил пустую строку для разделения
+    text += "\n"
 
-    text += "🚀 **Как оформить Подписку Профи?**\n"
-    text += "Автоматическая система оплаты находится в разработке и будет доступна в ближайшее время\\!\n"
-    text += "Следите за обновлениями\\.\n\n" 
+    # Кнопка для инициирования оплаты
+    keyboard = [
+        [InlineKeyboardButton("💳 Купить Профи (2 дня - 99 RUB)", callback_data="buy_profi_2days")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text += f"{escape_markdown('Ваш Telegram User ID (может понадобиться для ручной активации в будущем):', version=2)} `{user_id}`"
+    # Сообщение о разработке автоматической оплаты пока уберем отсюда,
+    # так как кнопка "Купить" теперь будет пытаться отправить инвойс.
+    # Если токен невалидный, обработчик кнопки сообщит об этом.
+    
+    # text += "🚀 **Как оформить Подписку Профи?**\n"
+    # text += "Автоматическая система оплаты находится в разработке и будет доступна в ближайшее время\\!\n"
+    # text += "Следите за обновлениями\\.\n\n" 
+    # text += f"{escape_markdown('Ваш Telegram User ID (может понадобиться для ручной активации в будущем):', version=2)} `{user_id}`"
     
     try:
-        await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
+        # Отправляем сообщение с кнопкой "Купить"
+        if update.callback_query: # Если это результат нажатия на кнопку (например, из /start)
+            await update.callback_query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
+        else:
+            await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=reply_markup)
+
     except telegram.error.BadRequest as e_br:
         logger.error(f"Error sending subscribe_info_command with Markdown: {e_br}. Text: {text}")
+        # Упрощенный текст и кнопка, если Markdown не сработал
         plain_text = (
-            "🌟 Подписка Профи – Максимум возможностей Gemini! 🌟\n\n"
-            "С Подпиской Профи вы получаете:\n"
-            f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_5_flash_preview']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY} запросов/день (бесплатно {DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY})\n"
-            f"- {AVAILABLE_TEXT_MODELS['custom_api_gemini_2_5_pro']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY} запросов/день (бесплатно {DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY})\n"
-            f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_0_flash']['name']}: {DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY} запросов/день (бесплатно для всех)\n\n"
-            "Тариф для теста:\n" # ИЗМЕНЕНО
-            "- 2 дня: 99 руб.\n\n"
-            # "- 1 неделя: 349 руб.\n" # ЗАКОММЕНТИРОВАНО
-            # "- 1 месяц: 1499 руб.\n\n" # ЗАКОММЕНТИРОВАНО
-            "Автоматическая оплата скоро появится! Ваш ID: " + str(user_id)
+            "🌟 Подписка Профи – Максимум Gemini! 🌟\n\n"
+            "Преимущества:\n"
+            f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_5_flash_preview']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY} в день (беспл. {DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY})\n"
+            f"- {AVAILABLE_TEXT_MODELS['custom_api_gemini_2_5_pro']['name']}: {DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY} в день (беспл. {DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY})\n"
+            f"- {AVAILABLE_TEXT_MODELS['google_gemini_2_0_flash']['name']}: {DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY} в день (бесплатно для всех)\n\n"
+            "Тариф для теста:\n"
+            "- 2 дня: 99 руб.\n"
         )
-        await update.message.reply_text(plain_text, reply_markup=get_main_reply_keyboard())
+        if update.callback_query:
+            await update.callback_query.edit_message_text(plain_text, reply_markup=reply_markup)
+        else:
+            await update.message.reply_text(plain_text, reply_markup=reply_markup)
+
+# Обработчик для кнопки "Купить"
+async def buy_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer() # Отвечаем на коллбэк
+    user_id = query.from_user.id
+
+    if query.data == "buy_profi_2days":
+        if not PAYMENT_PROVIDER_TOKEN or "YOUR_REAL_PAYMENT_PROVIDER_TOKEN_HERE" in PAYMENT_PROVIDER_TOKEN:
+            await query.message.reply_text(
+                "⚠️ К сожалению, сервис автоматической оплаты сейчас настраивается администратором и временно недоступен.\n"
+                "Пожалуйста, попробуйте позже или следите за обновлениями.",
+                reply_markup=get_main_reply_keyboard() # Возвращаем основную клавиатуру
+            )
+            logger.warning(f"Payment attempt by user {user_id} failed: PAYMENT_PROVIDER_TOKEN is not set.")
+            return
+
+        title = "Подписка Профи (2 дня)"
+        description = "Доступ к расширенным лимитам моделей Gemini на 2 дня."
+        # payload должен быть уникальным для каждого инвойса и содержать информацию для идентификации покупки.
+        # Макс. 128 байт. Включаем тип подписки, user_id (для сверки) и временную метку для уникальности.
+        payload = f"profi_2days_uid{user_id}_t{int(datetime.now().timestamp())}"
+        currency = "RUB"
+        price_amount = 99  # Цена в рублях
+        prices = [LabeledPrice(label="Подписка Профи (2 дня)", amount=price_amount * 100)]  # Цена в копейках
+
+        try:
+            await context.bot.send_invoice(
+                chat_id=user_id,
+                title=title,
+                description=description,
+                payload=payload,
+                provider_token=PAYMENT_PROVIDER_TOKEN,
+                currency=currency,
+                prices=prices,
+                # start_parameter='profi-2days-test', # Опциональный параметр для deeplink
+                # photo_url='URL_TO_YOUR_PRODUCT_IMAGE', # Опционально: URL картинки для инвойса
+                # need_shipping_address=False, # Обычно false для цифровых товаров
+            )
+            logger.info(f"Invoice sent to user {user_id} for 'profi_2days'. Payload: {payload}")
+            # После отправки инвойса обычно сообщение, где была кнопка "Купить", можно отредактировать или оставить как есть.
+            # Например, убрать кнопку "Купить", чтобы избежать повторных нажатий:
+            await query.edit_message_reply_markup(reply_markup=None)
+
+        except Exception as e:
+            logger.error(f"Error sending invoice to user {user_id}: {e}")
+            await query.message.reply_text("⚠️ Не удалось создать счет для оплаты. Пожалуйста, попробуйте позже.")
+
+# Обработчик PreCheckoutQuery (обязателен для Telegram Payments)
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.pre_checkout_query
+    # Здесь можно добавить логику проверки (например, доступность товара)
+    # Для простоты сейчас всегда подтверждаем
+    if query.invoice_payload.startswith("profi_2days_uid"): # Проверяем, что это наш payload
+        await query.answer(ok=True)
+        logger.info(f"PreCheckoutQuery for payload {query.invoice_payload} answered OK.")
+    else:
+        # Отклоняем неизвестные или невалидные payload
+        await query.answer(ok=False, error_message="Что-то пошло не так с этим платежом. Попробуйте снова.")
+        logger.warning(f"PreCheckoutQuery for UNKNOWN payload {query.invoice_payload} answered with error.")
+
+# Обработчик успешного платежа
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    payment_info = update.message.successful_payment
+    invoice_payload = payment_info.invoice_payload
+    
+    logger.info(f"Successful payment from user {user_id}! Payload: {invoice_payload}, Amount: {payment_info.total_amount / 100} {payment_info.currency}")
+
+    # Активируем подписку
+    if invoice_payload.startswith("profi_2days_uid"):
+        try:
+            # Рассчитываем дату окончания подписки
+            # Используем datetime.now(timezone.utc) для timezone-aware datetime, если работаем с UTC
+            # Или просто datetime.now() если все в одной таймзоне
+            valid_until_dt = datetime.now() + timedelta(days=2)
+            # Сохраняем в ISO формате. fromisoformat потом сможет это распарсить.
+            valid_until_iso = valid_until_dt.isoformat() 
+
+            all_user_subscriptions = context.bot_data.setdefault('user_subscriptions', {})
+            all_user_subscriptions[user_id] = {
+                'level': PRO_SUBSCRIPTION_LEVEL_KEY,
+                'valid_until': valid_until_iso, # 'YYYY-MM-DDTHH:MM:SS.ffffff'
+                'purchase_date': datetime.now().isoformat(),
+                'payload': invoice_payload,
+                'amount': payment_info.total_amount,
+                'currency': payment_info.currency
+            }
+            # Сохраняем данные немедленно (опционально, PicklePersistence делает это периодически)
+            # await context.application.persistence.flush()
+
+            logger.info(f"Subscription '{PRO_SUBSCRIPTION_LEVEL_KEY}' activated for user {user_id} until {valid_until_iso}")
+            
+            await update.message.reply_text(
+                f"🎉 Оплата прошла успешно! Ваша Подписка Профи на 2 дня активирована до {valid_until_dt.strftime('%Y-%m-%d %H:%M')}.\n"
+                "Теперь вам доступны расширенные лимиты!",
+                reply_markup=get_main_reply_keyboard()
+            )
+        except Exception as e_sub_activation:
+            logger.error(f"Error activating subscription for user {user_id} after payment. Payload: {invoice_payload}. Error: {e_sub_activation}")
+            await update.message.reply_text(
+                "Оплата прошла, но произошла ошибка при активации вашей подписки. Пожалуйста, свяжитесь с администратором.",
+                reply_markup=get_main_reply_keyboard()
+            )
+    else:
+        logger.warning(f"Received successful payment with UNKNOWN payload: {invoice_payload} from user {user_id}")
+        await update.message.reply_text(
+            "Оплата прошла, но тип подписки не распознан. Свяжитесь с администратором.",
+            reply_markup=get_main_reply_keyboard()
+        )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
