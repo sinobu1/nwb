@@ -1089,20 +1089,56 @@ async def main():
     application = Application.builder().token(TOKEN).persistence(persistence).build()
     await set_bot_commands(application)
 
+    # --- НОВЫЙ CONVERSATIONHANDLER ДЛЯ МЕНЮ РЕЖИМОВ ИИ ---
+    ai_mode_conv_handler = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Text(["🤖 Режим ИИ"]), ai_mode_menu_start), # Для кнопки на основной клавиатуре
+            CommandHandler("ai_modes", ai_mode_menu_start) # И/или отдельная команда
+        ],
+        states={
+            SELECT_AI_CATEGORY: [
+                CallbackQueryHandler(ai_mode_menu_select_category, pattern=f"^{CALLBACK_DATA_AI_CATEGORY_COMMUNICATION}$"),
+                CallbackQueryHandler(ai_mode_menu_select_category, pattern=f"^{CALLBACK_DATA_AI_CATEGORY_CREATIVE}$"),
+                # CallbackQueryHandler(ai_mode_menu_select_category, pattern=f"^{CALLBACK_DATA_AI_CATEGORY_SPECIALIZED}$"), # Если будут еще
+                CallbackQueryHandler(ai_mode_menu_cancel, pattern=f"^{CALLBACK_DATA_AI_CANCEL_SELECTION}$"),
+            ],
+            SELECT_AI_AGENT_FROM_CATEGORY: [
+                CallbackQueryHandler(ai_mode_menu_set_agent, pattern=r"^set_mode_"), # Ловим все выборы режимов
+                CallbackQueryHandler(ai_mode_menu_back_to_categories, pattern=f"^{CALLBACK_DATA_AI_BACK_TO_CATEGORIES}$"),
+                CallbackQueryHandler(ai_mode_menu_cancel, pattern=f"^{CALLBACK_DATA_AI_CANCEL_SELECTION}$"),
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel_ai_selection", ai_mode_menu_cancel), # Команда для отмены в любой момент
+            CallbackQueryHandler(ai_mode_menu_cancel, pattern=f"^{CALLBACK_DATA_AI_CANCEL_SELECTION}$") # Если кнопка отмены нажата на любом этапе
+        ],
+        # Опционально: Если диалог прервется из-за тайм-аута или другой ошибки
+        # conversation_timeout=300, # 5 минут
+        # per_user=True,
+        # per_chat=True,
+        # per_message=False, # или True, если каждая сессия должна быть уникальной для сообщения
+        # allow_reentry=True # Позволяет войти в диалог снова, даже если предыдущий не был корректно завершен
+    )
+    application.add_handler(ai_mode_conv_handler)
+    # --- КОНЕЦ НОВОГО CONVERSATIONHANDLER ---
+
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("mode", select_mode_command))
+    # УДАЛИТЕ ИЛИ ЗАКОММЕНТИРУЙТЕ СТАРЫЙ ОБРАБОТЧИК ДЛЯ "🤖 Режим ИИ" И "/mode"
+    # application.add_handler(CommandHandler("mode", select_mode_command)) # Старый обработчик
+    # application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command)) # Старый обработчик
+    
+    # Остальные ваши обработчики
     application.add_handler(CommandHandler("model", select_model_command))
     application.add_handler(CommandHandler("usage", usage_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("subscribe", subscribe_info_command))
-    application.add_handler(CommandHandler("get_news_bonus", get_news_bonus_info_command)) # Новая команда
+    application.add_handler(CommandHandler("get_news_bonus", get_news_bonus_info_command))
     application.add_handler(CommandHandler("claim_news_bonus", claim_news_bonus_command))
 
-    application.add_handler(MessageHandler(filters.Text(["🤖 Режим ИИ"]), select_mode_command))
     application.add_handler(MessageHandler(filters.Text(["⚙️ Модель ИИ"]), select_model_command))
     application.add_handler(MessageHandler(filters.Text(["📊 Лимиты"]), usage_command))
     application.add_handler(MessageHandler(filters.Text(["💎 Подписка Профи"]), subscribe_info_command))
-    application.add_handler(MessageHandler(filters.Text(["🎁 Бонус"]), get_news_bonus_info_command)) # Для кнопки "Бонус"
+    application.add_handler(MessageHandler(filters.Text(["🎁 Бонус"]), get_news_bonus_info_command))
     application.add_handler(MessageHandler(filters.Text(["❓ Помощь"]), help_command))
     
     application.add_handler(CallbackQueryHandler(button_callback)) # Общий обработчик для инлайн-кнопок
@@ -1112,10 +1148,19 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Starting bot application...")
-    try: await application.run_polling()
-    except Exception as e: logger.critical(f"Polling error: {e}\n{traceback.format_exc()}")
+    try:
+        await application.initialize() # Рекомендуется для v20+
+        await application.start()
+        await application.updater.start_polling() # Рекомендуется для v20+
+        # await application.run_polling() # Старый способ, можно заменить на строки выше
+        logger.info("Bot started successfully.")
+    except Exception as e:
+        logger.critical(f"Polling error: {e}\n{traceback.format_exc()}")
 
 if __name__ == "__main__":
-    try: asyncio.run(main())
-    except KeyboardInterrupt: logger.info("Bot stopped by user.")
-    except Exception as e: logger.critical(f"main() error: {e}\n{traceback.format_exc()}")
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user.")
+    except Exception as e:
+        logger.critical(f"main() error: {e}\n{traceback.format_exc()}")
