@@ -47,7 +47,7 @@ YOUR_ADMIN_ID = 489230152
 
 # --- КОНФИГУРАЦИЯ БОТА ---
 MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
-MAX_MESSAGE_LENGTH_TELEGRAM = 4000
+MAX_MESSAGE_LENGTH_TELEGRAM = 3800
 
 # --- ОБНОВЛЕННЫЕ ЛИМИТЫ ---
 DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 75
@@ -585,6 +585,13 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         if message_to_edit: await message_to_edit.edit_text(error_message_general, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
         else: await context.bot.send_message(chat_id=reply_chat_id, text=error_message_general, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
 
+if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi_subscriber:
+    if context.user_data.get('claimed_news_bonus', False) and context.user_data.get('news_bonus_uses_left', 0) > 0:
+        logger.info(f"User {user_id} has bonus for {model_key}. Allowing.")
+        return True, "bonus_available", 0
+    else:
+        return False, f"Бонус за подписку на [канал]({NEWS_CHANNEL_LINK}) не активирован или исчерпан.", 0
+
 async def claim_news_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await claim_news_bonus_logic(update, context, called_from_button=False, message_to_edit=None)
 
@@ -600,21 +607,27 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # БЛОК ДЛЯ data.startswith("set_mode_") УДАЛЕН ОТСЮДА
     # Эта логика теперь полностью обрабатывается в ai_mode_conv_handler (ai_mode_menu_set_agent)
 
-    if data.startswith("set_model_"): # Начинаем с elif, или делаем if, если это первый блок
-        model_key_cb = data.split("set_model_")[1]
-        if model_key_cb in AVAILABLE_TEXT_MODELS:
-            config = AVAILABLE_TEXT_MODELS[model_key_cb]
-            context.user_data['selected_model_id'] = config["id"]
-            context.user_data['selected_api_type'] = config["api_type"]
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            # ... (остальная часть логики для set_model_ остается без изменений) ...
-            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
-            model_daily_usage = user_model_counts.get(model_key_cb, {'date': '', 'count': 0})
-            current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
-            actual_l = get_user_actual_limit_for_model(user_id, model_key_cb, context)
-            limit_str = f'Ваш лимит для этой модели: {current_c_display}/{actual_l} в день'
-            new_text = f"⚙️ Модель изменена на: *{escape_markdown(config['name'],version=2)}*\n{escape_markdown(limit_str,version=2)}"
-            plain_fallback = f"Модель: {config['name']}. {limit_str}."
+    if data.startswith("set_model_"):
+    model_key_cb = data.split("set_model_")[1]
+    if model_key_cb in AVAILABLE_TEXT_MODELS:
+        config = AVAILABLE_TEXT_MODELS[model_key_cb]
+        context.user_data['selected_model_id'] = config["id"]
+        context.user_data['selected_api_type'] = config["api_type"]
+        # Автоматически устанавливаем режим для Gemini 2.5 Pro
+        if model_key_cb == "custom_api_gemini_2_5_pro" and "gemini_pro_custom_mode" in AI_MODES:
+            context.user_data['current_ai_mode'] = "gemini_pro_custom_mode"
+            mode_name = AI_MODES["gemini_pro_custom_mode"]["name"]
+        else:
+            context.user_data['current_ai_mode'] = DEFAULT_AI_MODE_KEY
+            mode_name = AI_MODES[DEFAULT_AI_MODE_KEY]["name"]
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
+        model_daily_usage = user_model_counts.get(model_key_cb, {'date': '', 'count': 0})
+        current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
+        actual_l = get_user_actual_limit_for_model(user_id, model_key_cb, context)
+        limit_str = f'Ваш лимит для этой модели: {current_c_display}/{actual_l} в день'
+        new_text = f"⚙️ Модель изменена на: *{escape_markdown(config['name'], version=2)}*\n🧠 Режим: *{escape_markdown(mode_name, version=2)}*\n{escape_markdown(limit_str, version=2)}"
+        plain_fallback = f"Модель: {config['name']}. Режим: {mode_name}. {limit_str}."
         else: new_text = plain_fallback = "⚠️ Ошибка: Такая модель не найдена."
 
         if new_text and message_to_edit:
@@ -994,6 +1007,11 @@ async def ai_mode_menu_set_agent(update: Update, context: ContextTypes.DEFAULT_T
                     reply_markup=get_main_reply_keyboard(), # Возвращаем основную клавиатуру
                     disable_web_page_preview=True
                 )
+                else:
+    text_response = "⚠️ Ошибка: Выбранный режим ИИ не найден. Пожалуйста, выберите режим заново."
+    keyboard = await get_ai_category_keyboard()
+    await query.edit_message_text(text=text_response, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+    return SELECT_AI_CATEGORY
         # Важно: После успешного выбора и подтверждения, можно снова показать ReplyKeyboard, если она скрывалась
         # или если пользователь вошел через команду без ReplyKeyboard.
         # Для простоты, если Inline была убрана, основная клавиатура должна остаться активной.
@@ -1064,7 +1082,6 @@ async def main():
     application = Application.builder().token(TOKEN).persistence(persistence).build()
     await set_bot_commands(application)
 
-    # --- НОВЫЙ CONVERSATIONHANDLER ДЛЯ МЕНЮ РЕЖИМОВ ИИ ---
     ai_mode_conv_handler = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Text(["🤖 Режим ИИ"]), ai_mode_menu_start), # Для кнопки на основной клавиатуре
@@ -1088,11 +1105,11 @@ async def main():
             CallbackQueryHandler(ai_mode_menu_cancel, pattern=f"^{CALLBACK_DATA_AI_CANCEL_SELECTION}$") # Если кнопка отмены нажата на любом этапе
         ],
         # Опционально: Если диалог прервется из-за тайм-аута или другой ошибки
-        # conversation_timeout=300, # 5 минут
-        # per_user=True,
-        # per_chat=True,
-        # per_message=False, # или True, если каждая сессия должна быть уникальной для сообщения
-        # allow_reentry=True # Позволяет войти в диалог снова, даже если предыдущий не был корректно завершен
+        conversation_timeout=300, # 5 минут
+        per_user=True,
+        per_chat=True,
+        per_message=False, # или True, если каждая сессия должна быть уникальной для сообщения
+        allow_reentry=True # Позволяет войти в диалог снова, даже если предыдущий не был корректно завершен
     )
     application.add_handler(ai_mode_conv_handler)
     # --- КОНЕЦ НОВОГО CONVERSATIONHANDLER ---
@@ -1131,7 +1148,11 @@ async def main():
         logger.info("Bot started successfully.")
     except Exception as e:
         logger.critical(f"Polling error: {e}\n{traceback.format_exc()}")
-
+        
+if not PAYMENT_PROVIDER_TOKEN or "YOUR_REAL_PAYMENT_PROVIDER_TOKEN_HERE" in PAYMENT_PROVIDER_TOKEN:
+    logger.critical("CRITICAL: PAYMENT_PROVIDER_TOKEN is not set correctly.")
+    return
+    
 if __name__ == "__main__":
     try:
         asyncio.run(main())
