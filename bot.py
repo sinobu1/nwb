@@ -43,14 +43,21 @@ MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
 MAX_MESSAGE_LENGTH_TELEGRAM = 4000
 
 # --- ОБНОВЛЕННЫЕ ЛИМИТЫ ---
-DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 100                   # Бесплатно для "2.0" (Gemini 2.0 Flash)
-DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50        # Бесплатно для "2.5 флэш" (Gemini 2.5 Flash Preview)
+DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72                    # Бесплатно для "2.0" (Gemini 2.0 Flash) - ИЗМЕНЕНО
+DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 48        # Бесплатно для "2.5 флэш" (Gemini 2.5 Flash Preview) - ИЗМЕНЕНО
 DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75    # С подпиской для "2.5 флэш"
 
-DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 2                       # Бесплатно для "2.5 про" (Custom API Gemini 2.5 Pro)
+DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0                       # Бесплатно для "2.5 про" (Custom API Gemini 2.5 Pro) - ИЗМЕНЕНО (бонус за подписку на канал)
 DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25              # С подпиской для "2.5 про"
 
 PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1" # Ключ для идентификации уровня подписки "Профи"
+
+# --- КАНАЛ НОВОСТЕЙ И БОНУС ---
+# ВАЖНО: Замените значения ниже на реальный юзернейм и ссылку вашего новостного канала!
+NEWS_CHANNEL_USERNAME = "@timextech"  # Например, "@my_cool_news_channel" (начинается с @)
+NEWS_CHANNEL_LINK = "https://t.me/timextech" # Например, "https://t.me/my_cool_news_channel"
+NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro" # Модель, для которой дается бонус
+NEWS_CHANNEL_BONUS_GENERATIONS = 1 # Количество бонусных генераций
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
 AI_MODES = {
@@ -299,45 +306,107 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config or not model_config.get("is_limited"):
         logger.debug(f"Model {model_key} not found or not limited. Allowing request.")
-        return True, "", 0 
-    
+        return True, "", 0
+
+    # --- News Channel Bonus Check ---
+    is_profi_subscriber = False # Определим заранее, нужен для логики бонуса и лимитов
+    if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY or model_config.get("limit_type") in ["subscription_or_daily_free", "subscription_custom_pro"]:
+        all_user_subscriptions = context.bot_data.get('user_subscriptions', {})
+        user_subscription_details = all_user_subscriptions.get(user_id, {})
+        if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY:
+            if user_subscription_details.get('valid_until'):
+                try:
+                    valid_until_dt = datetime.fromisoformat(user_subscription_details['valid_until'])
+                    now_dt = datetime.now(valid_until_dt.tzinfo)
+                    if now_dt.date() <= valid_until_dt.date():
+                        is_profi_subscriber = True
+                except ValueError:
+                    logger.error(f"Invalid date format for subscription for user {user_id}: {user_subscription_details['valid_until']}")
+                except Exception as e_date_check:
+                    logger.error(f"Error checking subscription date for user {user_id}: {e_date_check}")
+
+
+    if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi_subscriber:
+        news_bonus_uses_left = context.user_data.get('news_bonus_uses_left', 0)
+        if news_bonus_uses_left > 0:
+            logger.info(f"User {user_id} has {news_bonus_uses_left} news channel bonus uses for {model_key}. Allowing request via bonus.")
+            return True, "bonus_available", 0 # count_used is 0 for this check, as it's a bonus
+    # --- End News Channel Bonus Check ---
+
     all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
-    user_model_counts = all_daily_counts.setdefault(user_id, {}) 
+    user_model_counts = all_daily_counts.setdefault(user_id, {})
     model_daily_usage = user_model_counts.setdefault(model_key, {'date': '', 'count': 0})
 
     if model_daily_usage['date'] != today_str:
         logger.info(f"New day for user {user_id}, model {model_key}. Resetting count from {model_daily_usage['count']} (date {model_daily_usage['date']}).")
         model_daily_usage['date'] = today_str
         model_daily_usage['count'] = 0
-    
+
     current_user_model_count = model_daily_usage['count']
-    actual_limit = get_user_actual_limit_for_model(user_id, model_key, context)
-    logger.debug(f"User {user_id}, Model {model_key}: Count={current_user_model_count}, Limit={actual_limit}")
+    actual_limit = get_user_actual_limit_for_model(user_id, model_key, context) # actual_limit уже учитывает Profi подписку
+    logger.debug(f"User {user_id}, Model {model_key}: Daily Count={current_user_model_count}, Daily Limit={actual_limit}, IsProfi={is_profi_subscriber}")
 
     if current_user_model_count >= actual_limit:
         message = (f"Вы достигли дневного лимита ({current_user_model_count}/{actual_limit}) "
-                   f"для модели '{model_config['name']}'.\n"
-                   "Попробуйте завтра или рассмотрите подписку /subscribe для увеличения лимитов.")
+                   f"для модели '{model_config['name']}'.\n")
 
+        if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi_subscriber:
+            claimed_bonus_flag = context.user_data.get('claimed_news_bonus', False)
+            current_bonus_uses = context.user_data.get('news_bonus_uses_left', 0)
+
+            if not claimed_bonus_flag :
+                message += (f"💡 Подпишитесь на наш новостной канал {NEWS_CHANNEL_LINK} и используйте команду "
+                            f"`/claim_news_bonus`, чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} бесплатную генерацию для этой модели!\n")
+            elif current_bonus_uses == 0 and claimed_bonus_flag:
+                 message += "ℹ️ Ваш бонус за подписку на новости для этой модели уже использован.\n"
+
+        message += "Попробуйте завтра или рассмотрите подписку /subscribe для увеличения лимитов."
         return False, message, current_user_model_count
     return True, "", current_user_model_count
 
 def increment_request_count(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE):
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_config or not model_config.get("is_limited"): 
+    if not model_config or not model_config.get("is_limited"):
         return
+
+    # --- News Channel Bonus Consumption ---
+    if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY:
+        all_user_subscriptions = context.bot_data.get('user_subscriptions', {})
+        user_subscription_details = all_user_subscriptions.get(user_id, {})
+        is_profi_subscriber = False
+        if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY:
+            if user_subscription_details.get('valid_until'):
+                try:
+                    valid_until_dt = datetime.fromisoformat(user_subscription_details['valid_until'])
+                    now_dt = datetime.now(valid_until_dt.tzinfo) # Use timezone from valid_until_dt if available
+                    if now_dt.date() <= valid_until_dt.date():
+                        is_profi_subscriber = True
+                except ValueError:
+                    pass # Invalid date format
+                except Exception:
+                    pass # Other date processing errors
+
+
+        if not is_profi_subscriber:
+            news_bonus_uses_left = context.user_data.get('news_bonus_uses_left', 0)
+            if news_bonus_uses_left > 0:
+                context.user_data['news_bonus_uses_left'] = news_bonus_uses_left - 1
+                logger.info(f"User {user_id} consumed a news channel bonus use for {model_key}. Remaining bonus uses: {context.user_data['news_bonus_uses_left']}")
+                # This was a bonus use, do not increment the daily model count for regular limits
+                return # IMPORTANT: Exit early, daily count not affected
+    # --- End News Channel Bonus Consumption ---
 
     today_str = datetime.now().strftime("%Y-%m-%d")
     all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
     user_model_counts = all_daily_counts.setdefault(user_id, {})
     model_daily_usage = user_model_counts.setdefault(model_key, {'date': today_str, 'count': 0})
-    
-    if model_daily_usage['date'] != today_str: 
+
+    if model_daily_usage['date'] != today_str:
         model_daily_usage['date'] = today_str
-        model_daily_usage['count'] = 0 
-        
+        model_daily_usage['count'] = 0
+
     model_daily_usage['count'] += 1
-    logger.info(f"User {user_id} request count for {model_key} incremented to {model_daily_usage['count']}")
+    logger.info(f"User {user_id} daily request count for {model_key} incremented to {model_daily_usage['count']}")
 
 
 # --- Команды Telegram ---
@@ -375,27 +444,51 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action6 = f"❓ {escape_markdown('Получить помощь (`/help`)', version=2)}"
     invitation = escape_markdown("Просто напишите ваш запрос!", version=2)
 
+news_channel_info_md = ""
+if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle": # Показываем, только если настроено
+    bonus_model_name_start = "продвинутой модели"
+    if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+        bonus_model_name_start = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
+
+    news_channel_info_md = (
+        f"📢 {escape_markdown(f'Подпишитесь на наш новостной канал, чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} бонусную генерацию для {bonus_model_name_start}: ', version=2)}"
+        f"{escape_markdown(NEWS_CHANNEL_LINK, version=2)}\n"
+        f"{escape_markdown('После подписки используйте команду ', version=2)} `/claim_news_bonus`\n\n"
+    )
+    
     text_to_send = (
         f"{greeting}\n\n"
         f"{mode_line}\n"
         f"{model_line}\n"
         f"{limit_info_line}\n\n"
         f"{you_can}\n"
+        f"{news_channel_info_md}" # ДОБАВЛЕНА ЭТА СТРОКА
         f"{action1}\n{action2}\n{action3}\n{action4}\n{action5}\n{action6}\n\n"
         f"{invitation}"
     )
     try:
         await update.message.reply_text(text_to_send, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest: 
-        plain_text_version = (
-            f"Привет! Я твой многофункциональный ИИ-бот.\n\n"
-            f"Режим: {current_mode_name_for_start}\nМодель: {current_model_name_for_start}\n"
-            f"Лимит: {current_count_for_start}/{actual_limit_for_model_start} в день.\n\n"
-            "Вы можете:\n"
-            "▫️ Задавать вопросы.\n▫️ /mode - сменить режим\n▫️ /model - сменить модель\n"
-            "▫️ /usage - лимиты\n▫️ /subscribe - Подписка Профи\n▫️ /help - помощь\n\n"
-            "Ваш запрос?"
+         plain_news_channel_info = ""
+    if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+        bonus_model_name_plain = "продвинутой модели"
+        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+             bonus_model_name_plain = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
+        plain_news_channel_info = (
+            f"Новости и бонус: Подпишитесь на {NEWS_CHANNEL_LINK} и введите /claim_news_bonus "
+            f"для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain}).\n\n"
         )
+
+    plain_text_version = (
+        f"Привет! Я твой многофункциональный ИИ-бот.\n\n"
+        f"Режим: {current_mode_name_for_start}\nМодель: {current_model_name_for_start}\n"
+        f"Лимит: {current_count_for_start}/{actual_limit_for_model_start} в день.\n\n"
+        f"{plain_news_channel_info}" # ДОБАВЛЕНА ЭТА СТРОКА
+        "Вы можете:\n"
+        "▫️ Задавать вопросы.\n▫️ /mode - сменить режим\n▫️ /model - сменить модель\n"
+        "▫️ /usage - лимиты\n▫️ /subscribe - Подписка Профи\n▫️ /help - помощь\n\n"
+        "Ваш запрос?"
+    )
         await update.message.reply_text(plain_text_version, reply_markup=get_main_reply_keyboard())
     logger.info(f"Start command processed for user {user_id}.")
 
@@ -459,6 +552,32 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not subscription_active:
         usage_text += f"\n{escape_markdown('Хотите больше лимитов? Ознакомьтесь с Подпиской Профи:', version=2)} /subscribe"
+
+if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+    bonus_model_name_usage = "продвинутой модели"
+    if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+        bonus_model_name_usage = f"модели '{escape_markdown(AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name'], version=2)}'"
+
+    claimed_bonus_usage = context.user_data.get('claimed_news_bonus', False)
+    bonus_uses_left_usage = context.user_data.get('news_bonus_uses_left', 0)
+
+    if not claimed_bonus_usage:
+        usage_text += (
+            f"\n🎁 {escape_markdown(f'Подпишитесь на {NEWS_CHANNEL_LINK} и используйте /claim_news_bonus, ', version=2)}"
+            f"{escape_markdown(f'чтобы получить {NEWS_CHANNEL_BONUS_GENERATIONS} генерацию для {bonus_model_name_usage}!', version=2)}\n"
+        )
+    elif bonus_uses_left_usage > 0:
+        usage_text += (
+            f"\n🎁 {escape_markdown(f'У вас есть {bonus_uses_left_usage} бонусных генераций для {bonus_model_name_usage} ', version=2)}"
+            f"{escape_markdown(f'(за подписку на {NEWS_CHANNEL_LINK})', version=2)}.\n"
+        )
+    else: # claimed_bonus_usage is True and bonus_uses_left_usage == 0
+         usage_text += (
+            f"\nℹ️ {escape_markdown(f'Бонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_usage}) уже использован.', version=2)}\n"
+        )
+
+
+if not subscription_active:
     
     try:
         await update.message.reply_text(usage_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
@@ -472,6 +591,25 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_active:
             plain_usage_text += "\nПодписка Профи: /subscribe"
         await update.message.reply_text(plain_usage_text, reply_markup=get_main_reply_keyboard())
+
+if NEWS_CHANNEL_LINK and NEWS_CHANNEL_LINK != "https://t.me/YourNewsChannelHandle":
+        bonus_model_name_plain_usage = "продвинутой модели"
+        if NEWS_CHANNEL_BONUS_MODEL_KEY in AVAILABLE_TEXT_MODELS:
+             bonus_model_name_plain_usage = f"модели '{AVAILABLE_TEXT_MODELS[NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}'"
+
+        claimed_bonus_plain_usage = context.user_data.get('claimed_news_bonus', False)
+        bonus_uses_left_plain_usage = context.user_data.get('news_bonus_uses_left', 0)
+        if not claimed_bonus_plain_usage:
+            plain_usage_text += f"\nБонус: Подпишитесь на {NEWS_CHANNEL_LINK}, команда /claim_news_bonus для {NEWS_CHANNEL_BONUS_GENERATIONS} генерации ({bonus_model_name_plain_usage}).\n"
+        elif bonus_uses_left_plain_usage > 0:
+            plain_usage_text += f"\nБонус: У вас {bonus_uses_left_plain_usage} генераций для {bonus_model_name_plain_usage} (канал {NEWS_CHANNEL_LINK}).\n"
+        else:
+            plain_usage_text += f"\nБонус за подписку на {NEWS_CHANNEL_LINK} ({bonus_model_name_plain_usage}) использован.\n"
+
+
+    if not subscription_active:
+        plain_usage_text += "\nПодписка Профи: /subscribe"
+    await update.message.reply_text(plain_usage_text, reply_markup=get_main_reply_keyboard())
 
 async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -649,6 +787,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"`/model` {escape_markdown('или кнопка ⚙️ `Модель ИИ` - выбор конкретной модели Gemini для генерации ответов.', version=2)}\n"
         f"`/usage` {escape_markdown('или кнопка 📊 `Лимиты` - просмотр ваших текущих дневных лимитов на запросы.', version=2)}\n"
         f"`/subscribe` {escape_markdown('или кнопка 💎 `Подписка Профи` - информация о платной подписке для расширения лимитов.', version=2)}\n"
+        f"`/claim_news_bonus` {escape_markdown(f'🎁 Получить бонус за подписку на наш новостной канал ({NEWS_CHANNEL_LINK})', version=2)}\n" # ДОБАВЛЕНА ЭТА СТРОКА
         f"`/help` {escape_markdown('или кнопка ❓ `Помощь` - это сообщение.', version=2)}\n\n"
         f"💡 {escape_markdown('Просто отправьте свой вопрос или задание боту, и я постараюсь помочь!', version=2)}"
     )
@@ -656,10 +795,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(help_text_md, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=get_main_reply_keyboard())
     except telegram.error.BadRequest:
         await update.message.reply_text(
-            "Я ИИ-бот Gemini. Доступные команды: /start, /mode, /model, /usage, /subscribe, /help.\n"
-            "Просто напишите ваш вопрос.", 
-            reply_markup=get_main_reply_keyboard()
-        )
+        "Я ИИ-бот Gemini. Доступные команды: /start, /mode, /model, /usage, /subscribe, /claim_news_bonus, /help.\n" # ДОБАВЛЕНО /claim_news_bonus
+        f"Новостной канал для бонуса: {NEWS_CHANNEL_LINK}\n" # ДОБАВЛЕНА ЭТА СТРОКА
+        "Просто напишите ваш вопрос.",
+        reply_markup=get_main_reply_keyboard()
+    )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -969,6 +1109,7 @@ async def set_bot_commands(application: Application):
         BotCommand("model", "⚙️ Выбрать модель ИИ"),
         BotCommand("usage", "📊 Мои лимиты"),
         BotCommand("subscribe", "💎 Подписка Профи"),
+        BotCommand("claim_news_bonus", "🎁 Бонус за новости")
         BotCommand("help", "ℹ️ Помощь"),
     ]
 
@@ -978,6 +1119,97 @@ async def set_bot_commands(application: Application):
     except Exception as e:
         logger.error(f"Failed to set bot commands: {e}")
 
+async def claim_news_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not user:
+        logger.warning("claim_news_bonus_command called without effective_user.")
+        return
+
+    # Проверка, настроен ли канал администратором
+    if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle" or \
+       not NEWS_CHANNEL_LINK or NEWS_CHANNEL_LINK == "https://t.me/YourNewsChannelHandle":
+        await update.message.reply_text(
+            "Функция бонуса за подписку на новостной канал временно не настроена администратором. "
+            "Пожалуйста, попробуйте позже."
+        )
+        logger.warning(f"claim_news_bonus_command: NEWS_CHANNEL_USERNAME ('{NEWS_CHANNEL_USERNAME}') or NEWS_CHANNEL_LINK ('{NEWS_CHANNEL_LINK}') is not configured.")
+        return
+
+    bonus_model_config = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY)
+    if not bonus_model_config:
+        await update.message.reply_text("Ошибка: Модель для начисления бонуса не найдена. Обратитесь к администратору.")
+        logger.error(f"NEWS_CHANNEL_BONUS_MODEL_KEY '{NEWS_CHANNEL_BONUS_MODEL_KEY}' not found in AVAILABLE_TEXT_MODELS.")
+        return
+    bonus_model_name = bonus_model_config['name']
+
+
+    if context.user_data.get('claimed_news_bonus', False):
+        remaining_bonus = context.user_data.get('news_bonus_uses_left', 0)
+        if remaining_bonus > 0:
+            reply_msg = (
+                f"Вы уже активировали бонус за подписку на новостной канал. "
+                f"У вас осталось {remaining_bonus} бесплатных генераций для модели '{bonus_model_name}'.\n"
+                f"Наш канал: {NEWS_CHANNEL_LINK}"
+            )
+        else:
+            reply_msg = (
+                f"Вы уже получали и использовали бонус за подписку на новостной канал для модели '{bonus_model_name}'.\n"
+                f"Наш канал: {NEWS_CHANNEL_LINK}"
+            )
+        await update.message.reply_text(reply_msg)
+        return
+
+    try:
+        member_status = await context.bot.get_chat_member(chat_id=NEWS_CHANNEL_USERNAME, user_id=user.id)
+        logger.debug(f"User {user.id} status in {NEWS_CHANNEL_USERNAME}: {member_status.status}")
+
+        # Статусы, подтверждающие членство
+        allowed_statuses = ['member', 'administrator', 'creator']
+        # Статус 'restricted' также может означать, что пользователь в канале, но с ограничениями (не забанен).
+        # Иногда 'left' или 'kicked' могут прийти, если пользователь только что вышел/был удален.
+        # Важно: если канал приватный, бот должен быть администратором канала для этой проверки.
+
+        if member_status.status in allowed_statuses:
+            context.user_data['claimed_news_bonus'] = True
+            context.user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
+            await update.message.reply_text(
+                f"🎉 Спасибо за подписку на наш новостной канал!\n"
+                f"Вам начислена {NEWS_CHANNEL_BONUS_GENERATIONS} бесплатная генерация для модели '{bonus_model_name}'.\n"
+                f"Этот бонус не имеет срока действия, но он одноразовый.\n"
+                f"Наш канал: {NEWS_CHANNEL_LINK}"
+            )
+            logger.info(f"User {user.id} claimed news channel bonus. Granted {NEWS_CHANNEL_BONUS_GENERATIONS} uses for {NEWS_CHANNEL_BONUS_MODEL_KEY}.")
+        else:
+            await update.message.reply_text(
+                f"Мы не смогли подтвердить вашу подписку на канал {NEWS_CHANNEL_LINK}. \n"
+                f"Пожалуйста, убедитесь, что вы подписаны, и ваш профиль не скрыт (если канал публичный), "
+                f"затем попробуйте снова: /claim_news_bonus\n"
+                f"Если вы только что подписались, подождите минуту и повторите команду."
+            )
+    except telegram.error.BadRequest as e:
+        error_text = str(e).lower()
+        if "user not found" in error_text or "member not found" in error_text or "participant not found" in error_text :
+            await update.message.reply_text(
+                f"Мы не смогли подтвердить вашу подписку на канал {NEWS_CHANNEL_LINK}. \n"
+                f"Возможно, вы не подписаны. Пожалуйста, подпишитесь и попробуйте снова: /claim_news_bonus"
+            )
+        elif "chat not found" in error_text or "channel not found" in error_text:
+            await update.message.reply_text(
+                "Новостной канал для проверки подписки не найден. "
+                "Администратор бота, вероятно, указал неверный юзернейм канала."
+            )
+            logger.error(f"NEWS_CHANNEL_USERNAME ('{NEWS_CHANNEL_USERNAME}') seems to be invalid/incorrect for get_chat_member.")
+        elif "bot is not a member" in error_text:
+             await update.message.reply_text(
+                f"Не удалось проверить подписку. Если канал приватный, бот должен быть его участником (или администратором)."
+            )
+             logger.error(f"Bot is not a member of the private channel {NEWS_CHANNEL_USERNAME} and cannot check membership.")
+        else:
+            logger.error(f"BadRequest error checking channel membership for user {user.id} in {NEWS_CHANNEL_USERNAME}: {e}")
+            await update.message.reply_text("Произошла ошибка при проверке подписки. Попробуйте позже.")
+    except Exception as e:
+        logger.error(f"Unexpected error in claim_news_bonus_command for user {user.id}: {e}\n{traceback.format_exc()}")
+        await update.message.reply_text("Произошла непредвиденная ошибка при попытке получить бонус. Попробуйте позже.")
 
 async def main():
     if "YOUR_TELEGRAM_TOKEN" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8:
@@ -1008,6 +1240,9 @@ async def main():
     
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback))
+
+    
+application.add_handler(CommandHandler("claim_news_bonus", claim_news_bonus_command))
 
     logger.info("Starting bot application...")
     try:
