@@ -406,7 +406,7 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
 def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> ReplyKeyboardMarkup:
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
-        return ReplyKeyboardMarkup([[]], resize_keyboard=True, one_time_keyboard=False)
+        return ReplyKeyboardMarkup([[]], resize_keyboard=False, one_time_keyboard=False)
     
     keyboard = [[KeyboardButton(item["text"]) for item in menu["items"]]]
     if menu["is_submenu"]:
@@ -416,7 +416,7 @@ def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) ->
         nav_row.append(KeyboardButton("🏠 Главное меню"))
         keyboard.append(nav_row)
     
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=False, one_time_keyboard=False)
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key: str):
     menu = MENU_STRUCTURE.get(menu_key)
