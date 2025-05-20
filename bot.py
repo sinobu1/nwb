@@ -940,6 +940,146 @@ async def set_bot_commands(application: Application):
     try: await application.bot.set_my_commands(commands)
     except Exception as e: logger.error(f"Failed to set bot commands: {e}")
 
+async def ai_mode_menu_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Начало диалога выбора режима ИИ. Показывает категории."""
+    query = update.callback_query
+    message_target = query.message if query else update.message # Определяем, куда отвечать или что редактировать
+
+    keyboard = await get_ai_category_keyboard()
+    text = "🤖 Выберите категорию ИИ-агентов:"
+
+    if query:
+        await query.answer()
+        try:
+            await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+        except telegram.error.BadRequest as e:
+            if "message is not modified" in str(e).lower():
+                logger.info("Message not modified, skipping edit.")
+            else:
+                logger.error(f"Error editing message in ai_mode_menu_start: {e}")
+                # Если редактирование не удалось, можно отправить новое сообщение
+                await message_target.reply_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+        except Exception as e:
+            logger.error(f"Generic error in ai_mode_menu_start edit: {e}")
+            await message_target.reply_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+    else: # Если это команда /ai_mode_menu или текстовый ввод "Режим ИИ"
+        await message_target.reply_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+    
+    return SELECT_AI_CATEGORY
+
+async def ai_mode_menu_select_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обрабатывает выбор категории ИИ, показывает список агентов в категории."""
+    query = update.callback_query
+    await query.answer()
+    
+    selected_category = query.data 
+    context.user_data['selected_ai_category'] = selected_category # Сохраняем для кнопки "Назад"
+
+    keyboard = await get_ai_agent_keyboard_for_category(selected_category, context)
+    text = "👤 Выберите ИИ-агента из категории:"
+    
+    try:
+        await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+    except telegram.error.BadRequest as e:
+        if "message is not modified" in str(e).lower():
+            logger.info("Message not modified, skipping edit (select_category).")
+        else:
+            logger.error(f"Error editing message in ai_mode_menu_select_category: {e}")
+    except Exception as e:
+        logger.error(f"Generic error in ai_mode_menu_select_category edit: {e}")
+
+    return SELECT_AI_AGENT_FROM_CATEGORY
+
+async def ai_mode_menu_set_agent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обрабатывает выбор конкретного ИИ-агента (режима)."""
+    query = update.callback_query
+    await query.answer()
+    
+    mode_key_cb = query.data.split("set_mode_")[1] # Извлекаем ключ режима
+
+    if mode_key_cb in AI_MODES and mode_key_cb != "gemini_pro_custom_mode": # Проверяем, что режим существует и не специальный
+        context.user_data['current_ai_mode'] = mode_key_cb
+        details = AI_MODES[mode_key_cb]
+        text_response = f"🤖 Режим ИИ изменен на: *{escape_markdown(details['name'], version=2)}*\n\n{escape_markdown(details['welcome'], version=2)}"
+        try:
+            await query.edit_message_text(
+                text=text_response, 
+                reply_markup=None, # Убираем клавиатуру после выбора
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True
+            )
+        except telegram.error.BadRequest as e:
+            if "message is not modified" in str(e).lower():
+                logger.info("Message not modified, skipping edit (set_agent).")
+            else: # Если ошибка, попробуем просто отправить новое сообщение
+                logger.error(f"Error editing message text in ai_mode_menu_set_agent: {e}")
+                await query.message.reply_text(
+                    text_response,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=get_main_reply_keyboard(), # Возвращаем основную клавиатуру
+                    disable_web_page_preview=True
+                )
+        # Важно: После успешного выбора и подтверждения, можно снова показать ReplyKeyboard, если она скрывалась
+        # или если пользователь вошел через команду без ReplyKeyboard.
+        # Для простоты, если Inline была убрана, основная клавиатура должна остаться активной.
+        # Если же мы хотим показать основную клавиатуру явно после выбора, можно добавить:
+        # await query.message.reply_text("Меню выбора режима закрыто.", reply_markup=get_main_reply_keyboard())
+
+    elif mode_key_cb == "gemini_pro_custom_mode":
+        text_response = escape_markdown("Этот режим для Gemini 2.5 Pro выбирается автоматически при выборе соответствующей модели ИИ, а не через это меню.", version=2)
+        await query.edit_message_text(text=text_response, reply_markup=None, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+    else:
+        text_response = "⚠️ Ошибка: Выбранный режим ИИ не найден."
+        await query.edit_message_text(text=text_response, reply_markup=None, parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
+        
+    return ConversationHandler.END # Завершаем диалог выбора режима
+
+async def ai_mode_menu_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Отменяет диалог выбора режима ИИ."""
+    query = update.callback_query
+    text = "Выбор режима ИИ отменен."
+    if query:
+        await query.answer()
+        try:
+            await query.edit_message_text(text=text, reply_markup=None) # Убираем клавиатуру
+        except telegram.error.BadRequest as e:
+            if "message is not modified" in str(e).lower():
+                logger.info("Message not modified, skipping edit (cancel).")
+            else:
+                logger.error(f"Error editing message in ai_mode_menu_cancel: {e}")
+                await query.message.reply_text(text=text, reply_markup=get_main_reply_keyboard())
+        except Exception as e:
+             logger.error(f"Generic error in ai_mode_menu_cancel edit: {e}")
+             await query.message.reply_text(text=text, reply_markup=get_main_reply_keyboard())
+
+    else: # Если отмена пришла не через query (например, команда /cancel)
+        await update.message.reply_text(text=text, reply_markup=get_main_reply_keyboard())
+
+    context.user_data.pop('selected_ai_category', None) # Очищаем, если что-то сохраняли
+    return ConversationHandler.END
+
+async def ai_mode_menu_back_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Возврат к выбору категории из меню выбора агента."""
+    # Это по сути то же самое, что и начало диалога, только текст может быть другой
+    # или можно просто вызвать ai_mode_menu_start, если он может корректно обработать query.
+    # Для явности, сделаем отдельную логику, похожую на ai_mode_menu_start
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = await get_ai_category_keyboard()
+    text = "🤖 Выберите категорию ИИ-агентов:"
+    try:
+        await query.edit_message_text(text=text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+    except telegram.error.BadRequest as e:
+        if "message is not modified" in str(e).lower():
+            logger.info("Message not modified, skipping edit (back_to_categories).")
+        else:
+            logger.error(f"Error editing message in ai_mode_menu_back_to_categories: {e}")
+    except Exception as e:
+        logger.error(f"Generic error in ai_mode_menu_back_to_categories: {e}")
+        
+    return SELECT_AI_CATEGORY # Возвращаемся в состояние выбора категории
+
 async def main():
     if "YOUR_TELEGRAM_TOKEN" in TOKEN or not TOKEN or len(TOKEN.split(":")[0]) < 8 :
         logger.critical("CRITICAL: TELEGRAM_TOKEN is not set correctly or is a placeholder.")
