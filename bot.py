@@ -41,8 +41,8 @@ MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
 MAX_MESSAGE_LENGTH_TELEGRAM = 4000
 
 # --- ОБНОВЛЕННЫЕ ЛИМИТЫ ---
-DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72
-DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 48
+DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 75
+DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50
 DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75
 DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0 # Бонус за подписку
 DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25
@@ -57,7 +57,7 @@ NEWS_CHANNEL_BONUS_GENERATIONS = 1
 # --- РЕЖИМЫ РАБОТЫ ИИ (из bot (22).py) ---
 AI_MODES = {
     "universal_ai_basic": {
-        "name": "🤖 Универсальный ИИ (Базовый)",
+        "name": "🤖 Универсальный ИИ",
         "prompt": (
             "Ты — продвинутый ИИ-ассистент Gemini от Google. "
             "Твоя задача — помогать пользователю с разнообразными запросами: отвечать на вопросы, генерировать текст, "
@@ -121,7 +121,7 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "google_flash_free"
     },
     "google_gemini_2_5_flash_preview": {
-        "name": "💨 Gemini 2.5 Flash Preview",
+        "name": "⭐ Gemini 2.5 Flash Preview",
         "id": "gemini-2.5-flash-preview-04-17", # Используйте актуальный ID, например 'gemini-1.5-flash-preview-0514'
         "api_type": "google_genai",
         "is_limited": True,
@@ -131,7 +131,7 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "google_flash_preview_flex"
     },
     "custom_api_gemini_2_5_pro": {
-        "name": "🌟 Gemini 2.5 Pro (Продвинутый)",
+        "name": "💎 Gemini 2.5 Pro (Продвинутый)",
         "id": "gemini-2.5-pro-preview-03-25", # Убедитесь в актуальности ID для вашего Custom API
         "api_type": "custom_http_api",
         "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
