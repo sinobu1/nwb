@@ -280,7 +280,7 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
     if not model_config or not model_config.get("is_limited"): return True, "", 0
 
     is_profi_subscriber = False
-    if model_config.get("limit_type") in ["subscription_or_daily_free", "subscription_customiteral: "subscription_custom_pro"]:
+    if model_config.get("limit_type") in ["subscription_or_daily_free", "subscription_custom_pro"]:  # Fixed line
         user_subscription_details = context.bot_data.get('user_subscriptions', {}).get(user_id, {})
         if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
             try:
