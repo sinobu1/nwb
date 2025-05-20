@@ -590,40 +590,24 @@ async def claim_news_bonus_command(update: Update, context: ContextTypes.DEFAULT
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    await query.answer() # Отвечаем на callback query как можно раньше
     data = query.data
     user_id = query.from_user.id
     message_to_edit = query.message
     new_text = ""
     plain_fallback = ""
 
-    if data.startswith("set_mode_"):
-        mode_key = data.split("set_mode_")[1]
-        if mode_key in AI_MODES and mode_key != "gemini_pro_custom_mode":
-            context.user_data['current_ai_mode'] = mode_key
-            details = AI_MODES[mode_key]
-            new_text = f"🤖 Режим изменен на: *{escape_markdown(details['name'],version=2)}*\n\n{escape_markdown(details['welcome'],version=2)}"
-            plain_fallback = f"Режим: {details['name']}.\n{details['welcome']}"
-        elif mode_key == "gemini_pro_custom_mode":
-            new_text = escape_markdown("Этот режим для Gemini 2.5 Pro выбирается автоматически.", version=2)
-            plain_fallback = "Режим для Gemini 2.5 Pro выбирается автоматически."
-        else: new_text = plain_fallback = "⚠️ Ошибка: Режим не найден."
-        
-        if new_text and message_to_edit:
-            try: await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-            except telegram.error.BadRequest:
-                try: await message_to_edit.edit_text(text=plain_fallback, reply_markup=None, disable_web_page_preview=True)
-                except Exception as e_pf: logger.error(f"Fallback edit failed in set_mode: {e_pf}")
-            except Exception as e_gen: logger.error(f"General edit error in set_mode: {e_gen}")
-        return
+    # БЛОК ДЛЯ data.startswith("set_mode_") УДАЛЕН ОТСЮДА
+    # Эта логика теперь полностью обрабатывается в ai_mode_conv_handler (ai_mode_menu_set_agent)
 
-    elif data.startswith("set_model_"):
+    if data.startswith("set_model_"): # Начинаем с elif, или делаем if, если это первый блок
         model_key_cb = data.split("set_model_")[1]
         if model_key_cb in AVAILABLE_TEXT_MODELS:
             config = AVAILABLE_TEXT_MODELS[model_key_cb]
             context.user_data['selected_model_id'] = config["id"]
             context.user_data['selected_api_type'] = config["api_type"]
             today_str = datetime.now().strftime("%Y-%m-%d")
+            # ... (остальная часть логики для set_model_ остается без изменений) ...
             user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
             model_daily_usage = user_model_counts.get(model_key_cb, {'date': '', 'count': 0})
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
@@ -635,19 +619,29 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if new_text and message_to_edit:
             try: await message_to_edit.edit_text(text=new_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=None, disable_web_page_preview=True)
-            except telegram.error.BadRequest:
-                try: await message_to_edit.edit_text(text=plain_fallback, reply_markup=None, disable_web_page_preview=True)
-                except Exception as e_pf: logger.error(f"Fallback edit failed in set_model: {e_pf}")
+            except telegram.error.BadRequest as e_bad_req:
+                if "message is not modified" in str(e_bad_req).lower():
+                    logger.info(f"Message not modified in set_model_: {e_bad_req}")
+                else:
+                    try: await message_to_edit.edit_text(text=plain_fallback, reply_markup=None, disable_web_page_preview=True)
+                    except Exception as e_pf: logger.error(f"Fallback edit failed in set_model: {e_pf}")
             except Exception as e_gen: logger.error(f"General edit error in set_model: {e_gen}")
-        return
+        return # Важно не забыть return, если это был последний блок if/elif
         
     elif data == "check_news_subscription":
         await claim_news_bonus_logic(update, context, called_from_button=True, message_to_edit=message_to_edit)
         return
 
     elif data == "buy_profi_2days":
-        await buy_button_handler(update, context) # buy_button_handler уже async
+        await buy_button_handler(update, context) 
         return
+    
+    # Если есть другие обработчики elif, они остаются здесь
+    # Если data не соответствует ни одному из условий, функция просто завершится
+    # (после query.answer() в начале).
+    # Можно добавить логгирование для необработанных callback_data, если нужно:
+    # else:
+    #     logger.warning(f"Unhandled callback_data: {data} from user {user_id}")
 
 # --- Остальные обработчики команд и сообщений (из bot (22).py) ---
 async def select_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
