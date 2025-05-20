@@ -121,7 +121,7 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "google_flash_free"
     },
     "google_gemini_2_5_flash_preview": {
-        "name": "⭐ Gemini 2.5 Flash Preview",
+        "name": "⭐ Gemini 2.5 Flash (Preview)",
         "id": "gemini-2.5-flash-preview-04-17", # Используйте актуальный ID, например 'gemini-1.5-flash-preview-0514'
         "api_type": "google_genai",
         "is_limited": True,
@@ -131,7 +131,7 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "google_flash_preview_flex"
     },
     "custom_api_gemini_2_5_pro": {
-        "name": "💎 Gemini 2.5 Pro (Продвинутый)",
+        "name": "💎 Gemini 2.5 Pro (Preview)",
         "id": "gemini-2.5-pro-preview-03-25", # Убедитесь в актуальности ID для вашего Custom API
         "api_type": "custom_http_api",
         "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
@@ -743,8 +743,8 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text_parts = [
-        f"👋 Я многофункциональный ИИ-бот на базе моделей Gemini от Google\.",
-        "\n*Основные команды и кнопки:*",
+        f"👋 Я многофункциональный ИИ-бот на базе моделей Gemini от Google.",
+        "*Основные команды и кнопки:",
         "`/start` \- Начало / Инфо",
         "`/mode` \- Сменить режим ИИ",
         "`/model` \- Выбрать модель ИИ",
@@ -752,7 +752,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/subscribe` \- Подписка Профи",
         f"`/get_news_bonus` \- 🎁 Бонус за подписку на [канал]({NEWS_CHANNEL_LINK})",
         "`/help` \- Это сообщение",
-        "\n💡 Просто отправьте свой вопрос или задание боту\!"
+        "💡 Просто отправьте свой вопрос или задание боту!"
     ]
     final_help_text_md = ""
     for part in help_text_parts:
