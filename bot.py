@@ -408,12 +408,15 @@ def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) ->
     if not menu:
         return ReplyKeyboardMarkup([[]], resize_keyboard=True, one_time_keyboard=False)
     
-    # Разделяем кнопки на ряды по 2
+    # Для главного меню — по 2 кнопки в ряду, для подменю — столбик
     keyboard = []
-    items = menu["items"]
-    for i in range(0, len(items), 2):
-        row = [KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))]
-        keyboard.append(row)
+    if menu_key == "main_menu":
+        items = menu["items"]
+        for i in range(0, len(items), 2):
+            row = [KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))]
+            keyboard.append(row)
+    else:
+        keyboard = [[KeyboardButton(item["text"])] for item in menu["items"]]
     
     if menu["is_submenu"]:
         nav_row = []
@@ -422,7 +425,7 @@ def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) ->
         nav_row.append(KeyboardButton("🏠 Главное меню"))
         keyboard.append(nav_row)
     
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=False, one_time_keyboard=False)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key: str):
     menu = MENU_STRUCTURE.get(menu_key)
