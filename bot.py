@@ -406,9 +406,15 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
 def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> ReplyKeyboardMarkup:
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
-        return ReplyKeyboardMarkup([[]], resize_keyboard=False, one_time_keyboard=False)
+        return ReplyKeyboardMarkup([[]], resize_keyboard=True, one_time_keyboard=False)
     
-    keyboard = [[KeyboardButton(item["text"]) for item in menu["items"]]]
+    # Разделяем кнопки на ряды по 2
+    keyboard = []
+    items = menu["items"]
+    for i in range(0, len(items), 2):
+        row = [KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))]
+        keyboard.append(row)
+    
     if menu["is_submenu"]:
         nav_row = []
         if menu["parent"]:
