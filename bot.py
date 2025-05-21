@@ -585,37 +585,23 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
 
     if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle":
         text = "Функция бонуса не настроена."
-        try:
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                parse_mode=None
-            )
-            logger.info(f"Sent bonus not configured message: {text}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for bonus not configured: {e}")
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+        await update.message.reply_text(
+            text,
+            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            parse_mode=None
+        )
+        logger.info(f"Sent bonus not configured message: {text}")
         return
 
     bonus_model_config = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY)
     if not bonus_model_config:
         text = "Ошибка: Бонусная модель не найдена."
-        try:
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                parse_mode=None
-            )
-            logger.info(f"Sent bonus model not found message: {text}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for bonus model not found: {e}")
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+        await update.message.reply_text(
+            text,
+            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            parse_mode=None
+        )
+        logger.info(f"Sent bonus model not found message: {text}")
         return
 
     bonus_model_name = bonus_model_config['name']
@@ -623,23 +609,16 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
     if context.user_data.get('claimed_news_bonus', False):
         uses_left = context.user_data.get('news_bonus_uses_left', 0)
         if uses_left > 0:
-            reply_text = f'Вы уже активировали бонус. У вас осталось <b>{uses_left}</b> генераций для {bonus_model_name}.<br><a href="{NEWS_CHANNEL_LINK}">Канал</a>'
+            reply_text = f'Вы уже активировали бонус. У вас осталось <b>{uses_left}</b> генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
         else:
-            reply_text = f'Бонус для {bonus_model_name} использован.<br><a href="{NEWS_CHANNEL_LINK}">Канал</a>'
-        try:
-            await update.message.reply_text(
-                reply_text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                disable_web_page_preview=True
-            )
-            logger.info(f"Sent bonus already claimed message: {reply_text}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for bonus already claimed: {e}")
-            await update.message.reply_text(
-                reply_text.replace('<b>', '').replace('</b>', ''),
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+            reply_text = f'Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
+        await update.message.reply_text(
+            reply_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            disable_web_page_preview=True
+        )
+        logger.info(f"Sent bonus already claimed message: {reply_text}")
         return
 
     try:
@@ -647,58 +626,40 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         if member_status.status in ['member', 'administrator', 'creator']:
             context.user_data['claimed_news_bonus'] = True
             context.user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
-            success_text = f'🎉 Спасибо за подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>!<br>Вам начислена <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерация для {bonus_model_name}.'
-            try:
-                await update.message.reply_text(
-                    success_text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=generate_menu_keyboard('main_menu', context),
-                    disable_web_page_preview=True
-                )
-                logger.info(f"Sent bonus success message: {success_text}")
-            except telegram.error.BadRequest as e:
-                logger.error(f"Error sending message for bonus success: {e}")
-                await update.message.reply_text(
-                    success_text.replace('<b>', '').replace('</b>', ''),
-                    reply_markup=generate_menu_keyboard('main_menu', context)
-                )
+            success_text = f'🎉 Спасибо за подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>! Вам начислена <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерация для {bonus_model_name}.'
+            await update.message.reply_text(
+                success_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=generate_menu_keyboard('main_menu', context),
+                disable_web_page_preview=True
+            )
+            logger.info(f"Sent bonus success message: {success_text}")
         else:
             fail_text = f'Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> и нажмите «Получить» снова.'
             reply_markup_inline = InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
             ])
-            try:
-                await update.message.reply_text(
-                    fail_text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=reply_markup_inline,
-                    disable_web_page_preview=True
-                )
-                logger.info(f"Sent bonus subscription required message: {fail_text}")
-            except telegram.error.BadRequest as e:
-                logger.error(f"Error sending message for bonus subscription required: {e}")
-                await update.message.reply_text(
-                    fail_text,
-                    reply_markup=reply_markup_inline
-                )
-    except telegram.error.BadRequest as e:
-        error_text_response = str(e).lower()
-        reply_message_on_error = f"Ошибка проверки подписки: {str(e)}. Попробуйте позже."
-        if "user not found" in error_text_response or "member not found" in error_text_response or "participant not found" in error_text_response:
-            reply_message_on_error = f'Мы не смогли подтвердить подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>. Подпишитесь и попробуйте снова.'
-        elif "chat not found" in error_text_response or "channel not found" in error_text_response:
-            reply_message_on_error = "Канал не найден."
-        elif "bot is not a member" in error_text_response:
-            reply_message_on_error = f"Бот должен быть участником канала."
-        logger.error(f"BadRequest error checking channel membership: {e}")
-        try:
             await update.message.reply_text(
-                reply_message_on_error,
+                fail_text,
                 parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+                reply_markup=reply_markup_inline,
                 disable_web_page_preview=True
             )
-            logger.info(f"Sent bonus error message: {reply_message_on_error}")
+            logger.info(f"Sent bonus subscription required message: {fail_text}")
+    except telegram.error.BadRequest as e:
+        error_text_response = str(e).lower()
+        reply_message_on_error = f'Мы не смогли подтвердить подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>. Подпишитесь и попробуйте снова.'
+        reply_markup_inline = InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
+        ])
+        await update.message.reply_text(
+            reply_message_on_error,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup_inline,
+            disable_web_page_preview=True
+        )
+        logger.error(f"BadRequest error checking channel membership: {e}")
+        logger.info(f"Sent bonus error message: {reply_message_on_error}")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for bonus error: {e}")
             await update.message.reply_text(
@@ -750,27 +711,26 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bonus_model_name = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', "бонусной модели")
         bonus_info = ""
         if not context.user_data.get('claimed_news_bonus', False):
-            bonus_info = f'<br>🎁 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерации ({bonus_model_name})!'
+            bonus_info = f'🎁 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерации ({bonus_model_name})!'
         elif (bonus_uses_left := context.user_data.get('news_bonus_uses_left', 0)) > 0:
-            bonus_info = f'<br>🎁 У вас <b>{bonus_uses_left}</b> бонусных генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
+            bonus_info = f'🎁 У вас <b>{bonus_uses_left}</b> бонусных генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
         else:
-            bonus_info = f'<br>ℹ️ Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
+            bonus_info = f'ℹ️ Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
         usage_text_parts.append(bonus_info)
 
     if not subscription_active:
-        usage_text_parts.append(f"<br>Больше лимитов? Меню «Подписка».")
+        usage_text_parts.append("Больше лимитов? Меню «Подписка».")
 
     final_usage_text = "\n".join(usage_text_parts)
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
 
-    try:
-        await update.message.reply_text(
-            final_usage_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
-            disable_web_page_preview=True
-        )
-        logger.info(f"Sent limits message: {final_usage_text}")
+    await update.message.reply_text(
+        final_usage_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent limits message: {final_usage_text}")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending message for show_limits: {e}")
         await update.message.reply_text(
