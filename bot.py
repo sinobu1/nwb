@@ -29,7 +29,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
-SERVICE_ACCOUNT_KEY_JSON_STR = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_JSON")
+SERVICE_ACCOUNT_KEY_JSON_STR = os.getenv("8f89d5b9414bb30030f7e30e0d1c24136c34cd13")
 DB = None # Клиент Firestore будет здесь
 
 if SERVICE_ACCOUNT_KEY_JSON_STR:
