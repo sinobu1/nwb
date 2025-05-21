@@ -329,7 +329,12 @@ def get_user_actual_limit_for_model(user_id: int, model_key: str, context: Conte
     if limit_type == "subscription_or_daily_free":
         return model_config.get("subscription_daily_limit" if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY else "limit_if_no_subscription", 0)
     if limit_type == "subscription_custom_pro":
-        return model_config.get("subscription_daily_limit" if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY else "limit_if_no_subscription", 0)
+        base_limit = model_config.get("subscription_daily_limit" if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY else "limit_if_no_subscription", 0)
+        # Учитываем бонус за подписку на канал
+        if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False):
+            bonus_uses_left = context.user_data.get('news_bonus_uses_left', 0)
+            return base_limit + bonus_uses_left
+        return base_limit
     return model_config.get("limit", float('inf')) if not model_config.get("is_limited", False) else 0
 
 def check_and_log_request_attempt(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE) -> tuple[bool, str, int]:
@@ -588,7 +593,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'timestamp': datetime.now().isoformat()
     }
     
-    # Удаляем предыдущее сообщение с командой
+    # Удаляем сообщение пользователя
     await try_delete_user_message(update, context)
     
     await show_help(update, context)
@@ -770,17 +775,22 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model_daily_usage = user_model_counts.get(model_k, {'date': '', 'count': 0})
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
             actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
-            usage_text_parts.append(f"▫️ {model_c['name']}: *{current_c_display}/{actual_l}*")
+            # Добавляем примечание о бонусе для Gemini Pro
+            bonus_note = ""
+            if model_k == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False) and context.user_data.get('news_bonus_uses_left', 0) > 0:
+                bonus_note = " (вкл. бонус)"
+            usage_text_parts.append(f"▫️ {model_c['name']}: *{current_c_display}/{actual_l}*{bonus_note}")
 
     if NEWS_CHANNEL_USERNAME and NEWS_CHANNEL_USERNAME != "@YourNewsChannelHandle":
         bonus_model_name = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', "бонусной модели")
         bonus_info = ""
         if not context.user_data.get('claimed_news_bonus', False):
-            bonus_info = f"\n🎁 Подпишитесь на [канал]({NEWS_CHANNEL_LINK}) для *{NEWS_CHANNEL_BONUS_GENERATIONS}* генерации ({bonus_model_name})!"
+            # Используем escape_markdown только для текста ссылки
+            bonus_info = f"\n🎁 Подпишитесь на [{escape_markdown('канал', version=2)}]({NEWS_CHANNEL_LINK}) для *{NEWS_CHANNEL_BONUS_GENERATIONS}* генерации ({bonus_model_name})!"
         elif (bonus_uses_left := context.user_data.get('news_bonus_uses_left', 0)) > 0:
-            bonus_info = f"\n🎁 У вас *{bonus_uses_left}* бонусных генераций для {bonus_model_name} ([канал]({NEWS_CHANNEL_LINK}))."
+            bonus_info = f"\n🎁 У вас *{bonus_uses_left}* бонусных генераций для {bonus_model_name} ([{escape_markdown('канал', version=2)}]({NEWS_CHANNEL_LINK}))."
         else:
-            bonus_info = f"\nℹ️ Бонус для {bonus_model_name} использован ([канал]({NEWS_CHANNEL_LINK}))."
+            bonus_info = f"\nℹ️ Бонус для {bonus_model_name} использован ([{escape_markdown('канал', version=2)}]({NEWS_CHANNEL_LINK}))."
         usage_text_parts.append(bonus_info)
 
     if not subscription_active:
