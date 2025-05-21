@@ -371,7 +371,7 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
             if not context.user_data.get('claimed_news_bonus', False):
                 message_parts.append(f'💡 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для бонусной генерации!')
             elif context.user_data.get('news_bonus_uses_left', 0) == 0:
-                message_parts.append(f"ℹ️ Бонус за подписку использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).")
+                message_parts.append(f"ℹ️ Бонус за подписку использован (<a href='{NEWS_CHANNEL_LINK}'>канал</a>).")
         message_parts.append("Попробуйте завтра или купите подписку в меню «Подписка».")
         return False, "\n".join(message_parts), current_daily_count
     return True, "", current_daily_count
