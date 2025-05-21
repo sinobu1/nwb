@@ -24,7 +24,8 @@ import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
-from functools import lru_cache
+from collections import defaultdict
+from time import time
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -216,7 +217,7 @@ MENU_STRUCTURE = {
     },
     "models_submenu": {
         "title": "Выберите модель ИИ",
-        "items": [(model["name"], "set_model", key) for key, model in AVAILABLE_TEXT_MODELS.items()],
+        "items": [(model["name"], "set_model", key) for key, mode in AVAILABLE_TEXT_MODELS.items()],
         "parent": "main_menu"
     },
     "limits_submenu": {
@@ -259,22 +260,37 @@ except Exception as e:
     logger.error(f"Failed to initialize Firebase: {e}")
     db = None
 
-# --- FIRESTORE HELPERS ---
-@lru_cache(maxsize=1000)
+# --- IN-MEMORY CACHE ---
+USER_DATA_CACHE = defaultdict(dict)
+BOT_DATA_CACHE = {}
+CACHE_TTL = 60  # Cache TTL in seconds
+
 async def get_user_data(user_id: int) -> dict:
+    cache_key = str(user_id)
+    cached = USER_DATA_CACHE.get(cache_key)
+    if cached and (time() - cached['timestamp']) < CACHE_TTL:
+        return cached['data']
+
     if not db:
         return {}
     doc_ref = db.collection("users").document(str(user_id))
     doc = await asyncio.to_thread(doc_ref.get)
-    return doc.to_dict() or {}
+    data = doc.to_dict() or {}
+    USER_DATA_CACHE[cache_key] = {'data': data, 'timestamp': time()}
+    return data
 
-@lru_cache(maxsize=1)
 async def get_bot_data() -> dict:
+    global BOT_DATA_CACHE
+    if BOT_DATA_CACHE and (time() - BOT_DATA_CACHE.get('timestamp', 0)) < CACHE_TTL:
+        return BOT_DATA_CACHE['data']
+
     if not db:
         return {}
     doc_ref = db.collection("bot_data").document("data")
     doc = await asyncio.to_thread(doc_ref.get)
-    return doc.to_dict() or {}
+    data = doc.to_dict() or {}
+    BOT_DATA_CACHE = {'data': data, 'timestamp': time()}
+    return data
 
 async def set_user_data(user_id: int, data: dict):
     if not db:
@@ -282,6 +298,8 @@ async def set_user_data(user_id: int, data: dict):
         return
     doc_ref = db.collection("users").document(str(user_id))
     await asyncio.to_thread(doc_ref.set, data, merge=True)
+    cache_key = str(user_id)
+    USER_DATA_CACHE[cache_key] = {'data': data, 'timestamp': time()}
     logger.debug(f"Updated user data for {user_id}")
 
 async def set_bot_data(data: dict):
@@ -290,6 +308,8 @@ async def set_bot_data(data: dict):
         return
     doc_ref = db.collection("bot_data").document("data")
     await asyncio.to_thread(doc_ref.set, data, merge=True)
+    global BOT_DATA_CACHE
+    BOT_DATA_CACHE = {'data': data, 'timestamp': time()}
     logger.debug(f"Updated bot data")
 
 async def get_current_mode_details(user_id: int) -> dict:
