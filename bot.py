@@ -264,9 +264,9 @@ try:
         logger.error(f"Ошибка инициализации Firebase: {e}")
         raise
 
-    # Инициализация асинхронного клиента Firestore с явными учетными данными
-    db = firestore.AsyncClient(credentials=cred)
-    logger.info("Firestore AsyncClient успешно инициализирован")
+    # Инициализация асинхронного клиента Firestore из firebase_admin
+    db = firestore.client()  # Используем синхронный клиент для совместимости
+    logger.info("Firestore клиент успешно инициализирован")
 except Exception as e:
     logger.error(f"Неизвестная ошибка при инициализации Firebase/Firestore: {e}")
     raise
