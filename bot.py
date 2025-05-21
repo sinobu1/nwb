@@ -21,10 +21,35 @@ from datetime import datetime, timedelta
 from telegram import LabeledPrice
 from typing import Optional
 import uuid
+import firebase_admin # НОВЫЙ ИМПОРТ
+from firebase_admin import credentials, firestore # НОВЫЙ ИМПОРТ
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
+SERVICE_ACCOUNT_KEY_JSON_STR = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_JSON")
+DB = None # Клиент Firestore будет здесь
+
+if SERVICE_ACCOUNT_KEY_JSON_STR:
+    if not firebase_admin._apps: # Проверяем, не инициализировано ли уже приложение
+        try:
+            cred_json = json.loads(SERVICE_ACCOUNT_KEY_JSON_STR)
+            cred = credentials.Certificate(cred_json)
+            firebase_admin.initialize_app(cred)
+            logger.info("Firebase Admin SDK успешно инициализирован.")
+            DB = firestore.client()
+            logger.info("Клиент Firestore успешно получен.")
+        except json.JSONDecodeError:
+            logger.error("Ошибка декодирования JSON из FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Убедитесь, что это корректная JSON-строка.")
+        except ValueError as e:
+            logger.error(f"Ошибка в данных учетной записи Firebase (возможно, неполный JSON): {e}")
+        except Exception as e:
+            logger.error(f"Непредвиденная ошибка при инициализации Firebase Admin SDK: {e}")
+else:
+    logger.warning("Переменная окружения FIREBASE_SERVICE_ACCOUNT_KEY_JSON не установлена. Firestore не будет использоваться.")
+# --- КОНЕЦ ИНИЦИАЛИЗАЦИИ FIREBASE ---
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
@@ -481,6 +506,202 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
         disable_web_page_preview=True
     )
     logger.info(f"Sent menu message for {menu_key}: {text}")
+
+# ... (после ваших вспомогательных функций) ...
+
+class FirestorePersistence(PicklePersistence): # Пока наследуемся от PicklePersistence для простоты, потом заменим методы
+    def __init__(self, firestore_client, store_user_data=True, store_chat_data=True, store_bot_data=True, single_collection_name: Optional[str] = "telegram_bot_data"):
+        # super().__init__(filepath='dummy_persistence') # PicklePersistence требует filepath, но мы его не будем использовать
+        self._firestore_client = firestore_client
+        self._store_user_data = store_user_data
+        self._store_chat_data = store_chat_data # В вашем коде chat_data не используется активно, но для полноты
+        self._store_bot_data = store_bot_data
+        self.user_data = None
+        self.chat_data = None
+        self.bot_data = None
+        self.conversations = None # Если используете ConversationHandler
+
+        # Определяем коллекции. Можно использовать одну общую или разные.
+        # Для простоты начнем с одной коллекции и разных документов для user, chat, bot data.
+        self._main_collection_name = single_collection_name
+        self._user_doc_prefix = "user_"
+        self._chat_doc_prefix = "chat_"
+        self._bot_doc_id = "bot_application_data"
+        self._conversations_doc_id = "conversations_data"
+
+
+    async def load_data(self) -> None:
+        """Загружает данные из Firestore при старте бота."""
+        if not self._firestore_client:
+            logger.warning("Клиент Firestore не инициализирован. Данные не будут загружены из Firestore.")
+            # Загружаем пустые словари, чтобы PTB не ругался
+            self.user_data = {}
+            self.chat_data = {}
+            self.bot_data = {}
+            self.conversations = {}
+            return
+
+        logger.info("Загрузка данных из Firestore...")
+        self.user_data = await self._load_type_data(self._user_doc_prefix) if self._store_user_data else {}
+        self.chat_data = await self._load_type_data(self._chat_doc_prefix) if self._store_chat_data else {}
+
+        if self._store_bot_data:
+            try:
+                doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id)
+                doc = await asyncio.to_thread(doc_ref.get)
+                if doc.exists:
+                    self.bot_data = doc.to_dict()
+                    logger.info(f"Bot_data загружены из документа: {self._bot_doc_id}")
+                else:
+                    self.bot_data = {}
+                    logger.info(f"Документ для bot_data ({self._bot_doc_id}) не найден, используется пустой словарь.")
+            except Exception as e:
+                logger.error(f"Ошибка загрузки bot_data из Firestore: {e}")
+                self.bot_data = {}
+        else:
+            self.bot_data = {}
+
+        # Загрузка conversations, если они используются
+        self.conversations = {} # Пока не реализуем для ConversationHandler
+        logger.info("Загрузка данных из Firestore завершена.")
+
+
+    async def _load_type_data(self, prefix: str) -> dict:
+        """Вспомогательный метод для загрузки user_data или chat_data."""
+        data_dict = {}
+        try:
+            collection_ref = self._firestore_client.collection(self._main_collection_name)
+            # Firestore не поддерживает "начинается с" в ID документа напрямую без составных запросов.
+            # Поэтому либо храним user_id/chat_id как поле, либо делаем N запросов.
+            # Для начала, будем предполагать, что мы можем перечислить документы и отфильтровать.
+            # Это НЕЭФФЕКТИВНО для большого количества пользователей/чатов.
+            # В идеале, `get_user_data` и `get_chat_data` в PTB должны возвращать dict-like объекты,
+            # которые подгружают данные по ключу. Но PTB ожидает полные словари при инициализации.
+            docs = await asyncio.to_thread(collection_ref.stream) # stream() - это синхронная операция
+            for doc in docs:
+                if doc.id.startswith(prefix):
+                    try:
+                        key_id = int(doc.id[len(prefix):]) # Получаем ID после префикса
+                        data_dict[key_id] = doc.to_dict()
+                    except ValueError:
+                        logger.warning(f"Не удалось преобразовать ID документа '{doc.id}' в int для ключа.")
+            logger.info(f"Загружено {len(data_dict)} записей для префикса '{prefix}'.")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки данных для префикса '{prefix}' из Firestore: {e}")
+        return data_dict
+
+    async def get_user_data(self) -> dict:
+        if self.user_data is None:
+             await self.load_data() # Убедимся, что данные загружены
+        return self.user_data if self.user_data is not None else {}
+
+    async def get_chat_data(self) -> dict:
+        if self.chat_data is None:
+            await self.load_data()
+        return self.chat_data if self.chat_data is not None else {}
+
+    async def get_bot_data(self) -> dict:
+        if self.bot_data is None:
+            await self.load_data()
+        return self.bot_data if self.bot_data is not None else {}
+
+    async def get_conversations(self, name: str) -> dict:
+        # Для ConversationHandler. Пока не реализуем подробно.
+        if self.conversations is None:
+            await self.load_data()
+        return self.conversations.get(name, {}) if self.conversations is not None else {}
+
+
+    async def update_user_data(self, user_id: int, data: dict) -> None:
+        if not self._store_user_data or not self._firestore_client:
+            return
+        doc_id = f"{self._user_doc_prefix}{user_id}"
+        try:
+            # logger.debug(f"Обновление user_data для {doc_id}: {data}")
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
+                data, merge=True # merge=True чтобы обновлять, а не перезаписывать полностью
+            )
+        except Exception as e:
+            logger.error(f"Ошибка обновления user_data для {doc_id} в Firestore: {e}")
+
+    async def update_chat_data(self, chat_id: int, data: dict) -> None:
+        if not self._store_chat_data or not self._firestore_client:
+            return
+        doc_id = f"{self._chat_doc_prefix}{chat_id}"
+        try:
+            # logger.debug(f"Обновление chat_data для {doc_id}: {data}")
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
+                data, merge=True
+            )
+        except Exception as e:
+            logger.error(f"Ошибка обновления chat_data для {doc_id} в Firestore: {e}")
+
+    async def update_bot_data(self, data: dict) -> None:
+        if not self._store_bot_data or not self._firestore_client:
+            return
+        try:
+            # logger.debug(f"Обновление bot_data ({self._bot_doc_id}): {data}")
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id).set,
+                data # bot_data обычно перезаписывается полностью
+            )
+        except Exception as e:
+            logger.error(f"Ошибка обновления bot_data ({self._bot_doc_id}) в Firestore: {e}")
+
+    async def update_conversation(self, name: str, key: tuple, new_state: Optional[object]) -> None:
+        # Для ConversationHandler. Пока не реализуем подробно.
+        # logger.debug(f"Обновление conversation: name={name}, key={key}, new_state={new_state}")
+        # if self.conversations is None: self.conversations = {}
+        # if name not in self.conversations: self.conversations[name] = {}
+        # if new_state is None:
+        #     self.conversations[name].pop(key, None)
+        # else:
+        #     self.conversations[name][key] = new_state
+        # # Здесь нужна логика сохранения self.conversations в Firestore, например, в отдельный документ.
+        pass
+
+    async def drop_chat_data(self, chat_id: int) -> None:
+        if not self._store_chat_data or not self._firestore_client:
+            return
+        doc_id = f"{self._chat_doc_prefix}{chat_id}"
+        try:
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
+            )
+            if self.chat_data and chat_id in self.chat_data:
+                del self.chat_data[chat_id]
+            logger.info(f"Chat_data для {doc_id} удалены из Firestore.")
+        except Exception as e:
+            logger.error(f"Ошибка удаления chat_data для {doc_id} из Firestore: {e}")
+
+
+    async def drop_user_data(self, user_id: int) -> None:
+        if not self._store_user_data or not self._firestore_client:
+            return
+        doc_id = f"{self._user_doc_prefix}{user_id}"
+        try:
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
+            )
+            if self.user_data and user_id in self.user_data:
+                del self.user_data[user_id]
+            logger.info(f"User_data для {doc_id} удалены из Firestore.")
+        except Exception as e:
+            logger.error(f"Ошибка удаления user_data для {doc_id} из Firestore: {e}")
+
+    async def flush(self) -> None:
+        """
+        Метод flush() вызывается PTB для принудительного сохранения данных.
+        В нашем случае данные пишутся сразу, но если бы мы кешировали их локально
+        перед отправкой в Firestore, здесь бы происходила отправка.
+        Пока что он может быть пустым.
+        """
+        # logger.debug("Вызван метод flush. Данные уже должны быть сохранены в Firestore при каждом update.")
+        pass
+
+# --- КОНЕЦ КЛАССА FirestorePersistence ---
 
 # --- Обработчики команд ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1010,8 +1231,21 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Sent error handler message")
 
 async def main():
-    persistence = PicklePersistence(filepath="bot_persistence")
-    app = Application.builder().token(TOKEN).persistence(persistence).build()
+    async def main():
+    # НОВАЯ ИНИЦИАЛИЗАЦИЯ PERSISTENCE
+    if DB: # DB - это наш firestore.client()
+        persistence = FirestorePersistence(firestore_client=DB)
+        await persistence.load_data() # Явно загружаем данные перед созданием Application
+    else:
+        logger.warning("Клиент Firestore не доступен. Используется PicklePersistence для локальной отладки.")
+        # В качестве запасного варианта, если Firebase не настроен, можно оставить Pickle.
+        # Но для Railway это не будет работать между перезапусками.
+        # Для продакшена на Railway нужно, чтобы DB был успешно инициализирован.
+        persistence = PicklePersistence(filepath="bot_persistence_fallback")
+
+
+    app = Application.builder().token(TOKEN).persistence(persistence).build() #
+
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", open_menu_command))
