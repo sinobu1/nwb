@@ -217,7 +217,7 @@ MENU_STRUCTURE = {
     },
     "models_submenu": {
         "title": "Выберите модель ИИ",
-        "items": [(model["name"], "set_model", key) for key, mode in AVAILABLE_TEXT_MODELS.items()],
+        "items": [(model["name"], "set_model", key) for key, model in AVAILABLE_TEXT_MODELS.items()],
         "parent": "main_menu"
     },
     "limits_submenu": {
