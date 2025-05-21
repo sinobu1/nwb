@@ -15,7 +15,6 @@ import logging
 import traceback
 import os
 import asyncio
-import nest_asyncio
 import json
 from datetime import datetime, timedelta
 from telegram import LabeledPrice
@@ -30,7 +29,7 @@ from time import time
 # Enable debug logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG  # Changed from INFO to DEBUG
+    level=logging.DEBUG
 )
 logger = logging.getLogger(__name__)
 
@@ -282,6 +281,16 @@ async def get_user_data(user_id: int) -> dict:
     USER_DATA_CACHE[cache_key] = {'data': data, 'timestamp': time()}
     return data
 
+async def set_user_data(user_id: int, data: dict):
+    if not db:
+        logger.warning(f"Firestore not initialized, cannot set user data for {user_id}")
+        return
+    doc_ref = db.collection("users").document(str(user_id))
+    await asyncio.to_thread(doc_ref.set, data, merge=True)
+    cache_key = str(user_id)
+    USER_DATA_CACHE[cache_key] = {'data': data, 'timestamp': time()}
+    logger.debug(f"Updated user data for {user_id}")
+
 async def get_bot_data() -> dict:
     global BOT_DATA_CACHE
     if BOT_DATA_CACHE and (time() - BOT_DATA_CACHE.get('timestamp', 0)) < CACHE_TTL:
@@ -294,16 +303,6 @@ async def get_bot_data() -> dict:
     data = doc.to_dict() or {}
     BOT_DATA_CACHE = {'data': data, 'timestamp': time()}
     return data
-
-async def set_user_data(user_id: int, data: dict):
-    if not db:
-        logger.warning(f"Firestore not initialized, cannot set user data for {user_id}")
-        return
-    doc_ref = db.collection("users").document(str(user_id))
-    await asyncio.to_thread(doc_ref.set, data, merge=True)
-    cache_key = str(user_id)
-    USER_DATA_CACHE[cache_key] = {'data': data, 'timestamp': time()}
-    logger.debug(f"Updated user data for {user_id}")
 
 async def set_bot_data(data: dict):
     if not db:
@@ -1263,7 +1262,15 @@ async def main():
     ]
     await app.bot.set_my_commands(bot_commands)
     logger.info("Bot commands set")
+    
+    # Initialize and run polling in the existing event loop
+    await app.initialize()
+    await app.start()
     await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+    
+    # Properly shut down the application
+    await app.stop()
+    await app.shutdown()
 
 def validate_api_keys():
     keys = [
@@ -1278,11 +1285,15 @@ def validate_api_keys():
             logger.warning(f"{name} is missing or incorrectly formatted.")
 
 if __name__ == '__main__':
-    validate_api_keys()
-    if GOOGLE_GEMINI_API_KEY and GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"):
-        try:
-            genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
-            logger.info("Google Gemini API configured")
-        except Exception as e:
-            logger.error(f"Failed to configure Google Gemini API: {e}")
-    asyncio.run(main())
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            logger.warning("Existing event loop is running, using it.")
+            loop.create_task(main())
+        else:
+            loop.run_until_complete(main())
+    except RuntimeError as e:
+        logger.error(f"Event loop error: {e}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
