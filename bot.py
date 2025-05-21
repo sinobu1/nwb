@@ -1471,6 +1471,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif api_type_from_config == "custom_http_api":
         api_key_variable_name = model_config.get("api_key_var_name") # Use new var name
         actual_api_key_value = None # Use new var name
+        payload_messages_list = []  # Initialize payload messages list for custom HTTP API
         if api_key_variable_name:
             actual_api_key_value = globals().get(api_key_variable_name) # Get actual key from global scope
 
@@ -1484,22 +1485,41 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Accept": "application/json"
             }
             
-            # System prompt is passed as a separate message for custom APIs
-            payload_messages_list = [] # Use new var name
-            if system_prompt_text: # Only add system message if it's defined
-                 payload_messages_list.append({"role": "system", "content": system_prompt_text})
-            payload_messages_list.append({"role": "user", "content": user_message})
+            # Определяем, используется ли модель GPT-4o mini
+            is_gpt_4o_mini = (model_config["id"] == "gpt-4o-mini")
+            
+            if system_prompt_text: # Добавляем системный промпт, если он есть
+                if is_gpt_4o_mini:
+                    payload_messages_list.append({
+                        "role": "system",
+                        "content": [{"type": "text", "text": system_prompt_text}]  # Новый формат для GPT-4o mini
+                    })
+                else:
+                    payload_messages_list.append({"role": "system", "content": system_prompt_text})  # Старый формат для других моделей
+            
+            # Добавляем сообщение пользователя
+            if is_gpt_4o_mini:
+                payload_messages_list.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": user_message}]  # Новый формат для GPT-4o mini
+                })
+            else:
+                payload_messages_list.append({"role": "user", "content": user_message})  # Старый формат для других моделей
 
-            api_payload = { # Use new var name
+            api_payload = {
                 "messages": payload_messages_list,
-                "model": model_config["id"], # Use the ID from config, e.g., "gpt-4o-mini", "grok-3-beta"
-                "is_sync": True, # As per current bot logic; example shows callback_url but bot isn't using it
-                "max_tokens": model_config.get("max_tokens", MAX_OUTPUT_TOKENS_GEMINI_LIB), # Allow model-specific max_tokens
-                "temperature": model_config.get("temperature", 1.0), # Allow model-specific temperature
+                "model": model_config["id"],
+                "is_sync": True,  # Выбран синхронный режим
+                # "callback_url": null,  # Можно добавить явно, если API требует, но для is_sync: True обычно не нужен
+                "max_tokens": model_config.get("max_tokens", MAX_OUTPUT_TOKENS_GEMINI_LIB),
+                "temperature": model_config.get("temperature", 1.0),
                 "top_p": model_config.get("top_p", 1.0),
-                "n": 1, # Number of choices
-                # "stream": False, # Explicitly false if not streaming
+                "n": 1,  # Количество вариантов ответа
+                "stream": False  # Явно указываем, что не используем стриминг (по умолчанию False)
+                # Остальные параметры из документации (frequency_penalty, logit_bias и т.д.)
+                # можно добавить сюда, если они нужны, или если API их требует.
             }
+
             
             # Add model-specific parameters if any are defined in pricing_info or elsewhere
             if model_config.get("parameters"): # Example if you add a "parameters" dict to model_config
