@@ -55,9 +55,7 @@ PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
 # --- КАНАЛ НОВОСТЕЙ И БОНУС ---
 NEWS_CHANNEL_USERNAME = "@timextech"
 NEWS_CHANNEL_LINK = "https://t.me/timextech"
-NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
-NEWS_CHANNEL_BONUS_GENERATIONS = 1
-NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_grok_3"
+NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro", "custom_api_grok_3"
 NEWS_CHANNEL_BONUS_GENERATIONS = 1
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
