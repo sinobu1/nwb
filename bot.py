@@ -55,7 +55,7 @@ PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
 # --- КАНАЛ НОВОСТЕЙ И БОНУС ---
 NEWS_CHANNEL_USERNAME = "@timextech"
 NEWS_CHANNEL_LINK = "https://t.me/timextech"
-NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro", "custom_api_grok_3"
+NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
 NEWS_CHANNEL_BONUS_GENERATIONS = 1
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
@@ -116,6 +116,14 @@ AI_MODES = {
         ),
         "welcome": "Режим 'Аналитик' активирован. Какую задачу проанализировать?"
     },
+    "grok_3_custom_mode": {
+        "name": "Grok Продвинутый",
+        "prompt": (
+            "Ты — Grok 3, мощный и немного эксцентричный ИИ-ассистент."
+            # ... остальной специфичный промпт для Grok ...
+        ),
+        "welcome": "Активирован режим 'Grok Продвинутый'. Задавайте свои каверзные вопросы!"
+    },
     "joker": {
         "name": "Шутник",
         "prompt": (
@@ -164,18 +172,20 @@ AVAILABLE_TEXT_MODELS = {
         "pricing_info": {}
     },
     "custom_api_grok_3": {
-        "name": "Grok 3",
-        "id": "grok-3-beta",
-        "api_type": "custom_http_api",
-        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
-        "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True,
-        "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": 0,  # Бесплатный лимит для Grok 3
-        "subscription_daily_limit": 25,  # Лимит для подписчиков
-        "cost_category": "custom_api_grok_3_paid",
-        "pricing_info": {}
-    }
+    "name": "Grok 3",
+    "id": "grok-3-beta",
+    "api_type": "custom_http_api",
+    "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
+    "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
+    "is_limited": True,
+    "limit_type": "subscription_custom_pro",
+    # Изменено для использования константы
+    "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY,
+    # Изменено для использования константы
+    "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY,
+    "cost_category": "custom_api_pro_paid",
+    "pricing_info": {}
+   }
 }
 DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
@@ -311,6 +321,14 @@ async def get_current_mode_details(user_id: int) -> dict:
     current_model_key = await get_current_model_key(user_id)
     if current_model_key == "custom_api_gemini_2_5_pro":
         return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
+    mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
+
+async def get_current_mode_details(user_id: int) -> dict:
+    user_data = await get_user_data(user_id)
+    current_model_key = await get_current_model_key(user_id)
+    if current_model_key == "custom_api_grok_3":
+        return AI_MODES.get("grok_3_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
     mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
     return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
