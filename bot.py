@@ -51,7 +51,7 @@ DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75
 DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0
 DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25
 PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
-DEFAULT_FREE_REQUESTS_GROK_DAILY = 1
+DEFAULT_FREE_REQUESTS_GROK_DAILY = 3
 DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY = 25
 
 # --- КАНАЛ НОВОСТЕЙ И БОНУС ---
@@ -60,7 +60,7 @@ NEWS_CHANNEL_LINK = "https://t.me/timextech"
 NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
 NEWS_CHANNEL_BONUS_GENERATIONS = 1
 
-# --- РЕЖИМЫ РАБОТЫ ИИ ---
+# --- АГЕНТЫ ИИ ---
 AI_MODES = {
     "universal_ai_basic": {
         "name": "Универсальный",
@@ -78,7 +78,7 @@ AI_MODES = {
             "4. Чистота текста: Генерируй только ясный, чистый текст без избыточных символов или пунктуации, не несущей смысловой нагрузки или не требуемой грамматикой."
             "5. Полнота: Старайся давать полные ответы. Убедись, что пункты списков завершены, и не начинай новый, если не уверен, что сможешь его закончить."
         ),
-        "welcome": "Активирован режим 'Универсальный'. Какой у вас запрос?"
+        "welcome": "Активирован агент 'Универсальный'. Какой у вас запрос?"
     },
     "gemini_pro_custom_mode": {
         "name": "Продвинутый",
@@ -87,9 +87,9 @@ AI_MODES = {
             "Твоя задача — предоставлять точные, развернутые и полезные ответы на запросы пользователя."
             "Соблюдай вежливость и объективность."
             "Формулируй ответы ясно и структурированно, используя абзацы и списки при необходимости."
-            "Если твои знания ограничены по времени, указывай это."
+            "Если твои знания ограничены по времени, укажи это."
         ),
-        "welcome": "Активирован режим 'Продвинутый'. Какой у вас запрос?"
+        "welcome": "Активирован агент 'Продвинутый'. Какой у вас запрос?"
     },
     "creative_helper": {
         "name": "Творческий",
@@ -103,7 +103,7 @@ AI_MODES = {
             "4. Язык: Используй богатый и выразительный язык, соответствующий творческой задаче."
             "6. Завершённость: Старайся доводить творческие произведения до логического конца в рамках одного ответа, если это подразумевается задачей."
         ),
-        "welcome": "Режим 'Творческий' к вашим услугам! Над какой задачей поработаем?"
+        "welcome": "Агент 'Творческий' к вашим услугам! Над какой задачей поработаем?"
     },
     "analyst": {
         "name": "Аналитик",
@@ -116,15 +116,7 @@ AI_MODES = {
             "3. Обоснование: Объясни свои рассуждения, если требуется."
             "Если данных недостаточно, укажи, что нужно для более точного анализа."
         ),
-        "welcome": "Режим 'Аналитик' активирован. Какую задачу проанализировать?"
-    },
-    "grok_3_custom_mode": {
-        "name": "Grok Продвинутый",
-        "prompt": (
-            "Ты — Grok 3, мощный и немного эксцентричный ИИ-ассистент."
-            # ... остальной специфичный промпт для Grok ...
-        ),
-        "welcome": "Активирован режим 'Grok Продвинутый'. Задавайте свои каверзные вопросы!"
+        "welcome": "Агент 'Аналитик' активирован. Какую задачу проанализировать?"
     },
     "joker": {
         "name": "Шутник",
@@ -134,7 +126,7 @@ AI_MODES = {
             "Добавляй шутки, анекдоты или забавные комментарии, но оставайся в рамках приличия."
             "Форматируй ответы так, чтобы они были веселыми и читабельными."
         ),
-        "welcome": "Режим 'Шутник' включен! 😄 Готов ответить с улыбкой!"
+        "welcome": "Агент 'Шутник' включен! 😄 Готов ответить с улыбкой!"
     }
 }
 DEFAULT_AI_MODE_KEY = "universal_ai_basic"
@@ -179,8 +171,8 @@ AVAILABLE_TEXT_MODELS = {
         "api_type": "custom_http_api",
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
         "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True,  # Указывает, что модель имеет лимиты
-        "limit_type": "subscription_custom_pro", # Тип лимита, обычно означает разные лимиты для подписчиков и не-подписчиков
+        "is_limited": True,
+        "limit_type": "subscription_custom_pro",
         "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_GROK_DAILY,
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY,
         "cost_category": "custom_api_grok_3_paid",
@@ -195,7 +187,7 @@ MENU_STRUCTURE = {
     "main_menu": {
         "title": "📋 Главное меню",
         "items": [
-            {"text": "🤖 Режимы ИИ", "action": "submenu", "target": "ai_modes_submenu"},
+            {"text": "🤖 Агенты ИИ", "action": "submenu", "target": "ai_modes_submenu"},
             {"text": "⚙️ Модели ИИ", "action": "submenu", "target": "models_submenu"},
             {"text": "📊 Лимиты", "action": "submenu", "target": "limits_submenu"},
             {"text": "🎁 Бонус", "action": "submenu", "target": "bonus_submenu"},
@@ -206,7 +198,7 @@ MENU_STRUCTURE = {
         "is_submenu": False
     },
     "ai_modes_submenu": {
-        "title": "Выберите режим ИИ",
+        "title": "Выберите агент ИИ",
         "items": [
             {"text": mode["name"], "action": "set_agent", "target": key}
             for key, mode in AI_MODES.items()
@@ -321,14 +313,6 @@ async def get_current_mode_details(user_id: int) -> dict:
     current_model_key = await get_current_model_key(user_id)
     if current_model_key == "custom_api_gemini_2_5_pro":
         return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
-    mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
-    return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
-
-async def get_current_mode_details(user_id: int) -> dict:
-    user_data = await get_user_data(user_id)
-    current_model_key = await get_current_model_key(user_id)
-    if current_model_key == "custom_api_grok_3":
-        return AI_MODES.get("grok_3_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
     mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
     return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
@@ -874,8 +858,8 @@ async def show_help(update: Update, user_id: int):
     help_text = (
         "<b>❓ Помощь</b>\n\n"
         "Я — ИИ-бот на базе Gemini. Вот что я умею:\n"
-        "▫️ Отвечать на вопросы в разных режимах ИИ\n"
-        "▫️ Менять модели и режимы через меню\n"
+        "▫️ Отвечать на вопросы в разных агентах ИИ\n"
+        "▫️ Менять модели и агентов через меню\n"
         "▫️ Показывать лимиты запросов\n"
         "▫️ Предоставлять бонусы за подписку на канал\n"
         "▫️ Поддерживать подписку для расширенных лимитов\n\n"
@@ -961,7 +945,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             details = AI_MODES[target]
             new_text = f"🤖 Агент изменён на: <b>{details['name']}</b>\n\n{details['welcome']}"
         elif target == "gemini_pro_custom_mode":
-            new_text = "Режим для Gemini Pro выбирается автоматически."
+            new_text = "Агент для Gemini Pro выбирается автоматически."
         else:
             new_text = "⚠️ Ошибка: Агент не найден."
         await update.message.reply_text(
@@ -1081,49 +1065,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 {"role": "user", "content": user_message}
             ],
             "model": model_config["id"],
-            "is_sync": True,  # Синхронный режим для Grok 3
+            "is_sync": True,
             "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB,
             "temperature": 1.0,
             "top_p": 1.0,
             "n": 1
         }
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
-        )
-        response.raise_for_status() # Оставляем проверку на HTTP ошибки
-        response_data = response.json()
-        extracted_text = None # Переменная для найденного текста
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
+            )
+            response.raise_for_status()
+            response_data = response.json()
+            extracted_text = None
 
-        if model_config["api_type"] == "custom_http_api":
             if model_config["id"] == "grok-3-beta":
-                # Для Grok (is_sync: True):
-                # 1. Пробуем "output" (из документации Grok для успешного результата)
-                text_candidate = response_data.get("output")
-                if text_candidate:
-                    extracted_text = str(text_candidate).strip()
-                else:
-                    # 2. Если в "output" нет, пробуем "text" (на всякий случай, для унификации)
-                    text_candidate = response_data.get("text")
-                    if text_candidate:
-                        extracted_text = str(text_candidate).strip()
+                # Попробуем несколько возможных ключей для Grok
+                for key in ["output", "text", "choices", "message"]:
+                    if key in response_data:
+                        if key == "choices" and isinstance(response_data[key], list) and len(response_data[key]) > 0:
+                            extracted_text = response_data[key][0].get("message", {}).get("content", "").strip()
+                        else:
+                            extracted_text = str(response_data[key]).strip()
+                        break
+                if not extracted_text:
+                    # Дополнительная попытка для вложенных структур
+                    if "message" in response_data and isinstance(response_data["message"], dict):
+                        extracted_text = response_data["message"].get("content", "").strip()
+            elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
+                extracted_text = response_data.get("text", "").strip()
 
-            elif model_config["id"] == "gemini-2.5-pro-preview-03-25": # Или ваш ID для Gemini Pro
-                # Для Gemini Pro (работает с "text"):
-                text_candidate = response_data.get("text")
-                if text_candidate:
-                    extracted_text = str(text_candidate).strip()
-            
-            # Сюда можно добавить обработку других моделей, если они появятся
-
-            # Финальное присвоение
             if extracted_text:
                 response_text = extracted_text
             else:
                 response_text = "Ответ не получен."
-                # Если хотите видеть, что пришло, когда ответ не найден:
-                # logger.warning(f"Could not extract text for model {model_config['id']}. Response data: {response_data}")
-        else:
-            response_text = "Неизвестный тип API." # Для других api_type
+                logger.warning(f"Could not extract text for model {model_config['id']}. Response data: {response_data}")
+        except requests.exceptions.RequestException as e:
+            response_text = f"Ошибка API: {str(e)}"
+            logger.error(f"Request error for model {model_config['id']}: {str(e)}")
+            logger.debug(f"Response content: {response.text if response else 'No response'}")
+    else:
+        response_text = "Неизвестный тип API."
         logger.error(f"Unknown api_type for model {current_model_key}")
 
     response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
