@@ -1089,22 +1089,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             extracted_text = None
 
             if model_config["id"] == "grok-3-beta":
-                # Попробуем несколько возможных ключей для Grok
-                for key in ["output", "text", "choices", "message", "content"]:
-                    if key in response_data:
-                        if key == "choices" and isinstance(response_data[key], list) and len(response_data[key]) > 0:
-                            extracted_text = response_data[key][0].get("message", {}).get("content", "").strip()
-                        elif key == "message" and isinstance(response_data[key], dict):
-                            extracted_text = response_data[key].get("content", "").strip()
-                        else:
-                            extracted_text = str(response_data[key]).strip()
-                        break
+                # Try extracting from response array
+                if "response" in response_data and isinstance(response_data["response"], list) and len(response_data["response"]) > 0:
+                    completion = response_data["response"][0]
+                    if "choices" in completion and isinstance(completion["choices"], list) and len(completion["choices"]) > 0:
+                        choice = completion["choices"][0]
+                        if "message" in choice and isinstance(choice["message"], dict):
+                            extracted_text = choice["message"].get("content", "").strip()
+                # Fallback to other keys
                 if not extracted_text:
-                    # Дополнительная попытка для вложенных структур
-                    if "message" in response_data and isinstance(response_data["message"], dict):
-                        extracted_text = response_data["message"].get("content", "").strip()
-                    elif "choices" in response_data and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
-                        extracted_text = response_data["choices"][0].get("text", "").strip()
+                    for key in ["output", "text", "content"]:
+                        if key in response_data:
+                            extracted_text = str(response_data[key]).strip()
+                            break
             elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
                 extracted_text = response_data.get("text", "").strip()
 
@@ -1117,9 +1114,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response_text = f"Ошибка API: {str(e)}"
             logger.error(f"Request error for model {model_config['id']}: {str(e)}")
             logger.debug(f"Response content: {response.text if response else 'No response'}")
-    else:
-        response_text = "Неизвестный тип API."
-        logger.error(f"Unknown api_type for model {current_model_key}")
+            
+        else:
+            response_text = "Неизвестный тип API."
+            logger.error(f"Unknown api_type for model {current_model_key}")
 
     response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
     if was_truncated:
