@@ -403,6 +403,17 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
     model_daily_usage['count'] += 1
     logger.info(f"User {user_id} count for {model_key} incremented to {model_daily_usage['count']}")
 
+# --- Проверка, является ли текст кнопкой меню ---
+def is_menu_button_text(text: str) -> bool:
+    navigation_buttons = ["⬅️ Назад", "🏠 Главное меню"]
+    if text in navigation_buttons:
+        return True
+    for menu_key, menu in MENU_STRUCTURE.items():
+        for item in menu["items"]:
+            if item["text"] == text:
+                return True
+    return False
+
 # --- Удаление пользовательских сообщений с командами или кнопками ---
 async def try_delete_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -884,7 +895,7 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    button_text = update.message.text
+    button_text = update.message.text.strip()
     current_menu_key = context.user_data.get('current_menu', 'main_menu')
     current_menu = MENU_STRUCTURE.get(current_menu_key, MENU_STRUCTURE['main_menu'])
     
@@ -896,6 +907,8 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # Удаляем сообщение пользователя
     await try_delete_user_message(update, context)
+
+    logger.info(f"Processing button '{button_text}' in menu '{current_menu_key}'")
 
     # Обработка навигационных кнопок
     if button_text == "⬅️ Назад":
@@ -911,7 +924,17 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Поиск кнопки в текущем меню
     selected_item = next((item for item in current_menu["items"] if item["text"] == button_text), None)
+    
+    # Если не нашли в текущем меню, ищем во всех меню
     if not selected_item:
+        for menu_key, menu in MENU_STRUCTURE.items():
+            selected_item = next((item for item in menu["items"] if item["text"] == button_text), None)
+            if selected_item:
+                logger.info(f"Button '{button_text}' found in menu '{menu_key}'")
+                break
+
+    if not selected_item:
+        logger.warning(f"Button '{button_text}' not found in any menu. Current menu: {current_menu_key}")
         text = "Команда не распознана. Используйте кнопки меню."
         try:
             await update.message.reply_text(
@@ -929,6 +952,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     action = selected_item["action"]
     target = selected_item["target"]
+    logger.info(f"Button '{button_text}' triggers action '{action}' with target '{target}'")
 
     if action == "submenu":
         await show_menu(update, context, target)
@@ -1007,6 +1031,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_message = update.message.text.strip()
     chat_id = update.effective_chat.id
+
+    # Пропускаем, если текст является кнопкой меню
+    if is_menu_button_text(user_message):
+        logger.info(f"Text '{user_message}' is a menu button, skipping handle_text")
+        return
 
     current_model_key = get_current_model_key(context)
     model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
