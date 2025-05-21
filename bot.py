@@ -1414,6 +1414,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         current_model_key = DEFAULT_MODEL_KEY
         model_config = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
         # Notify admin if possible, or send a very generic error to user.
+        user_data = await get_user_data(user_id)
         await update.message.reply_text("Произошла критическая ошибка конфигурации модели. Пожалуйста, сообщите администратору.",
                                         reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')))
         return
@@ -1772,9 +1773,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def main():
-    app_builder = Application.builder().token(TOKEN) # Use new var name
-    # Configure connection pool size if needed, e.g., app_builder.pool_timeout(20).connect_timeout(20)
-    # app_builder.http_version('1.1').get_updates_http_version('1.1') # If issues with HTTP/2
+    app_builder = Application.builder().token(TOKEN)
+    # Настройте тайм-ауты здесь, если они нужны для всех HTTP-запросов бота:
+    app_builder.read_timeout(30).connect_timeout(30) # Таймаут чтения и соединения
+    # app_builder.pool_timeout(20) # Таймаут пула соединений, если нужно
 
     app = app_builder.build()
 
@@ -1813,9 +1815,9 @@ async def main():
     except Exception as e_set_commands: # Use new var name
         logger.error(f"Failed to set bot commands: {e_set_commands}")
 
-    logger.info("Bot is starting polling...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30, read_timeout=30, connect_timeout=30) # Adjusted timeouts
-
+        logger.info("Bot is starting polling...")
+    
+    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
 
 if __name__ == '__main__':
     # Configure Google Gemini API
