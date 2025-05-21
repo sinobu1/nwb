@@ -736,13 +736,9 @@ async def refresh_user_data(self, user_id: int) -> None:
             doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
             doc = await asyncio.to_thread(doc_ref.get)
             if doc.exists:
-                # self.user_data это словарь, который PTB использует для context.user_data
-                # Мы должны обновить соответствующий ключ в этом словаре.
                 self.user_data[user_id] = doc.to_dict()
                 logger.info(f"User_data для {user_id} успешно обновлены из Firestore.")
             else:
-                # Если документа нет в Firestore, удаляем его из локального кэша,
-                # чтобы context.user_data был пустым для этого пользователя.
                 if user_id in self.user_data:
                     del self.user_data[user_id]
                 logger.info(f"Документ для user_data ({doc_id}) не найден в Firestore при обновлении.")
@@ -777,13 +773,11 @@ async def refresh_user_data(self, user_id: int) -> None:
             doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id)
             doc = await asyncio.to_thread(doc_ref.get)
             if doc.exists:
-                # self.bot_data это словарь, который PTB использует для context.bot_data
-                # Мы должны обновить его содержимое.
-                self.bot_data.clear() # Очищаем старые данные
-                self.bot_data.update(doc.to_dict()) # Загружаем новые
+                self.bot_data.clear()
+                self.bot_data.update(doc.to_dict())
                 logger.info(f"Bot_data успешно обновлены из Firestore ({self._bot_doc_id}).")
             else:
-                self.bot_data.clear() # Если документа нет, bot_data должен быть пустым
+                self.bot_data.clear()
                 logger.info(f"Документ для bot_data ({self._bot_doc_id}) не найден в Firestore при обновлении.")
         except Exception as e:
             logger.error(f"Ошибка при обновлении bot_data из Firestore ({self._bot_doc_id}): {e}", exc_info=True)
