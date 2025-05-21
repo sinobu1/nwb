@@ -841,7 +841,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if target in AI_MODES and target != "gemini_pro_custom_mode":
             context.user_data['current_ai_mode'] = target
             details = AI_MODES[target]
-            new_text = f"🤖 Агент изменён на: <b>{details['name']}</b><br><br>{details['welcome']}"
+            new_text = f"🤖 Агент изменён на: <b>{details['name']}</b>\n\n{details['welcome']}"
         elif target == "gemini_pro_custom_mode":
             new_text = "Режим для Gemini Pro выбирается автоматически."
         else:
@@ -866,7 +866,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
             actual_l = get_user_actual_limit_for_model(user_id, target, context)
             limit_str = f'Лимит: {current_c_display}/{actual_l} в день'
-            new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b>\n{limit_str}"  # Заменили <br> на \n
+            new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b>\n{limit_str}"
         else:
             new_text = "⚠️ Ошибка: Модель не найдена."
         await update.message.reply_text(
