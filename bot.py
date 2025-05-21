@@ -1016,7 +1016,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info(f"Sent error handler message")
 
-def main():
+async def main():
     persistence = PicklePersistence(filepath="bot_persistence")
     app = Application.builder().token(TOKEN).persistence(persistence).build()
 
@@ -1039,10 +1039,10 @@ def main():
         BotCommand("bonus", "Получить бонус"),
         BotCommand("help", "Справка")
     ]
-    app.bot.set_my_commands(commands)
+    await app.bot.set_my_commands(commands)  # Await the coroutine
 
     logger.info("Bot is starting...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    await app.run_polling(allowed_updates=Update.ALL_TYPES)  # Await run_polling
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())  # Run the async main function
