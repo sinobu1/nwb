@@ -510,231 +510,219 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
 # ... (после ваших вспомогательных функций) ...
 
 class FirestorePersistence(BasePersistence):
-    def __init__(self, firestore_client, store_user_data=True, store_chat_data=True, store_bot_data=True, store_callback_data=True, single_collection_name: Optional[str] = "telegram_bot_data"):
-        # Вызываем __init__ класса BasePersistence
+    def __init__(self, firestore_client,
+                 store_user_data=True, store_chat_data=True,
+                 store_bot_data=True, store_callback_data=True, # PTB v20+ также использует callback_data
+                 single_collection_name: Optional[str] = "telegram_bot_data"):
+        
         super().__init__(
             store_user_data=store_user_data,
             store_chat_data=store_chat_data,
             store_bot_data=store_bot_data,
-            store_callback_data=store_callback_data # Добавьте это для полноты
+            store_callback_data=store_callback_data
         )
-        self._firestore_client = firestore_client
-        # Атрибуты user_data, chat_data, bot_data, callback_data должны быть инициализированы BasePersistence.
-        # Вы будете заполнять их в вашем методе load_data().
-        # Удалите эти ручные инициализации значением None, если BasePersistence это обрабатывает:
-        # self.user_data = None # BasePersistence должен создать self.user_data = {} и т.д.
-        # self.chat_data = None
-        # self.bot_data = None
-        # self.callback_data = None # Для callback_data, если store_callback_data=True
+        # Атрибуты self.user_data, self.chat_data, self.bot_data, self.callback_data
+        # уже инициализированы в super().__init__ как {} или None в зависимости от флагов store_...
+        # Нам нужно будет их заполнить в load_data().
 
-        self.conversations = None # Оставьте это, если обрабатываете кастомно или BasePersistence этого не делает
+        self._firestore_client = firestore_client
+        self.conversations = {} # Для ConversationHandler, пока оставим пустым
 
         self._main_collection_name = single_collection_name
         self._user_doc_prefix = "user_"
         self._chat_doc_prefix = "chat_"
         self._bot_doc_id = "bot_application_data"
-        self._conversations_doc_id = "conversations_data"
-        self._callback_doc_id = "callback_data" # Для callback_data
+        self._conversations_doc_id = "conversations_data" # Не используется активно в этом примере
+        self._callback_doc_id = "callback_application_data" # Документ для callback_data
 
-
-    async def get_callback_data(self) -> Optional[dict]:
-    if not self._firestore_client or not self.store_callback_data: # Проверяем флаг из super().__init__
-        # self.callback_data должен быть уже инициализирован BasePersistence как None или {}
-        return self.callback_data
-
-    # Если self.callback_data еще не был загружен (например, при первом запуске)
-    # или если вы хотите всегда подгружать свежие данные.
-    # Однако, PTB ожидает, что этот метод вернет уже загруженные/кэшированные данные.
-    # Загрузка обычно происходит в методе, аналогичном load_data, или при первом доступе.
-    # Для простоты, если BasePersistence не инициализирует self.callback_data,
-    # можно попробовать загрузить здесь, но это может быть неоптимально.
-
-    # ПРЕДПОЛАГАЕМ, ЧТО ДАННЫЕ УЖЕ ЗАГРУЖЕНЫ В self.callback_data В МЕТОДЕ load_data
-    # ЕСЛИ НЕТ, ТО НУЖНА ЛОГИКА ЗАГРУЗКИ ЗДЕСЬ ИЛИ В load_data
-    # Пример загрузки, если self.callback_data пуст и должен быть загружен:
-    # if self.callback_data is None and self.store_callback_data: # Проверяем, что еще не загружено
-    #     logger.info(f"Попытка загрузки callback_data из документа: {self._callback_doc_id}")
-    #     try:
-    #         doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id)
-    #         doc = await asyncio.to_thread(doc_ref.get)
-    #         if doc.exists:
-    #             self.callback_data = doc.to_dict()
-    #             logger.info(f"Callback_data загружены из документа: {self._callback_doc_id}")
-    #         else:
-    #             self.callback_data = None # Или {} в зависимости от ожиданий PTB
-    #             logger.info(f"Документ для callback_data ({self._callback_doc_id}) не найден.")
-    #     except Exception as e:
-    #         logger.error(f"Ошибка загрузки callback_data из Firestore: {e}")
-    #         self.callback_data = None # Или {}
-
-    return self.callback_data # Возвращаем то, что было установлено/загружено
-
-
-async def update_callback_data(self, data: dict) -> None:
-    if not self.store_callback_data or not self._firestore_client:
-        return
-    try:
-        await asyncio.to_thread(
-            self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id).set,
-            data
-        )
-        self.callback_data = data # Обновляем локальный кэш
-    except Exception as e:
-        logger.error(f"Ошибка обновления callback_data ({self._callback_doc_id}) в Firestore: {e}")
-
-# В методе load_data (или в новом методе инициализации данных, вызываемом из __init__ или перед get_bot/user/chat_data):
-# async def load_data(self) -> None:
-#     ...
-#     if self.store_callback_data: # Проверяем флаг, установленный BasePersistence
-#         try:
-#             doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id)
-#             doc = await asyncio.to_thread(doc_ref.get)
-#             if doc.exists:
-#                 self.callback_data = doc.to_dict() # Инициализируем атрибут экземпляра
-#                 logger.info(f"Callback_data загружены из документа: {self._callback_doc_id}")
-#             else:
-#                 self.callback_data = None # или {}
-#                 logger.info(f"Документ для callback_data ({self._callback_doc_id}) не найден.")
-#         except Exception as e:
-#             logger.error(f"Ошибка загрузки callback_data из Firestore: {e}")
-#             self.callback_data = None # или {}
-#     else:
-#         self.callback_data = None # или {} в зависимости от того, что ожидает PTB
-#     ...
-
-
-    async def _load_type_data(self, prefix: str) -> dict:
+    async def _load_firestore_collection_to_dict(self, prefix: str) -> dict:
         """Вспомогательный метод для загрузки user_data или chat_data."""
         data_dict = {}
+        if not self._firestore_client:
+            return data_dict
         try:
             collection_ref = self._firestore_client.collection(self._main_collection_name)
-            # Firestore не поддерживает "начинается с" в ID документа напрямую без составных запросов.
-            # Поэтому либо храним user_id/chat_id как поле, либо делаем N запросов.
-            # Для начала, будем предполагать, что мы можем перечислить документы и отфильтровать.
-            # Это НЕЭФФЕКТИВНО для большого количества пользователей/чатов.
-            # В идеале, `get_user_data` и `get_chat_data` в PTB должны возвращать dict-like объекты,
-            # которые подгружают данные по ключу. Но PTB ожидает полные словари при инициализации.
-            docs = await asyncio.to_thread(collection_ref.stream) # stream() - это синхронная операция
-            for doc in docs:
+            # НЕЭФФЕКТИВНО для большого количества! Загружает ВСЕ документы.
+            docs_stream = await asyncio.to_thread(collection_ref.stream)
+            for doc in docs_stream:
                 if doc.id.startswith(prefix):
                     try:
-                        key_id = int(doc.id[len(prefix):]) # Получаем ID после префикса
+                        key_id = int(doc.id[len(prefix):])
                         data_dict[key_id] = doc.to_dict()
                     except ValueError:
-                        logger.warning(f"Не удалось преобразовать ID документа '{doc.id}' в int для ключа.")
+                        logger.warning(f"Не удалось преобразовать ID документа '{doc.id}' в int.")
             logger.info(f"Загружено {len(data_dict)} записей для префикса '{prefix}'.")
         except Exception as e:
-            logger.error(f"Ошибка загрузки данных для префикса '{prefix}' из Firestore: {e}")
+            logger.error(f"Ошибка загрузки данных для префикса '{prefix}' из Firestore: {e}", exc_info=True)
         return data_dict
 
+    async def _load_firestore_single_doc(self, doc_id: str, data_type_name: str) -> Optional[dict]:
+        """Вспомогательный метод для загрузки bot_data или callback_data."""
+        if not self._firestore_client:
+            return None
+        data_to_load = None
+        try:
+            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                data_to_load = doc.to_dict()
+                logger.info(f"{data_type_name} загружены из документа: {doc_id}")
+            else:
+                logger.info(f"Документ для {data_type_name} ({doc_id}) не найден, используется None/пустой словарь.")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки {data_type_name} из Firestore ({doc_id}): {e}", exc_info=True)
+        return data_to_load
+
+    async def load_data(self) -> None:
+        """Загружает все необходимые данные из Firestore при старте бота."""
+        if not self._firestore_client:
+            logger.warning("Клиент Firestore не инициализирован. Данные не будут загружены из Firestore.")
+            # BasePersistence уже инициализировал user_data и т.д. как {} или None.
+            return
+
+        logger.info("Загрузка данных из Firestore...")
+
+        if self.store_user_data:
+            self.user_data.update(await self._load_firestore_collection_to_dict(self._user_doc_prefix))
+        if self.store_chat_data:
+            self.chat_data.update(await self._load_firestore_collection_to_dict(self._chat_doc_prefix))
+        
+        if self.store_bot_data:
+            loaded_bot_data = await self._load_firestore_single_doc(self._bot_doc_id, "Bot_data")
+            if loaded_bot_data is not None:
+                self.bot_data.update(loaded_bot_data)
+        
+        if self.store_callback_data:
+            loaded_callback_data = await self._load_firestore_single_doc(self._callback_doc_id, "Callback_data")
+            if loaded_callback_data is not None:
+                self.callback_data.update(loaded_callback_data)
+        
+        # self.conversations пока не загружаем/сохраняем подробно
+        logger.info("Загрузка данных из Firestore завершена.")
+
+    # --- Методы GET ---
+    # BasePersistence уже предоставляет get_user_data, get_chat_data, get_bot_data, get_callback_data,
+    # которые возвращают self.user_data, self.chat_data и т.д.
+    # Поэтому нам не нужно их переопределять, если load_data правильно заполняет эти атрибуты.
+    # Оставим их для явности, но они просто возвращают уже загруженные данные.
+
     async def get_user_data(self) -> dict:
-        if self.user_data is None:
-             await self.load_data() # Убедимся, что данные загружены
-        return self.user_data if self.user_data is not None else {}
+        return self.user_data
 
     async def get_chat_data(self) -> dict:
-        if self.chat_data is None:
-            await self.load_data()
-        return self.chat_data if self.chat_data is not None else {}
+        return self.chat_data
 
     async def get_bot_data(self) -> dict:
-        if self.bot_data is None:
-            await self.load_data()
-        return self.bot_data if self.bot_data is not None else {}
+        return self.bot_data
 
+    async def get_callback_data(self) -> Optional[dict]:
+        return self.callback_data
+    
     async def get_conversations(self, name: str) -> dict:
-        # Для ConversationHandler. Пока не реализуем подробно.
-        if self.conversations is None:
-            await self.load_data()
-        return self.conversations.get(name, {}) if self.conversations is not None else {}
+        # logger.debug(f"Запрошены conversations для {name}")
+        return self.conversations.get(name, {})
 
-
+    # --- Методы UPDATE ---
     async def update_user_data(self, user_id: int, data: dict) -> None:
-        if not self._store_user_data or not self._firestore_client:
+        if not self.store_user_data or not self._firestore_client:
             return
+        # Обновляем локальный кэш (словарь self.user_data, который PTB передает в context.user_data)
+        self.user_data[user_id] = data # PTB ожидает, что мы обновим это сами
         doc_id = f"{self._user_doc_prefix}{user_id}"
         try:
-            # logger.debug(f"Обновление user_data для {doc_id}: {data}")
             await asyncio.to_thread(
                 self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
-                data, merge=True # merge=True чтобы обновлять, а не перезаписывать полностью
+                data # Сохраняем весь словарь data, так как он и есть context.user_data
             )
         except Exception as e:
-            logger.error(f"Ошибка обновления user_data для {doc_id} в Firestore: {e}")
+            logger.error(f"Ошибка обновления user_data для {doc_id} в Firestore: {e}", exc_info=True)
 
     async def update_chat_data(self, chat_id: int, data: dict) -> None:
-        if not self._store_chat_data or not self._firestore_client:
+        if not self.store_chat_data or not self._firestore_client:
             return
+        self.chat_data[chat_id] = data
         doc_id = f"{self._chat_doc_prefix}{chat_id}"
         try:
-            # logger.debug(f"Обновление chat_data для {doc_id}: {data}")
             await asyncio.to_thread(
                 self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
-                data, merge=True
+                data
             )
         except Exception as e:
-            logger.error(f"Ошибка обновления chat_data для {doc_id} в Firestore: {e}")
+            logger.error(f"Ошибка обновления chat_data для {doc_id} в Firestore: {e}", exc_info=True)
 
     async def update_bot_data(self, data: dict) -> None:
-        if not self._store_bot_data or not self._firestore_client:
+        if not self.store_bot_data or not self._firestore_client:
             return
+        self.bot_data = data.copy() # Обновляем локальный кэш
         try:
-            # logger.debug(f"Обновление bot_data ({self._bot_doc_id}): {data}")
             await asyncio.to_thread(
                 self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id).set,
-                data # bot_data обычно перезаписывается полностью
+                data
             )
         except Exception as e:
-            logger.error(f"Ошибка обновления bot_data ({self._bot_doc_id}) в Firestore: {e}")
+            logger.error(f"Ошибка обновления bot_data ({self._bot_doc_id}) в Firestore: {e}", exc_info=True)
+
+    async def update_callback_data(self, data: dict) -> None:
+        if not self.store_callback_data or not self._firestore_client:
+            return
+        self.callback_data = data.copy() if data else None
+        try:
+            # Если data пустой, можно удалить документ или сохранить пустой объект
+            if data:
+                 await asyncio.to_thread(
+                    self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id).set,
+                    data
+                )
+            else: # Если data пустой/None, удаляем документ callback_data
+                 await asyncio.to_thread(
+                    self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id).delete
+                )
+        except Exception as e:
+            logger.error(f"Ошибка обновления callback_data ({self._callback_doc_id}) в Firestore: {e}", exc_info=True)
 
     async def update_conversation(self, name: str, key: tuple, new_state: Optional[object]) -> None:
-        # Для ConversationHandler. Пока не реализуем подробно.
         # logger.debug(f"Обновление conversation: name={name}, key={key}, new_state={new_state}")
-        # if self.conversations is None: self.conversations = {}
-        # if name not in self.conversations: self.conversations[name] = {}
-        # if new_state is None:
-        #     self.conversations[name].pop(key, None)
-        # else:
-        #     self.conversations[name][key] = new_state
-        # # Здесь нужна логика сохранения self.conversations в Firestore, например, в отдельный документ.
+        if name not in self.conversations:
+            self.conversations[name] = {}
+        if new_state is None:
+            self.conversations[name].pop(key, None)
+        else:
+            self.conversations[name][key] = new_state
+        # TODO: Подумать о сохранении conversations в Firestore, если это необходимо.
+        # Например, можно сохранять self.conversations в отдельный документ.
+        # await self._firestore_client.collection(self._main_collection_name).document(self._conversations_doc_id).set(self.conversations)
         pass
 
-    async def drop_chat_data(self, chat_id: int) -> None:
-        if not self._store_chat_data or not self._firestore_client:
-            return
-        doc_id = f"{self._chat_doc_prefix}{chat_id}"
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
-            )
-            if self.chat_data and chat_id in self.chat_data:
-                del self.chat_data[chat_id]
-            logger.info(f"Chat_data для {doc_id} удалены из Firestore.")
-        except Exception as e:
-            logger.error(f"Ошибка удаления chat_data для {doc_id} из Firestore: {e}")
-
-
+    # --- Методы DROP ---
     async def drop_user_data(self, user_id: int) -> None:
-        if not self._store_user_data or not self._firestore_client:
+        if not self.store_user_data or not self._firestore_client:
             return
+        if user_id in self.user_data:
+            del self.user_data[user_id] # Удаляем из локального кэша
         doc_id = f"{self._user_doc_prefix}{user_id}"
         try:
             await asyncio.to_thread(
                 self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
             )
-            if self.user_data and user_id in self.user_data:
-                del self.user_data[user_id]
             logger.info(f"User_data для {doc_id} удалены из Firestore.")
         except Exception as e:
-            logger.error(f"Ошибка удаления user_data для {doc_id} из Firestore: {e}")
+            logger.error(f"Ошибка удаления user_data для {doc_id} из Firestore: {e}", exc_info=True)
+            
+    async def drop_chat_data(self, chat_id: int) -> None:
+        if not self.store_chat_data or not self._firestore_client:
+            return
+        if chat_id in self.chat_data:
+            del self.chat_data[chat_id]
+        doc_id = f"{self._chat_doc_prefix}{chat_id}"
+        try:
+            await asyncio.to_thread(
+                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
+            )
+            logger.info(f"Chat_data для {doc_id} удалены из Firestore.")
+        except Exception as e:
+            logger.error(f"Ошибка удаления chat_data для {doc_id} из Firestore: {e}", exc_info=True)
 
     async def flush(self) -> None:
-        """
-        Метод flush() вызывается PTB для принудительного сохранения данных.
-        В нашем случае данные пишутся сразу, но если бы мы кешировали их локально
-        перед отправкой в Firestore, здесь бы происходила отправка.
-        Пока что он может быть пустым.
-        """
         # logger.debug("Вызван метод flush. Данные уже должны быть сохранены в Firestore при каждом update.")
         pass
 
