@@ -726,6 +726,68 @@ class FirestorePersistence(BasePersistence):
         # logger.debug("Вызван метод flush. Данные уже должны быть сохранены в Firestore при каждом update.")
         pass
 
+async def refresh_user_data(self, user_id: int) -> None:
+        """Обновляет данные для конкретного пользователя из Firestore."""
+        if not self.store_user_data or not self._firestore_client:
+            return
+        doc_id = f"{self._user_doc_prefix}{user_id}"
+        logger.debug(f"Обновление user_data для {user_id} из Firestore...")
+        try:
+            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                # self.user_data это словарь, который PTB использует для context.user_data
+                # Мы должны обновить соответствующий ключ в этом словаре.
+                self.user_data[user_id] = doc.to_dict()
+                logger.info(f"User_data для {user_id} успешно обновлены из Firestore.")
+            else:
+                # Если документа нет в Firestore, удаляем его из локального кэша,
+                # чтобы context.user_data был пустым для этого пользователя.
+                if user_id in self.user_data:
+                    del self.user_data[user_id]
+                logger.info(f"Документ для user_data ({doc_id}) не найден в Firestore при обновлении.")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении user_data для {user_id} из Firestore: {e}", exc_info=True)
+
+    async def refresh_chat_data(self, chat_id: int) -> None:
+        """Обновляет данные для конкретного чата из Firestore."""
+        if not self.store_chat_data or not self._firestore_client:
+            return
+        doc_id = f"{self._chat_doc_prefix}{chat_id}"
+        logger.debug(f"Обновление chat_data для {chat_id} из Firestore...")
+        try:
+            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                self.chat_data[chat_id] = doc.to_dict()
+                logger.info(f"Chat_data для {chat_id} успешно обновлены из Firestore.")
+            else:
+                if chat_id in self.chat_data:
+                    del self.chat_data[chat_id]
+                logger.info(f"Документ для chat_data ({doc_id}) не найден в Firestore при обновлении.")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении chat_data для {chat_id} из Firestore: {e}", exc_info=True)
+
+    async def refresh_bot_data(self) -> None:
+        """Обновляет bot_data из Firestore."""
+        if not self.store_bot_data or not self._firestore_client:
+            return
+        logger.debug(f"Обновление bot_data из Firestore...")
+        try:
+            doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id)
+            doc = await asyncio.to_thread(doc_ref.get)
+            if doc.exists:
+                # self.bot_data это словарь, который PTB использует для context.bot_data
+                # Мы должны обновить его содержимое.
+                self.bot_data.clear() # Очищаем старые данные
+                self.bot_data.update(doc.to_dict()) # Загружаем новые
+                logger.info(f"Bot_data успешно обновлены из Firestore ({self._bot_doc_id}).")
+            else:
+                self.bot_data.clear() # Если документа нет, bot_data должен быть пустым
+                logger.info(f"Документ для bot_data ({self._bot_doc_id}) не найден в Firestore при обновлении.")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении bot_data из Firestore ({self._bot_doc_id}): {e}", exc_info=True)
+
 # --- КОНЕЦ КЛАССА FirestorePersistence ---
 
 # --- Обработчики команд ---
