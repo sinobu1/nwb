@@ -23,6 +23,7 @@ from typing import Optional
 import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore
+from firebase_admin import initialize_app
 from google.cloud.firestore_v1 import AsyncClient
 
 nest_asyncio.apply()
