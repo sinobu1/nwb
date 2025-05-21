@@ -1231,20 +1231,21 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Sent error handler message")
 
 async def main():
-    async def main():
+    # Эта строка с отступом - она внутри функции main
+    # persistence = PicklePersistence(filepath="bot_persistence") # ЗАКОММЕНТИРУЙТЕ ИЛИ УДАЛITE ЭТУ СТРОКУ
+
     # НОВАЯ ИНИЦИАЛИЗАЦИЯ PERSISTENCE
+    # Эта строка тоже с отступом
     if DB: # DB - это наш firestore.client()
         persistence = FirestorePersistence(firestore_client=DB)
         await persistence.load_data() # Явно загружаем данные перед созданием Application
     else:
+        # и эта
         logger.warning("Клиент Firestore не доступен. Используется PicklePersistence для локальной отладки.")
-        # В качестве запасного варианта, если Firebase не настроен, можно оставить Pickle.
-        # Но для Railway это не будет работать между перезапусками.
-        # Для продакшена на Railway нужно, чтобы DB был успешно инициализирован.
         persistence = PicklePersistence(filepath="bot_persistence_fallback")
 
-
-    app = Application.builder().token(TOKEN).persistence(persistence).build() #
+    # и так далее для всего остального кода функции main
+    app = Application.builder().token(TOKEN).persistence(persistence).build()
 
 
     app.add_handler(CommandHandler("start", start))
