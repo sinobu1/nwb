@@ -25,6 +25,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1 import AsyncClient
+from gemini_pro_handler import query_gemini_pro, GEMINI_PRO_CONFIG
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -158,22 +159,10 @@ AVAILABLE_TEXT_MODELS = {
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY,
         "cost_category": "google_flash_preview_flex"
     },
-    "custom_api_gemini_2_5_pro": {
-        "name": "Gemini Pro",
-        "id": "gemini-2.5-pro-preview-03-25", # Это ID, который ожидает ваш API
-        "api_type": "custom_http_api",
-        "endpoint": CUSTOM_GEMINI_PRO_ENDPOINT,
-        "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
-        "is_limited": True,
-        "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY,
-        "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY,
-        "cost_category": "custom_api_pro_paid",
-        "pricing_info": {}
-    },
+    "custom_api_gemini_2_5_pro": GEMINI_PRO_CONFIG,  # Ссылка на конфигурацию из модуля
     "custom_api_grok_3": {
         "name": "Grok 3",
-        "id": "grok-3-beta", # Это ID, который ожидает ваш API
+        "id": "grok-3-beta",
         "api_type": "custom_http_api",
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
         "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
@@ -184,18 +173,17 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "custom_api_grok_3_paid",
         "pricing_info": {}
     },
-    # --- НОВАЯ МОДЕЛЬ GPT-4o mini ---
     "custom_api_gpt_4o_mini": {
         "name": "GPT-4o mini",
-        "id": "gpt-4o-mini", # ID модели для API запроса
+        "id": "gpt-4o-mini",
         "api_type": "custom_http_api",
-        "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", # Эндпоинт из документации
-        "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY", # Имя переменной с ключом API
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini",
+        "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
         "is_limited": True,
-        "limit_type": "subscription_custom_pro", # Можно настроить иначе при необходимости
+        "limit_type": "subscription_custom_pro",
         "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY,
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY,
-        "cost_category": "custom_api_gpt4o_mini_paid", # Категория стоимости
+        "cost_category": "custom_api_gpt4o_mini_paid",
         "pricing_info": {}
     }
 }
@@ -1469,141 +1457,121 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Google GenAI API error for user {user_id}, model {model_config['id']}: {e_google}", exc_info=True)
 
     elif api_type_from_config == "custom_http_api":
-        api_key_variable_name = model_config.get("api_key_var_name") # Use new var name
-        actual_api_key_value = None # Use new var name
-        payload_messages_list = []  # Initialize payload messages list for custom HTTP API
+        api_key_variable_name = model_config.get("api_key_var_name")
+        actual_api_key_value = None
+        payload_messages_list = []
         if api_key_variable_name:
-            actual_api_key_value = globals().get(api_key_variable_name) # Get actual key from global scope
+            actual_api_key_value = globals().get(api_key_variable_name)
 
-        if not actual_api_key_value or "YOUR_" in actual_api_key_value or actual_api_key_value == "": # Basic check for placeholder or empty
+        if not actual_api_key_value or "YOUR_" in actual_api_key_value or actual_api_key_value == "":
             response_text_from_api = f"Ошибка конфигурации: Ключ API для модели «{model_config.get('name', current_model_key)}» не настроен корректно. Пожалуйста, сообщите администратору."
             logger.error(f"Custom API key error: Variable name '{api_key_variable_name}' for model '{current_model_key}' not found in globals, is None, or seems to be a placeholder.")
         else:
-            http_headers = { # Use new var name
-                "Authorization": f"Bearer {actual_api_key_value}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-            
-            # Определяем, используется ли модель GPT-4o mini
-            is_gpt_4o_mini = (model_config["id"] == "gpt-4o-mini")
-            
-            if system_prompt_text: # Добавляем системный промпт, если он есть
+            if current_model_key == "custom_api_gemini_2_5_pro":
+                # Используем модуль gemini_pro_handler
+                response_text_from_api, success = await query_gemini_pro(system_prompt_text, user_message)
+                if not success:
+                    logger.warning(f"Gemini 2.5 Pro query failed for user {user_id}: {response_text_from_api}")
+            else:
+                http_headers = {
+                    "Authorization": f"Bearer {actual_api_key_value}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+                
+                is_gpt_4o_mini = (model_config["id"] == "gpt-4o-mini")
+                
+                if system_prompt_text:
+                    if is_gpt_4o_mini:
+                        payload_messages_list.append({
+                            "role": "system",
+                            "content": [{"type": "text", "text": system_prompt_text}]
+                        })
+                    else:
+                        payload_messages_list.append({"role": "system", "content": system_prompt_text})
+                
                 if is_gpt_4o_mini:
                     payload_messages_list.append({
-                        "role": "system",
-                        "content": [{"type": "text", "text": system_prompt_text}]  # Новый формат для GPT-4o mini
+                        "role": "user",
+                        "content": [{"type": "text", "text": user_message}]
                     })
                 else:
-                    payload_messages_list.append({"role": "system", "content": system_prompt_text})  # Старый формат для других моделей
-            
-            # Добавляем сообщение пользователя
-            if is_gpt_4o_mini:
-                payload_messages_list.append({
-                    "role": "user",
-                    "content": [{"type": "text", "text": user_message}]  # Новый формат для GPT-4o mini
-                })
-            else:
-                payload_messages_list.append({"role": "user", "content": user_message})  # Старый формат для других моделей
+                    payload_messages_list.append({"role": "user", "content": user_message})
 
-            api_payload = {
-                "messages": payload_messages_list,
-                "model": model_config["id"],
-                "is_sync": True,  # Выбран синхронный режим
-                # "callback_url": null,  # Можно добавить явно, если API требует, но для is_sync: True обычно не нужен
-                "max_tokens": model_config.get("max_tokens", MAX_OUTPUT_TOKENS_GEMINI_LIB),
-                "temperature": model_config.get("temperature", 1.0),
-                "top_p": model_config.get("top_p", 1.0),
-                "n": 1,  # Количество вариантов ответа
-                "stream": False  # Явно указываем, что не используем стриминг (по умолчанию False)
-                # Остальные параметры из документации (frequency_penalty, logit_bias и т.д.)
-                # можно добавить сюда, если они нужны, или если API их требует.
-            }
+                api_payload = {
+                    "messages": payload_messages_list,
+                    "model": model_config["id"],
+                    "is_sync": True,
+                    "max_tokens": model_config.get("max_tokens", MAX_OUTPUT_TOKENS_GEMINI_LIB),
+                    "temperature": model_config.get("temperature", 1.0),
+                    "top_p": model_config.get("top_p", 1.0),
+                    "n": 1,
+                    "stream": False
+                }
 
-            
-            # Add model-specific parameters if any are defined in pricing_info or elsewhere
-            if model_config.get("parameters"): # Example if you add a "parameters" dict to model_config
-                api_payload.update(model_config["parameters"])
+                try:
+                    logger.info(f"Sending request to Custom HTTP API: {model_config['endpoint']} for model {model_config['id']}, user {user_id}")
+                    custom_api_response_obj = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: requests.post(model_config["endpoint"], headers=http_headers, json=api_payload, timeout=45)
+                    )
+                    custom_api_response_obj.raise_for_status()
+                    response_json_data = custom_api_response_obj.json()
+                    logger.debug(f"Raw JSON response from {model_config['id']} for user {user_id}: {response_json_data}")
+                    extracted_api_text = None
 
+                    model_api_id = model_config["id"]
+                    if model_api_id == "grok-3-beta":
+                        if "response" in response_json_data and isinstance(response_json_data["response"], list) and response_json_data["response"]:
+                            completion = response_json_data["response"][0]
+                            if "choices" in completion and isinstance(completion["choices"], list) and completion["choices"]:
+                                choice = completion["choices"][0]
+                                if "message" in choice and isinstance(choice["message"], dict):
+                                    extracted_api_text = choice["message"].get("content", "").strip()
+                    elif model_api_id == "gpt-4o-mini":
+                        if response_json_data.get("status") == "success":
+                            raw_output_data = response_json_data.get("output")
+                            if isinstance(raw_output_data, str):
+                                extracted_api_text = raw_output_data.strip()
+                            elif isinstance(raw_output_data, dict):
+                                extracted_api_text = raw_output_data.get("text", raw_output_data.get("content", "")).strip()
+                                if not extracted_api_text:
+                                    logger.warning(f"gpt-4o-mini: 'output' was a dict but no 'text' or 'content' found: {raw_output_data}")
+                            elif raw_output_data is not None:
+                                extracted_api_text = str(raw_output_data).strip()
+                                logger.warning(f"gpt-4o-mini: 'output' was of unexpected type {type(raw_output_data)}, converted to string.")
+                            else:
+                                logger.warning(f"gpt-4o-mini: 'output' field was null or missing despite status 'success'. Response: {response_json_data}")
+                                extracted_api_text = "Ответ получен, но он пуст."
+                        else:
+                            logger.error(f"gpt-4o-mini API error: Status was '{response_json_data.get('status', 'N/A')}'. Full response: {response_json_data}")
+                            extracted_api_text = f"Ошибка от API GPT-4o mini: {response_json_data.get('status', 'статус не указан')}. {response_json_data.get('error_message', '')}"
 
-            try:
-                logger.info(f"Sending request to Custom HTTP API: {model_config['endpoint']} for model {model_config['id']}, user {user_id}")
-                custom_api_response_obj = await asyncio.get_event_loop().run_in_executor( # Use new var name
-                    None, lambda: requests.post(model_config["endpoint"], headers=http_headers, json=api_payload, timeout=45) # Increased timeout slightly
-                )
-                custom_api_response_obj.raise_for_status() # Will raise HTTPError for bad responses (4xx or 5xx)
-                
-                response_json_data = custom_api_response_obj.json() # Use new var name
-                logger.debug(f"Raw JSON response from {model_config['id']} for user {user_id}: {response_json_data}")
-                extracted_api_text = None # Use new var name
+                    if extracted_api_text is None:
+                        logger.warning(f"No specific parser worked for {model_api_id}. Trying generic keys from response: {response_json_data}")
+                        for fallback_key in ["text", "content", "message", "output", "response"]:
+                            if isinstance(response_json_data.get(fallback_key), str):
+                                extracted_api_text = response_json_data[fallback_key].strip()
+                                if extracted_api_text:
+                                    logger.info(f"Used generic fallback key '{fallback_key}' for {model_api_id}")
+                                    break
+                        if extracted_api_text is None:
+                            extracted_api_text = ""
 
-                # --- ОБНОВЛЕННАЯ ЛОГИКА ИЗВЛЕЧЕНИЯ ТЕКСТА ДЛЯ CUSTOM API ---
-                model_api_id = model_config["id"] # Use new var name
+                    if extracted_api_text:
+                        response_text_from_api = extracted_api_text
+                    else:
+                        response_text_from_api = "Ответ от API не содержит текстовых данных или не удалось его извлечь."
+                        logger.warning(f"Could not extract meaningful text for custom model {model_api_id}. Response data: {response_json_data}")
 
-                if model_api_id == "grok-3-beta":
-                    if "response" in response_json_data and isinstance(response_json_data["response"], list) and response_json_data["response"]:
-                        completion = response_json_data["response"][0]
-                        if "choices" in completion and isinstance(completion["choices"], list) and completion["choices"]:
-                            choice = completion["choices"][0]
-                            if "message" in choice and isinstance(choice["message"], dict):
-                                extracted_api_text = choice["message"].get("content", "").strip()
-                elif model_api_id == "gemini-2.5-pro-preview-03-25": # Custom Gemini Pro via gen-api.ru
-                    extracted_api_text = response_json_data.get("text", "").strip()
-                elif model_api_id == "gpt-4o-mini": # --- НОВАЯ ЛОГИКА ДЛЯ GPT-4o mini ---
-                    # Согласно примеру ответа: { "status": "success", "output": ... }
-                    if response_json_data.get("status") == "success":
-                        raw_output_data = response_json_data.get("output") # Use new var name
-                        if isinstance(raw_output_data, str):
-                            extracted_api_text = raw_output_data.strip()
-                        elif isinstance(raw_output_data, dict): # If output itself is an object
-                            extracted_api_text = raw_output_data.get("text", raw_output_data.get("content", "")).strip()
-                            if not extracted_api_text:
-                                logger.warning(f"gpt-4o-mini: 'output' was a dict but no 'text' or 'content' found: {raw_output_data}")
-                        elif raw_output_data is not None: # Not string, not dict, but not None
-                             extracted_api_text = str(raw_output_data).strip() # Try to convert to string
-                             logger.warning(f"gpt-4o-mini: 'output' was of unexpected type {type(raw_output_data)}, converted to string.")
-                        else: # Output was None
-                            logger.warning(f"gpt-4o-mini: 'output' field was null or missing despite status 'success'. Response: {response_json_data}")
-                            extracted_api_text = "Ответ получен, но он пуст."
-                    else: # Status was not 'success'
-                        logger.error(f"gpt-4o-mini API error: Status was '{response_json_data.get('status', 'N/A')}'. Full response: {response_json_data}")
-                        extracted_api_text = f"Ошибка от API GPT-4o mini: {response_json_data.get('status', 'статус не указан')}. {response_json_data.get('error_message', '')}"
-
-
-                # Generic fallback if specific parsers didn't yield text
-                if extracted_api_text is None: # Check if still None
-                    logger.warning(f"No specific parser worked for {model_api_id}. Trying generic keys from response: {response_json_data}")
-                    # Attempt to find text in common top-level keys if specific parsing failed
-                    for fallback_key in ["text", "content", "message", "output", "response"]:
-                        if isinstance(response_json_data.get(fallback_key), str):
-                            extracted_api_text = response_json_data[fallback_key].strip()
-                            if extracted_api_text:
-                                logger.info(f"Used generic fallback key '{fallback_key}' for {model_api_id}")
-                                break
-                    if extracted_api_text is None: # If still none, make it empty string
-                         extracted_api_text = ""
-
-
-                if extracted_api_text:
-                    response_text_from_api = extracted_api_text
-                else: # If extracted_api_text is empty string or still None after all attempts
-                    response_text_from_api = "Ответ от API не содержит текстовых данных или не удалось его извлечь."
-                    logger.warning(f"Could not extract meaningful text for custom model {model_api_id}. Response data: {response_json_data}")
-
-            except requests.exceptions.HTTPError as e_http: # For 4xx/5xx errors
-                response_text_from_api = f"Ошибка сети при обращении к Custom API ({e_http.response.status_code}). Попробуйте позже."
-                logger.error(f"Custom API HTTPError for model {model_config['id']} ({model_config['endpoint']}): {e_http}. Response: {e_http.response.text}", exc_info=True)
-                # response_content_debug = e_http.response.text if e_http.response else "No response content" # Already logged by exc_info
-            except requests.exceptions.RequestException as e_req: # Other network errors (timeout, DNS etc.)
-                response_text_from_api = f"Сетевая ошибка при обращении к Custom API: {type(e_req).__name__}. Проверьте соединение или попробуйте позже."
-                logger.error(f"Custom API RequestException for model {model_config['id']} ({model_config['endpoint']}): {e_req}", exc_info=True)
-            except Exception as e_custom_other: # Other unexpected errors during custom API handling
-                response_text_from_api = f"Неожиданная ошибка при работе с Custom API: {type(e_custom_other).__name__}."
-                logger.error(f"Unexpected error with Custom API model {model_config['id']}: {e_custom_other}", exc_info=True)
-                # response_content_debug = 'No response object available for other exceptions'
-                # if 'custom_api_response_obj' in locals() and custom_api_response_obj is not None:
-                #     response_content_debug = custom_api_response_obj.text
-                # logger.debug(f"Response content at time of other error: {response_content_debug}")
+                except requests.exceptions.HTTPError as e_http:
+                    response_text_from_api = f"Ошибка сети при обращении к Custom API ({e_http.response.status_code}). Попробуйте позже."
+                    logger.error(f"Custom API HTTPError for model {model_config['id']} ({model_config['endpoint']}): {e_http}. Response: {e_http.response.text}", exc_info=True)
+                except requests.exceptions.RequestException as e_req:
+                    response_text_from_api = f"Сетевая ошибка при обращении к Custom API: {type(e_req).__name__}. Проверьте соединение или попробуйте позже."
+                    logger.error(f"Custom API RequestException for model {model_config['id']} ({model_config['endpoint']}): {e_req}", exc_info=True)
+                except Exception as e_custom_other:
+                    response_text_from_api = f"Неожиданная ошибка при работе с Custom API: {type(e_custom_other).__name__}."
+                    logger.error(f"Unexpected error with Custom API model {model_config['id']}: {e_custom_other}", exc_info=True)
 
 
     else: # Unknown api_type
