@@ -38,6 +38,7 @@ YOUR_ADMIN_ID = 489230152
 # --- КОНФИГУРАЦИЯ БОТА ---
 MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
 MAX_MESSAGE_LENGTH_TELEGRAM = 4000
+MIN_AI_REQUEST_LENGTH = 4  # Минимальная длина запроса к ИИ
 
 # --- ЛИМИТЫ ---
 DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72
@@ -898,7 +899,12 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     button_text = update.message.text.strip()
     current_menu_key = context.user_data.get('current_menu', 'main_menu')
     current_menu = MENU_STRUCTURE.get(current_menu_key, MENU_STRUCTURE['main_menu'])
-    
+
+    # Проверяем, является ли текст кнопкой меню
+    if not is_menu_button_text(button_text):
+        logger.info(f"Text '{button_text}' is not a menu button, skipping to handle_text")
+        return  # Пропускаем в handle_text
+
     # Сохраняем данные сообщения с кнопкой
     context.user_data['user_command_message'] = {
         'message_id': update.message.message_id,
@@ -1032,10 +1038,29 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    # Пропускаем, если текст является кнопкой меню
+    # Проверяем, является ли текст кнопкой меню
     if is_menu_button_text(user_message):
         logger.info(f"Text '{user_message}' is a menu button, skipping handle_text")
         return
+
+    # Проверяем минимальную длину запроса
+    if len(user_message) < MIN_AI_REQUEST_LENGTH:
+        logger.info(f"Text '{user_message}' is too short for AI request, ignoring")
+        try:
+            await update.message.reply_text(
+                "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
+                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
+            )
+            logger.info(f"Sent short request message")
+        except telegram.error.BadRequest as e:
+            logger.error(f"Error sending short request message: {e}")
+            await update.message.reply_text(
+                "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
+                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
+            )
+        return
+
+    logger.info(f"Processing AI request: '{user_message}'")
 
     current_model_key = get_current_model_key(context)
     model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
@@ -1116,7 +1141,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            logger.info(f"Sent AI response")
+            logger.info(f"Sent AI response for request: '{user_message}'")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending AI response: {e}")
             await update.message.reply_text(
