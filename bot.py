@@ -27,8 +27,11 @@ from firebase_admin.exceptions import FirebaseError
 from collections import defaultdict
 from time import time
 
-nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Enable debug logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.DEBUG  # Changed from INFO to DEBUG
+)
 logger = logging.getLogger(__name__)
 
 # --- API KEYS AND TOKENS ---
@@ -1097,13 +1100,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 response.raise_for_status()
                 data = response.json()
-                logger.debug(f"Raw API response for {model_config['id']}: {json.dumps(data, indent=2)}")  # Log raw response
+                logger.debug(f"Raw API response for {model_config['id']}: {json.dumps(data, indent=2, ensure_ascii=False)}")
                 if model_config["id"] == "grok-3-beta" and data.get("response", [{}])[0].get("choices"):
                     response_text = data["response"][0]["choices"][0]["message"]["content"].strip()
                 elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
                     response_text = data.get("text", "").strip()
                 elif model_config["id"] == "gpt-4o-mini":
-                    if data.get("status") == "success":
+                    status = data.get("status", "unknown")
+                    if status == "success":
                         output = data.get("output", "")
                         if isinstance(output, str):
                             response_text = output.strip()
@@ -1116,12 +1120,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if not response_text:
                             response_text = "Ответ пуст: API вернул пустой или некорректный результат."
                     else:
-                        response_text = f"Ошибка API: Статус '{data.get('status', 'unknown')}'."
+                        error_message = data.get("error", data.get("message", "Нет подробностей об ошибке"))
+                        response_text = f"Ошибка API: Статус '{status}', подробности: {error_message}."
                 else:
                     response_text = data.get("text", data.get("content", data.get("output", "Ответ пуст."))).strip()
             except requests.exceptions.HTTPError as e:
-                response_text = f"Ошибка API: {e.response.status_code}."
+                response_text = f"Ошибка API: HTTP {e.response.status_code}."
                 logger.error(f"HTTPError for {model_config['id']}: {e}", exc_info=True)
+                if e.response.status_code == 401:
+                    response_text += " Возможна проблема с API-ключом."
+                elif e.response.status_code == 429:
+                    response_text += " Превышен лимит запросов."
             except Exception as e:
                 response_text = f"Ошибка API: {type(e).__name__}."
                 logger.error(f"Error for {model_config['id']}: {e}", exc_info=True)
@@ -1136,7 +1145,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         disable_web_page_preview=True
     )
     logger.info(f"Sent response (model: {current_model_key}) to user {user_id}")
-    
+
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
     expected_prefix = f"subscription_{PRO_SUBSCRIPTION_LEVEL_KEY}_"
