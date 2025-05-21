@@ -6,7 +6,7 @@ from telegram import (
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PicklePersistence, PreCheckoutQueryHandler, BasePersistence
+    ContextTypes, PreCheckoutQueryHandler
 )
 import google.generativeai as genai
 import google.api_core.exceptions
@@ -21,35 +21,13 @@ from datetime import datetime, timedelta
 from telegram import LabeledPrice
 from typing import Optional
 import uuid
-import firebase_admin # НОВЫЙ ИМПОРТ
-from firebase_admin import credentials, firestore # НОВЫЙ ИМПОРТ
+import firebase_admin
+from firebase_admin import credentials, firestore
+from google.cloud.firestore_v1 import AsyncClient
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
-SERVICE_ACCOUNT_KEY_JSON_STR = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY_JSON")
-DB = None # Клиент Firestore будет здесь
-
-if SERVICE_ACCOUNT_KEY_JSON_STR:
-    if not firebase_admin._apps: # Проверяем, не инициализировано ли уже приложение
-        try:
-            cred_json = json.loads(SERVICE_ACCOUNT_KEY_JSON_STR)
-            cred = credentials.Certificate(cred_json)
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin SDK успешно инициализирован.")
-            DB = firestore.client()
-            logger.info("Клиент Firestore успешно получен.")
-        except json.JSONDecodeError:
-            logger.error("Ошибка декодирования JSON из FIREBASE_SERVICE_ACCOUNT_KEY_JSON. Убедитесь, что это корректная JSON-строка.")
-        except ValueError as e:
-            logger.error(f"Ошибка в данных учетной записи Firebase (возможно, неполный JSON): {e}")
-        except Exception as e:
-            logger.error(f"Непредвиденная ошибка при инициализации Firebase Admin SDK: {e}")
-else:
-    logger.warning("Переменная окружения FIREBASE_SERVICE_ACCOUNT_KEY_JSON не установлена. Firestore не будет использоваться.")
-# --- КОНЕЦ ИНИЦИАЛИЗАЦИИ FIREBASE ---
 
 # --- КЛЮЧИ API И ТОКЕНЫ ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
@@ -255,30 +233,44 @@ MENU_STRUCTURE = {
     }
 }
 
-# --- Конфигурация API Google Gemini ---
-if not GOOGLE_GEMINI_API_KEY or "YOUR_GOOGLE_GEMINI_API_KEY" in GOOGLE_GEMINI_API_KEY or "AIzaSy" not in GOOGLE_GEMINI_API_KEY:
-    logger.warning("Google Gemini API key is not set correctly.")
-else:
-    try:
-        genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
-        logger.info("Google Gemini API configured successfully.")
-    except Exception as e:
-        logger.error(f"Failed to configure Google Gemini API: {str(e)}")
+# --- Инициализация Firebase ---
+cred = credentials.Certificate("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json")
+firebase_admin.initialize_app(cred)
+db = firestore.AsyncClient()
 
-if not CUSTOM_GEMINI_PRO_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GEMINI_PRO_API_KEY or "sk-" not in CUSTOM_GEMINI_PRO_API_KEY:
-    logger.warning("Custom Gemini Pro API key is not set correctly.")
+# --- Вспомогательные функции для работы с Firestore ---
+async def get_user_data(user_id: int) -> dict:
+    doc_ref = db.collection("users").document(str(user_id))
+    doc = await doc_ref.get()
+    return doc.to_dict() or {}
 
-# --- Вспомогательные функции ---
-def get_current_mode_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    current_model_key = get_current_model_key(context)
+async def set_user_data(user_id: int, data: dict):
+    doc_ref = db.collection("users").document(str(user_id))
+    await doc_ref.set(data, merge=True)
+    logger.info(f"Updated user data for {user_id}: {data}")
+
+async def get_bot_data() -> dict:
+    doc_ref = db.collection("bot_data").document("data")
+    doc = await doc_ref.get()
+    return doc.to_dict() or {}
+
+async def set_bot_data(data: dict):
+    doc_ref = db.collection("bot_data").document("data")
+    await doc_ref.set(data, merge=True)
+    logger.info(f"Updated bot data: {data}")
+
+async def get_current_mode_details(user_id: int) -> dict:
+    user_data = await get_user_data(user_id)
+    current_model_key = await get_current_model_key(user_id)
     if current_model_key == "custom_api_gemini_2_5_pro":
         return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
-    mode_key = context.user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
     return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
-def get_current_model_key(context: ContextTypes.DEFAULT_TYPE) -> str:
-    selected_id = context.user_data.get('selected_model_id', DEFAULT_MODEL_ID)
-    selected_api_type = context.user_data.get('selected_api_type')
+async def get_current_model_key(user_id: int) -> str:
+    user_data = await get_user_data(user_id)
+    selected_id = user_data.get('selected_model_id', DEFAULT_MODEL_ID)
+    selected_api_type = user_data.get('selected_api_type')
 
     if selected_api_type:
         for key, info in AVAILABLE_TEXT_MODELS.items():
@@ -287,19 +279,22 @@ def get_current_model_key(context: ContextTypes.DEFAULT_TYPE) -> str:
 
     for key, info in AVAILABLE_TEXT_MODELS.items():
         if info["id"] == selected_id:
-            if 'selected_api_type' not in context.user_data or context.user_data['selected_api_type'] != info.get("api_type"):
-                context.user_data['selected_api_type'] = info.get("api_type")
+            if 'selected_api_type' not in user_data or user_data['selected_api_type'] != info.get("api_type"):
+                user_data['selected_api_type'] = info.get("api_type")
+                await set_user_data(user_id, user_data)
                 logger.info(f"Inferred api_type to '{info.get('api_type')}' for model_id '{selected_id}'")
             return key
 
     logger.warning(f"Could not find key for model_id '{selected_id}'. Falling back to default.")
     default_model_config = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
-    context.user_data['selected_model_id'] = default_model_config["id"]
-    context.user_data['selected_api_type'] = default_model_config["api_type"]
+    await set_user_data(user_id, {
+        'selected_model_id': default_model_config["id"],
+        'selected_api_type': default_model_config["api_type"]
+    })
     return DEFAULT_MODEL_KEY
 
-def get_selected_model_details(context: ContextTypes.DEFAULT_TYPE) -> dict:
-    model_key = get_current_model_key(context)
+async def get_selected_model_details(user_id: int) -> dict:
+    model_key = await get_current_model_key(user_id)
     return AVAILABLE_TEXT_MODELS.get(model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
 
 def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
@@ -325,12 +320,13 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
             return text[:cut_at].strip() + suffix, True
     return text[:adjusted_max_length].strip() + suffix, True
 
-def get_user_actual_limit_for_model(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def get_user_actual_limit_for_model(user_id: int, model_key: str) -> int:
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config:
         return 0
-    all_user_subscriptions = context.bot_data.setdefault('user_subscriptions', {})
-    user_subscription_details = all_user_subscriptions.get(user_id, {})
+    bot_data = await get_bot_data()
+    user_subscriptions = bot_data.get('user_subscriptions', {})
+    user_subscription_details = user_subscriptions.get(str(user_id), {})
     current_sub_level = None
     if user_subscription_details.get('valid_until'):
         try:
@@ -347,21 +343,24 @@ def get_user_actual_limit_for_model(user_id: int, model_key: str, context: Conte
         return model_config.get("subscription_daily_limit" if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY else "limit_if_no_subscription", 0)
     if limit_type == "subscription_custom_pro":
         base_limit = model_config.get("subscription_daily_limit" if current_sub_level == PRO_SUBSCRIPTION_LEVEL_KEY else "limit_if_no_subscription", 0)
-        if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False):
-            bonus_uses_left = context.user_data.get('news_bonus_uses_left', 0)
+        user_data = await get_user_data(user_id)
+        if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and user_data.get('claimed_news_bonus', False):
+            bonus_uses_left = user_data.get('news_bonus_uses_left', 0)
             return base_limit + bonus_uses_left
         return base_limit
     return model_config.get("limit", float('inf')) if not model_config.get("is_limited", False) else 0
 
-def check_and_log_request_attempt(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE) -> tuple[bool, str, int]:
+async def check_and_log_request_attempt(user_id: int, model_key: str) -> tuple[bool, str, int]:
     today_str = datetime.now().strftime("%Y-%m-%d")
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config or not model_config.get("is_limited"):
         return True, "", 0
 
+    bot_data = await get_bot_data()
+    user_subscriptions = bot_data.get('user_subscriptions', {})
+    user_subscription_details = user_subscriptions.get(str(user_id), {})
     is_profi_subscriber = False
     if model_config.get("limit_type") in ["subscription_or_daily_free", "subscription_custom_pro"]:
-        user_subscription_details = context.bot_data.get('user_subscriptions', {}).get(user_id, {})
         if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
             try:
                 if datetime.now(datetime.fromisoformat(user_subscription_details['valid_until']).tzinfo).date() <= datetime.fromisoformat(user_subscription_details['valid_until']).date():
@@ -369,39 +368,47 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
             except Exception:
                 pass
 
+    user_data = await get_user_data(user_id)
     if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi_subscriber:
-        if context.user_data.get('news_bonus_uses_left', 0) > 0:
+        if user_data.get('news_bonus_uses_left', 0) > 0:
             logger.info(f"User {user_id} has bonus for {model_key}. Allowing.")
             return True, "bonus_available", 0
 
-    all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
-    user_model_counts = all_daily_counts.setdefault(user_id, {})
-    model_daily_usage = user_model_counts.setdefault(model_key, {'date': '', 'count': 0})
+    all_daily_counts = bot_data.get('all_user_daily_counts', {})
+    user_model_counts = all_daily_counts.get(str(user_id), {})
+    model_daily_usage = user_model_counts.get(model_key, {'date': '', 'count': 0})
     if model_daily_usage['date'] != today_str:
-        model_daily_usage.update({'date': today_str, 'count': 0})
+        model_daily_usage = {'date': today_str, 'count': 0}
+        user_model_counts[model_key] = model_daily_usage
+        all_daily_counts[str(user_id)] = user_model_counts
+        bot_data['all_user_daily_counts'] = all_daily_counts
+        await set_bot_data(bot_data)
 
     current_daily_count = model_daily_usage['count']
-    actual_daily_limit = get_user_actual_limit_for_model(user_id, model_key, context)
+    actual_daily_limit = await get_user_actual_limit_for_model(user_id, model_key)
 
     if current_daily_count >= actual_daily_limit:
         message_parts = [f"Вы достигли лимита ({current_daily_count}/{actual_daily_limit}) для {model_config['name']}."]
         if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi_subscriber:
-            if not context.user_data.get('claimed_news_bonus', False):
+            if not user_data.get('claimed_news_bonus', False):
                 message_parts.append(f'💡 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для бонусной генерации!')
-            elif context.user_data.get('news_bonus_uses_left', 0) == 0:
+            elif user_data.get('news_bonus_uses_left', 0) == 0:
                 message_parts.append(f"ℹ️ Бонус за подписку использован (<a href='{NEWS_CHANNEL_LINK}'>канал</a>).")
         message_parts.append("Попробуйте завтра или купите подписку в меню «Подписка».")
         return False, "\n".join(message_parts), current_daily_count
     return True, "", current_daily_count
 
-def increment_request_count(user_id: int, model_key: str, context: ContextTypes.DEFAULT_TYPE):
+async def increment_request_count(user_id: int, model_key: str):
     model_config = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_config or not model_config.get("is_limited"):
         return
 
+    user_data = await get_user_data(user_id)
+    bot_data = await get_bot_data()
+
     if model_key == NEWS_CHANNEL_BONUS_MODEL_KEY:
         is_profi_subscriber = False
-        user_subscription_details = context.bot_data.get('user_subscriptions', {}).get(user_id, {})
+        user_subscription_details = bot_data.get('user_subscriptions', {}).get(str(user_id), {})
         if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
             try:
                 if datetime.now(datetime.fromisoformat(user_subscription_details['valid_until']).tzinfo).date() <= datetime.fromisoformat(user_subscription_details['valid_until']).date():
@@ -410,19 +417,24 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
                 pass
         
         if not is_profi_subscriber:
-            news_bonus_uses_left = context.user_data.get('news_bonus_uses_left', 0)
+            news_bonus_uses_left = user_data.get('news_bonus_uses_left', 0)
             if news_bonus_uses_left > 0:
-                context.user_data['news_bonus_uses_left'] = news_bonus_uses_left - 1
-                logger.info(f"User {user_id} consumed bonus for {model_key}. Remaining: {context.user_data['news_bonus_uses_left']}")
+                user_data['news_bonus_uses_left'] = news_bonus_uses_left - 1
+                await set_user_data(user_id, user_data)
+                logger.info(f"User {user_id} consumed bonus for {model_key}. Remaining: {user_data['news_bonus_uses_left']}")
                 return
 
     today_str = datetime.now().strftime("%Y-%m-%d")
-    all_daily_counts = context.bot_data.setdefault('all_user_daily_counts', {})
-    user_model_counts = all_daily_counts.setdefault(user_id, {})
-    model_daily_usage = user_model_counts.setdefault(model_key, {'date': today_str, 'count': 0})
+    all_daily_counts = bot_data.get('all_user_daily_counts', {})
+    user_model_counts = all_daily_counts.get(str(user_id), {})
+    model_daily_usage = user_model_counts.get(model_key, {'date': today_str, 'count': 0})
     if model_daily_usage['date'] != today_str:
-        model_daily_usage.update({'date': today_str, 'count': 0})
+        model_daily_usage = {'date': today_str, 'count': 0}
     model_daily_usage['count'] += 1
+    user_model_counts[model_key] = model_daily_usage
+    all_daily_counts[str(user_id)] = user_model_counts
+    bot_data['all_user_daily_counts'] = all_daily_counts
+    await set_bot_data(bot_data)
     logger.info(f"User {user_id} count for {model_key} incremented to {model_daily_usage['count']}")
 
 # --- Проверка, является ли текст кнопкой меню ---
@@ -437,9 +449,10 @@ def is_menu_button_text(text: str) -> bool:
     return False
 
 # --- Удаление пользовательских сообщений с командами или кнопками ---
-async def try_delete_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def try_delete_user_message(update: Update, user_id: int):
     chat_id = update.effective_chat.id
-    user_command_message = context.user_data.get('user_command_message', {})
+    user_data = await get_user_data(user_id)
+    user_command_message = user_data.get('user_command_message', {})
     message_id = user_command_message.get('message_id')
     timestamp = user_command_message.get('timestamp')
 
@@ -450,23 +463,27 @@ async def try_delete_user_message(update: Update, context: ContextTypes.DEFAULT_
         msg_time = datetime.fromisoformat(timestamp)
         if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
             logger.info(f"User message {message_id} is older than 48 hours, clearing")
-            context.user_data.pop('user_command_message', None)
+            user_data.pop('user_command_message', None)
+            await set_user_data(user_id, user_data)
             return
     except Exception:
         logger.warning("Invalid user message timestamp, clearing")
-        context.user_data.pop('user_command_message', None)
+        user_data.pop('user_command_message', None)
+        await set_user_data(user_id, user_data)
         return
 
     try:
-        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id)
         logger.info(f"Deleted user message {message_id}")
-        context.user_data.pop('user_command_message', None)
+        user_data.pop('user_command_message', None)
+        await set_user_data(user_id, user_data)
     except telegram.error.BadRequest as e:
         logger.warning(f"Failed to delete user message {message_id}: {e}")
-        context.user_data.pop('user_command_message', None)
+        user_data.pop('user_command_message', None)
+        await set_user_data(user_id, user_data)
 
 # --- Функции для меню на клавиатуре ---
-def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> ReplyKeyboardMarkup:
+def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
         return ReplyKeyboardMarkup([[]], resize_keyboard=True, one_time_keyboard=False)
@@ -489,15 +506,18 @@ def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) ->
     
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key: str):
+async def show_menu(update: Update, user_id: int, menu_key: str):
     menu = MENU_STRUCTURE.get(menu_key)
     if not menu:
-        await update.message.reply_text("Ошибка: Меню не найдено.", reply_markup=generate_menu_keyboard("main_menu", context))
+        await update.message.reply_text("Ошибка: Меню не найдено.", reply_markup=generate_menu_keyboard("main_menu"))
         return
     
-    context.user_data['current_menu'] = menu_key
+    user_data = await get_user_data(user_id)
+    user_data['current_menu'] = menu_key
+    await set_user_data(user_id, user_data)
+    
     text = menu["title"]
-    reply_markup = generate_menu_keyboard(menu_key, context)
+    reply_markup = generate_menu_keyboard(menu_key)
     
     await update.message.reply_text(
         text,
@@ -507,359 +527,95 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
     )
     logger.info(f"Sent menu message for {menu_key}: {text}")
 
-# ... (после ваших вспомогательных функций) ...
-
-class FirestorePersistence(BasePersistence):
-    def __init__(self, firestore_client,
-                 store_user_data=True, store_chat_data=True,
-                 store_bot_data=True, store_callback_data=True, # PTB v20+ также использует callback_data
-                 single_collection_name: Optional[str] = "telegram_bot_data"):
-        
-        super().__init__(
-            store_user_data=store_user_data,
-            store_chat_data=store_chat_data,
-            store_bot_data=store_bot_data,
-            store_callback_data=store_callback_data
-        )
-        # Атрибуты self.user_data, self.chat_data, self.bot_data, self.callback_data
-        # уже инициализированы в super().__init__ как {} или None в зависимости от флагов store_...
-        # Нам нужно будет их заполнить в load_data().
-
-        self._firestore_client = firestore_client
-        self.conversations = {} # Для ConversationHandler, пока оставим пустым
-
-        self._main_collection_name = single_collection_name
-        self._user_doc_prefix = "user_"
-        self._chat_doc_prefix = "chat_"
-        self._bot_doc_id = "bot_application_data"
-        self._conversations_doc_id = "conversations_data" # Не используется активно в этом примере
-        self._callback_doc_id = "callback_application_data" # Документ для callback_data
-
-    async def _load_firestore_collection_to_dict(self, prefix: str) -> dict:
-        """Вспомогательный метод для загрузки user_data или chat_data."""
-        data_dict = {}
-        if not self._firestore_client:
-            return data_dict
-        try:
-            collection_ref = self._firestore_client.collection(self._main_collection_name)
-            # НЕЭФФЕКТИВНО для большого количества! Загружает ВСЕ документы.
-            docs_stream = await asyncio.to_thread(collection_ref.stream)
-            for doc in docs_stream:
-                if doc.id.startswith(prefix):
-                    try:
-                        key_id = int(doc.id[len(prefix):])
-                        data_dict[key_id] = doc.to_dict()
-                    except ValueError:
-                        logger.warning(f"Не удалось преобразовать ID документа '{doc.id}' в int.")
-            logger.info(f"Загружено {len(data_dict)} записей для префикса '{prefix}'.")
-        except Exception as e:
-            logger.error(f"Ошибка загрузки данных для префикса '{prefix}' из Firestore: {e}", exc_info=True)
-        return data_dict
-
-    async def _load_firestore_single_doc(self, doc_id: str, data_type_name: str) -> Optional[dict]:
-        """Вспомогательный метод для загрузки bot_data или callback_data."""
-        if not self._firestore_client:
-            return None
-        data_to_load = None
-        try:
-            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
-            doc = await asyncio.to_thread(doc_ref.get)
-            if doc.exists:
-                data_to_load = doc.to_dict()
-                logger.info(f"{data_type_name} загружены из документа: {doc_id}")
-            else:
-                logger.info(f"Документ для {data_type_name} ({doc_id}) не найден, используется None/пустой словарь.")
-        except Exception as e:
-            logger.error(f"Ошибка загрузки {data_type_name} из Firestore ({doc_id}): {e}", exc_info=True)
-        return data_to_load
-
-    async def load_data(self) -> None:
-        """Загружает все необходимые данные из Firestore при старте бота."""
-        if not self._firestore_client:
-            logger.warning("Клиент Firestore не инициализирован. Данные не будут загружены из Firestore.")
-            # BasePersistence уже инициализировал user_data и т.д. как {} или None.
-            return
-
-        logger.info("Загрузка данных из Firestore...")
-
-        if self.store_user_data:
-            self.user_data.update(await self._load_firestore_collection_to_dict(self._user_doc_prefix))
-        if self.store_chat_data:
-            self.chat_data.update(await self._load_firestore_collection_to_dict(self._chat_doc_prefix))
-        
-        if self.store_bot_data:
-            loaded_bot_data = await self._load_firestore_single_doc(self._bot_doc_id, "Bot_data")
-            if loaded_bot_data is not None:
-                self.bot_data.update(loaded_bot_data)
-        
-        if self.store_callback_data:
-            loaded_callback_data = await self._load_firestore_single_doc(self._callback_doc_id, "Callback_data")
-            if loaded_callback_data is not None:
-                self.callback_data.update(loaded_callback_data)
-        
-        # self.conversations пока не загружаем/сохраняем подробно
-        logger.info("Загрузка данных из Firestore завершена.")
-
-    # --- Методы GET ---
-    # BasePersistence уже предоставляет get_user_data, get_chat_data, get_bot_data, get_callback_data,
-    # которые возвращают self.user_data, self.chat_data и т.д.
-    # Поэтому нам не нужно их переопределять, если load_data правильно заполняет эти атрибуты.
-    # Оставим их для явности, но они просто возвращают уже загруженные данные.
-
-    async def get_user_data(self) -> dict:
-        return self.user_data
-
-    async def get_chat_data(self) -> dict:
-        return self.chat_data
-
-    async def get_bot_data(self) -> dict:
-        return self.bot_data
-
-    async def get_callback_data(self) -> Optional[dict]:
-        return self.callback_data
-    
-    async def get_conversations(self, name: str) -> dict:
-        # logger.debug(f"Запрошены conversations для {name}")
-        return self.conversations.get(name, {})
-
-    # --- Методы UPDATE ---
-    async def update_user_data(self, user_id: int, data: dict) -> None:
-        if not self.store_user_data or not self._firestore_client:
-            return
-        # Обновляем локальный кэш (словарь self.user_data, который PTB передает в context.user_data)
-        self.user_data[user_id] = data # PTB ожидает, что мы обновим это сами
-        doc_id = f"{self._user_doc_prefix}{user_id}"
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
-                data # Сохраняем весь словарь data, так как он и есть context.user_data
-            )
-        except Exception as e:
-            logger.error(f"Ошибка обновления user_data для {doc_id} в Firestore: {e}", exc_info=True)
-
-    async def update_chat_data(self, chat_id: int, data: dict) -> None:
-        if not self.store_chat_data or not self._firestore_client:
-            return
-        self.chat_data[chat_id] = data
-        doc_id = f"{self._chat_doc_prefix}{chat_id}"
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(doc_id).set,
-                data
-            )
-        except Exception as e:
-            logger.error(f"Ошибка обновления chat_data для {doc_id} в Firestore: {e}", exc_info=True)
-
-    async def update_bot_data(self, data: dict) -> None:
-        if not self.store_bot_data or not self._firestore_client:
-            return
-        self.bot_data = data.copy() # Обновляем локальный кэш
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id).set,
-                data
-            )
-        except Exception as e:
-            logger.error(f"Ошибка обновления bot_data ({self._bot_doc_id}) в Firestore: {e}", exc_info=True)
-
-    async def update_callback_data(self, data: dict) -> None:
-        if not self.store_callback_data or not self._firestore_client:
-            return
-        self.callback_data = data.copy() if data else None
-        try:
-            # Если data пустой, можно удалить документ или сохранить пустой объект
-            if data:
-                 await asyncio.to_thread(
-                    self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id).set,
-                    data
-                )
-            else: # Если data пустой/None, удаляем документ callback_data
-                 await asyncio.to_thread(
-                    self._firestore_client.collection(self._main_collection_name).document(self._callback_doc_id).delete
-                )
-        except Exception as e:
-            logger.error(f"Ошибка обновления callback_data ({self._callback_doc_id}) в Firestore: {e}", exc_info=True)
-
-    async def update_conversation(self, name: str, key: tuple, new_state: Optional[object]) -> None:
-        # logger.debug(f"Обновление conversation: name={name}, key={key}, new_state={new_state}")
-        if name not in self.conversations:
-            self.conversations[name] = {}
-        if new_state is None:
-            self.conversations[name].pop(key, None)
-        else:
-            self.conversations[name][key] = new_state
-        # TODO: Подумать о сохранении conversations в Firestore, если это необходимо.
-        # Например, можно сохранять self.conversations в отдельный документ.
-        # await self._firestore_client.collection(self._main_collection_name).document(self._conversations_doc_id).set(self.conversations)
-        pass
-
-    # --- Методы DROP ---
-    async def drop_user_data(self, user_id: int) -> None:
-        if not self.store_user_data or not self._firestore_client:
-            return
-        if user_id in self.user_data:
-            del self.user_data[user_id] # Удаляем из локального кэша
-        doc_id = f"{self._user_doc_prefix}{user_id}"
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
-            )
-            logger.info(f"User_data для {doc_id} удалены из Firestore.")
-        except Exception as e:
-            logger.error(f"Ошибка удаления user_data для {doc_id} из Firestore: {e}", exc_info=True)
-            
-    async def drop_chat_data(self, chat_id: int) -> None:
-        if not self.store_chat_data or not self._firestore_client:
-            return
-        if chat_id in self.chat_data:
-            del self.chat_data[chat_id]
-        doc_id = f"{self._chat_doc_prefix}{chat_id}"
-        try:
-            await asyncio.to_thread(
-                self._firestore_client.collection(self._main_collection_name).document(doc_id).delete
-            )
-            logger.info(f"Chat_data для {doc_id} удалены из Firestore.")
-        except Exception as e:
-            logger.error(f"Ошибка удаления chat_data для {doc_id} из Firestore: {e}", exc_info=True)
-
-    async def flush(self) -> None:
-        # logger.debug("Вызван метод flush. Данные уже должны быть сохранены в Firestore при каждом update.")
-        pass
-    async def refresh_user_data(self, user_id: int) -> None:
-        """Обновляет данные для конкретного пользователя из Firestore."""
-        if not self.store_user_data or not self._firestore_client:
-            return
-        doc_id = f"{self._user_doc_prefix}{user_id}"
-        logger.debug(f"Обновление user_data для {user_id} из Firestore...")
-        try:
-            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
-            doc = await asyncio.to_thread(doc_ref.get)
-            if doc.exists:
-                self.user_data[user_id] = doc.to_dict()
-                logger.info(f"User_data для {user_id} успешно обновлены из Firestore.")
-            else:
-                if user_id in self.user_data:
-                    del self.user_data[user_id]
-                logger.info(f"Документ для user_data ({doc_id}) не найден в Firestore при обновлении.")
-        except Exception as e:
-            logger.error(f"Ошибка при обновлении user_data для {user_id} из Firestore: {e}", exc_info=True)
-
-    async def refresh_chat_data(self, chat_id: int) -> None:
-        """Обновляет данные для конкретного чата из Firestore."""
-        if not self.store_chat_data or not self._firestore_client:
-            return
-        doc_id = f"{self._chat_doc_prefix}{chat_id}"
-        logger.debug(f"Обновление chat_data для {chat_id} из Firestore...")
-        try:
-            doc_ref = self._firestore_client.collection(self._main_collection_name).document(doc_id)
-            doc = await asyncio.to_thread(doc_ref.get)
-            if doc.exists:
-                self.chat_data[chat_id] = doc.to_dict()
-                logger.info(f"Chat_data для {chat_id} успешно обновлены из Firestore.")
-            else:
-                if chat_id in self.chat_data:
-                    del self.chat_data[chat_id]
-                logger.info(f"Документ для chat_data ({doc_id}) не найден в Firestore при обновлении.")
-        except Exception as e:
-            logger.error(f"Ошибка при обновлении chat_data для {chat_id} из Firestore: {e}", exc_info=True)
-
-    async def refresh_bot_data(self) -> None:
-        """Обновляет bot_data из Firestore."""
-        if not self.store_bot_data or not self._firestore_client:
-            return
-        logger.debug(f"Обновление bot_data из Firestore...")
-        try:
-            doc_ref = self._firestore_client.collection(self._main_collection_name).document(self._bot_doc_id)
-            doc = await asyncio.to_thread(doc_ref.get)
-            if doc.exists:
-                self.bot_data.clear()
-                self.bot_data.update(doc.to_dict())
-                logger.info(f"Bot_data успешно обновлены из Firestore ({self._bot_doc_id}).")
-            else:
-                self.bot_data.clear()
-                logger.info(f"Документ для bot_data ({self._bot_doc_id}) не найден в Firestore при обновлении.")
-        except Exception as e:
-            logger.error(f"Ошибка при обновлении bot_data из Firestore ({self._bot_doc_id}): {e}", exc_info=True)
-
-# --- КОНЕЦ КЛАССА FirestorePersistence ---
-
 # --- Обработчики команд ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    context.user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
-    context.user_data.setdefault('current_menu', 'main_menu')
-    if 'selected_model_id' not in context.user_data or 'selected_api_type' not in context.user_data:
-        default_model_conf = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
-        context.user_data.update({'selected_model_id': default_model_conf["id"], 'selected_api_type': default_model_conf["api_type"]})
+    user_data = await get_user_data(user_id)
+    user_data.setdefault('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    user_data.setdefault('current_menu', 'main_menu')
+    default_model_conf = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
+    user_data.setdefault('selected_model_id', default_model_conf["id"])
+    user_data.setdefault('selected_api_type', default_model_conf["api_type"])
+    await set_user_data(user_id, user_data)
     
-    # Сохраняем данные команды пользователя
-    context.user_data['user_command_message'] = {
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
+    await set_user_data(user_id, user_data)
     
-    current_model_key = get_current_model_key(context)
-    current_mode_name = get_current_mode_details(context)['name']
+    current_model_key = await get_current_model_key(user_id)
+    current_mode_name = (await get_current_mode_details(user_id))['name']
     current_model_name = AVAILABLE_TEXT_MODELS[current_model_key]['name']
 
     greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.\n🧠 Агент: <b>{current_mode_name}</b>\n⚙️ Модель: <b>{current_model_name}</b>\n\n💬 Задавайте вопросы или используйте меню ниже!"
     await update.message.reply_text(
         greeting,
         parse_mode=ParseMode.HTML,
-        reply_markup=generate_menu_keyboard("main_menu", context),
+        reply_markup=generate_menu_keyboard("main_menu"),
         disable_web_page_preview=True
     )
     logger.info(f"Sent start message for user {user_id}: {greeting}")
 
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
+    user_id = update.effective_user.id
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
-    await show_menu(update, context, "main_menu")
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
+    await show_menu(update, user_id, "main_menu")
 
 async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
+    user_id = update.effective_user.id
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
-    await show_limits(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
+    await show_limits(update, user_id)
 
 async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
+    user_id = update.effective_user.id
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
-    await show_subscription(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
+    await show_subscription(update, user_id)
 
 async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
+    user_id = update.effective_user.id
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
-    await claim_news_bonus_logic(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
+    await claim_news_bonus_logic(update, user_id)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
-        'message_id': update.message.message_id,
-        'timestamp': datetime.now().isoformat()
-    }
-    await try_delete_user_message(update, context)
-    await show_help(update, context)
-
-async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    context.user_data['user_command_message'] = {
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
+    await show_help(update, user_id)
 
-    user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
+async def show_limits(update: Update, user_id: int):
+    bot_data = await get_bot_data()
+    user_data = await get_user_data(user_id)
+    user_subscription_details = bot_data.get('user_subscriptions', {}).get(str(user_id), {})
     display_sub_level = "Бесплатный доступ"
     subscription_active = False
     if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
@@ -882,21 +638,21 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
         if model_c.get("is_limited"):
             today_str = datetime.now().strftime("%Y-%m-%d")
-            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
+            user_model_counts = bot_data.get('all_user_daily_counts', {}).get(str(user_id), {})
             model_daily_usage = user_model_counts.get(model_k, {'date': '', 'count': 0})
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
-            actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
+            actual_l = await get_user_actual_limit_for_model(user_id, model_k)
             bonus_note = ""
-            if model_k == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False) and context.user_data.get('news_bonus_uses_left', 0) > 0:
+            if model_k == NEWS_CHANNEL_BONUS_MODEL_KEY and user_data.get('claimed_news_bonus', False) and user_data.get('news_bonus_uses_left', 0) > 0:
                 bonus_note = " (вкл. бонус)"
             usage_text_parts.append(f"▫️ {model_c['name']}: <b>{current_c_display}/{actual_l}</b>{bonus_note}")
 
     if NEWS_CHANNEL_USERNAME and NEWS_CHANNEL_USERNAME != "@YourNewsChannelHandle":
         bonus_model_name = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', "бонусной модели")
         bonus_info = ""
-        if not context.user_data.get('claimed_news_bonus', False):
+        if not user_data.get('claimed_news_bonus', False):
             bonus_info = f'🎁 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерации ({bonus_model_name})!'
-        elif (bonus_uses_left := context.user_data.get('news_bonus_uses_left', 0)) > 0:
+        elif (bonus_uses_left := user_data.get('news_bonus_uses_left', 0)) > 0:
             bonus_info = f'🎁 У вас <b>{bonus_uses_left}</b> бонусных генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
         else:
             bonus_info = f'ℹ️ Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
@@ -906,7 +662,7 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usage_text_parts.append("Больше лимитов? Меню «Подписка».")
 
     final_usage_text = "\n".join(usage_text_parts)
-    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
+    reply_markup = generate_menu_keyboard(user_data.get('current_menu', 'limits_submenu'))
 
     await update.message.reply_text(
         final_usage_text,
@@ -916,21 +672,23 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     logger.info(f"Sent limits message: {final_usage_text}")
 
-async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def claim_news_bonus_logic(update: Update, user_id: int):
     user = update.effective_user
     chat_id = update.effective_chat.id
     
-    context.user_data['user_command_message'] = {
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
 
     if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle":
         text = "Функция бонуса не настроена."
         await update.message.reply_text(
             text,
-            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
             parse_mode=None
         )
         logger.info(f"Sent bonus not configured message: {text}")
@@ -941,7 +699,7 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         text = "Ошибка: Бонусная модель не найдена."
         await update.message.reply_text(
             text,
-            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
             parse_mode=None
         )
         logger.info(f"Sent bonus model not found message: {text}")
@@ -949,8 +707,8 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
 
     bonus_model_name = bonus_model_config['name']
 
-    if context.user_data.get('claimed_news_bonus', False):
-        uses_left = context.user_data.get('news_bonus_uses_left', 0)
+    if user_data.get('claimed_news_bonus', False):
+        uses_left = user_data.get('news_bonus_uses_left', 0)
         if uses_left > 0:
             reply_text = f'Вы уже активировали бонус. У вас осталось <b>{uses_left}</b> генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
         else:
@@ -958,30 +716,31 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(
             reply_text,
             parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
             disable_web_page_preview=True
         )
         logger.info(f"Sent bonus already claimed message: {reply_text}")
         return
 
     try:
-        member_status = await context.bot.get_chat_member(chat_id=NEWS_CHANNEL_USERNAME, user_id=user.id)
+        member_status = await update.get_bot().get_chat_member(chat_id=NEWS_CHANNEL_USERNAME, user_id=user.id)
         if member_status.status in ['member', 'administrator', 'creator']:
-            context.user_data['claimed_news_bonus'] = True
-            context.user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
+            user_data['claimed_news_bonus'] = True
+            user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
+            await set_user_data(user_id, user_data)
             success_text = f'🎉 Спасибо за подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>! Вам начислена <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерация для {bonus_model_name}.'
             await update.message.reply_text(
                 success_text,
                 parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard('main_menu', context),
+                reply_markup=generate_menu_keyboard('main_menu'),
                 disable_web_page_preview=True
             )
             logger.info(f"Sent bonus success message: {success_text}")
         else:
             fail_text = f'Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> и нажмите «Получить» снова.'
-            reply_markup_inline = InlineKeyboardMarkup([
-                [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
-            ])
+            reply_markup_inline = InlineKeyboardMarkup([[
+                InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)
+            ]])
             await update.message.reply_text(
                 fail_text,
                 parse_mode=ParseMode.HTML,
@@ -992,9 +751,9 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
     except telegram.error.BadRequest as e:
         error_text_response = str(e).lower()
         reply_message_on_error = f'Мы не смогли подтвердить подписку на <a href="{NEWS_CHANNEL_LINK}">канал</a>. Подпишитесь и попробуйте снова.'
-        reply_markup_inline = InlineKeyboardMarkup([
-            [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
-        ])
+        reply_markup_inline = InlineKeyboardMarkup([[
+            InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)
+        ]])
         await update.message.reply_text(
             reply_message_on_error,
             parse_mode=ParseMode.HTML,
@@ -1004,15 +763,10 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"BadRequest error checking channel membership: {e}")
         logger.info(f"Sent bonus error message: {reply_message_on_error}")
 
-async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    context.user_data['user_command_message'] = {
-        'message_id': update.message.message_id,
-        'timestamp': datetime.now().isoformat()
-    }
-    await try_delete_user_message(update, context)
-
-    user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
+async def show_subscription(update: Update, user_id: int):
+    bot_data = await get_bot_data()
+    user_data = await get_user_data(user_id)
+    user_subscription_details = bot_data.get('user_subscriptions', {}).get(str(user_id), {})
     sub_text_parts = ["<b>💎 Подписка Профи</b>"]
     is_active = False
     if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
@@ -1033,7 +787,7 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sub_text_parts.append("\nКупить подписку: /subscribe")
 
     final_sub_text = "\n".join(sub_text_parts)
-    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'subscription_submenu'), context)
+    reply_markup = generate_menu_keyboard(user_data.get('current_menu', 'subscription_submenu'))
 
     await update.message.reply_text(
         final_sub_text,
@@ -1043,12 +797,14 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     logger.info(f"Sent subscription message: {final_sub_text}")
 
-async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['user_command_message'] = {
+async def show_help(update: Update, user_id: int):
+    user_data = await get_user_data(user_id)
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
 
     help_text = (
         "<b>❓ Помощь</b>\n\n"
@@ -1066,7 +822,7 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "▫️ /bonus — Получить бонус\n"
         "▫️ /help — Эта справка"
     )
-    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'help_submenu'), context)
+    reply_markup = generate_menu_keyboard(user_data.get('current_menu', 'help_submenu'))
 
     await update.message.reply_text(
         help_text,
@@ -1079,30 +835,32 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     button_text = update.message.text.strip()
-    current_menu_key = context.user_data.get('current_menu', 'main_menu')
+    user_data = await get_user_data(user_id)
+    current_menu_key = user_data.get('current_menu', 'main_menu')
     current_menu = MENU_STRUCTURE.get(current_menu_key, MENU_STRUCTURE['main_menu'])
 
     if not is_menu_button_text(button_text):
         logger.info(f"Text '{button_text}' is not a menu button, skipping to handle_text")
         return
 
-    context.user_data['user_command_message'] = {
+    user_data['user_command_message'] = {
         'message_id': update.message.message_id,
         'timestamp': datetime.now().isoformat()
     }
-    await try_delete_user_message(update, context)
+    await set_user_data(user_id, user_data)
+    await try_delete_user_message(update, user_id)
 
     logger.info(f"Processing button '{button_text}' in menu '{current_menu_key}'")
 
     if button_text == "⬅️ Назад":
         parent_menu = current_menu.get("parent")
         if parent_menu:
-            await show_menu(update, context, parent_menu)
+            await show_menu(update, user_id, parent_menu)
         else:
-            await show_menu(update, context, "main_menu")
+            await show_menu(update, user_id, "main_menu")
         return
     elif button_text == "🏠 Главное меню":
-        await show_menu(update, context, "main_menu")
+        await show_menu(update, user_id, "main_menu")
         return
 
     selected_item = next((item for item in current_menu["items"] if item["text"] == button_text), None)
@@ -1118,7 +876,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         text = "Команда не распознана. Используйте кнопки меню."
         await update.message.reply_text(
             text,
-            reply_markup=generate_menu_keyboard(current_menu_key, context),
+            reply_markup=generate_menu_keyboard(current_menu_key),
             parse_mode=None
         )
         logger.info(f"Sent unrecognized command message: {text}")
@@ -1129,11 +887,12 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.info(f"Button '{button_text}' triggers action '{action}' with target '{target}'")
 
     if action == "submenu":
-        await show_menu(update, context, target)
+        await show_menu(update, user_id, target)
     elif action == "set_agent":
         return_menu = current_menu.get("parent", "main_menu")
         if target in AI_MODES and target != "gemini_pro_custom_mode":
-            context.user_data['current_ai_mode'] = target
+            user_data['current_ai_mode'] = target
+            await set_user_data(user_id, user_data)
             details = AI_MODES[target]
             new_text = f"🤖 Агент изменён на: <b>{details['name']}</b>\n\n{details['welcome']}"
         elif target == "gemini_pro_custom_mode":
@@ -1143,22 +902,27 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             new_text,
             parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard(return_menu, context),
+            reply_markup=generate_menu_keyboard(return_menu),
             disable_web_page_preview=True
         )
         logger.info(f"Sent set_agent message for {target}: {new_text}")
-        context.user_data['current_menu'] = return_menu
+        user_data['current_menu'] = return_menu
+        await set_user_data(user_id, user_data)
     elif action == "set_model":
         return_menu = current_menu.get("parent", "main_menu")
         if target in AVAILABLE_TEXT_MODELS:
             config = AVAILABLE_TEXT_MODELS[target]
-            context.user_data['selected_model_id'] = config["id"]
-            context.user_data['selected_api_type'] = config["api_type"]
+            user_data.update({
+                'selected_model_id': config["id"],
+                'selected_api_type': config["api_type"]
+            })
+            await set_user_data(user_id, user_data)
+            bot_data = await get_bot_data()
             today_str = datetime.now().strftime("%Y-%m-%d")
-            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
+            user_model_counts = bot_data.get('all_user_daily_counts', {}).get(str(user_id), {})
             model_daily_usage = user_model_counts.get(target, {'date': '', 'count': 0})
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
-            actual_l = get_user_actual_limit_for_model(user_id, target, context)
+            actual_l = await get_user_actual_limit_for_model(user_id, target)
             limit_str = f'Лимит: {current_c_display}/{actual_l} в день'
             new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b>\n{limit_str}"
         else:
@@ -1166,19 +930,20 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             new_text,
             parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard(return_menu, context),
+            reply_markup=generate_menu_keyboard(return_menu),
             disable_web_page_preview=True
         )
         logger.info(f"Sent set_model message for {target}: {new_text}")
-        context.user_data['current_menu'] = return_menu
+        user_data['current_menu'] = return_menu
+        await set_user_data(user_id, user_data)
     elif action == "show_limits":
-        await show_limits(update, context)
+        await show_limits(update, user_id)
     elif action == "check_bonus":
-        await claim_news_bonus_logic(update, context)
+        await claim_news_bonus_logic(update, user_id)
     elif action == "show_subscription":
-        await show_subscription(update, context)
+        await show_subscription(update, user_id)
     elif action == "show_help":
-        await show_help(update, context)
+        await show_help(update, user_id)
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1191,9 +956,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(user_message) < MIN_AI_REQUEST_LENGTH:
         logger.info(f"Text '{user_message}' is too short for AI request, ignoring")
+        user_data = await get_user_data(user_id)
         await update.message.reply_text(
             "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
-            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
             parse_mode=None
         )
         logger.info(f"Sent short request message")
@@ -1201,22 +967,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"Processing AI request: '{user_message}'")
 
-    current_model_key = get_current_model_key(context)
+    current_model_key = await get_current_model_key(user_id)
     model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
-    can_proceed, limit_message, current_count = check_and_log_request_attempt(user_id, current_model_key, context)
+    can_proceed, limit_message, current_count = await check_and_log_request_attempt(user_id, current_model_key)
 
     if not can_proceed:
+        user_data = await get_user_data(user_id)
         await update.message.reply_text(
             limit_message,
             parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
             disable_web_page_preview=True
         )
         logger.info(f"Sent limit reached message: {limit_message}")
         return
 
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-    mode_details = get_current_mode_details(context)
+    mode_details = await get_current_mode_details(user_id)
     system_prompt = mode_details["prompt"]
     full_prompt = f"{system_prompt}\n\n**Пользовательский запрос:**\n{user_message}"
 
@@ -1264,11 +1031,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if was_truncated:
         logger.info(f"Response for user {user_id} was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} characters")
 
-    increment_request_count(user_id, current_model_key, context)
+    await increment_request_count(user_id, current_model_key)
+    user_data = await get_user_data(user_id)
     await update.message.reply_text(
         response_text,
         parse_mode=None,
-        reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+        reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
         disable_web_page_preview=True
     )
     logger.info(f"Sent AI response for request: '{user_message}': {response_text[:100]}...")
@@ -1285,15 +1053,18 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     payment = update.message.successful_payment
     if payment.invoice_payload == f"subscription_{PRO_SUBSCRIPTION_LEVEL_KEY}":
         valid_until = datetime.now().astimezone() + timedelta(days=30)
-        context.bot_data.setdefault('user_subscriptions', {}).setdefault(user_id, {}).update({
+        bot_data = await get_bot_data()
+        bot_data.setdefault('user_subscriptions', {}).setdefault(str(user_id), {}).update({
             'level': PRO_SUBSCRIPTION_LEVEL_KEY,
             'valid_until': valid_until.isoformat()
         })
+        await set_bot_data(bot_data)
         text = f"🎉 Подписка <b>Профи</b> активирована до <b>{valid_until.strftime('%Y-%m-%d')}</b>! Наслаждайтесь расширенными лимитами."
+        user_data = await get_user_data(user_id)
         await update.message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard('main_menu', context),
+            reply_markup=generate_menu_keyboard('main_menu'),
             disable_web_page_preview=True
         )
         logger.info(f"Sent payment success message: {text}")
@@ -1302,31 +1073,17 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error: {context.error}")
     if update and update.effective_chat:
         chat_id = update.effective_chat.id
+        user_data = await get_user_data(update.effective_user.id)
         await context.bot.send_message(
             chat_id=chat_id,
             text="Произошла ошибка. Попробуйте снова или используйте /start.",
-            reply_markup=generate_menu_keyboard('main_menu', context),
+            reply_markup=generate_menu_keyboard('main_menu'),
             parse_mode=None
         )
         logger.info(f"Sent error handler message")
 
 async def main():
-    # Эта строка с отступом - она внутри функции main
-    # persistence = PicklePersistence(filepath="bot_persistence") # ЗАКОММЕНТИРУЙТЕ ИЛИ УДАЛITE ЭТУ СТРОКУ
-
-    # НОВАЯ ИНИЦИАЛИЗАЦИЯ PERSISTENCE
-    # Эта строка тоже с отступом
-    if DB: # DB - это наш firestore.client()
-        persistence = FirestorePersistence(firestore_client=DB)
-        await persistence.load_data() # Явно загружаем данные перед созданием Application
-    else:
-        # и эта
-        logger.warning("Клиент Firestore не доступен. Используется PicklePersistence для локальной отладки.")
-        persistence = PicklePersistence(filepath="bot_persistence_fallback")
-
-    # и так далее для всего остального кода функции main
-    app = Application.builder().token(TOKEN).persistence(persistence).build()
-
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", open_menu_command))
@@ -1347,10 +1104,23 @@ async def main():
         BotCommand("bonus", "Получить бонус"),
         BotCommand("help", "Справка")
     ]
-    await app.bot.set_my_commands(commands)  # Await the coroutine
+    await app.bot.set_my_commands(commands)
 
     logger.info("Bot is starting...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES)  # Await run_polling
+    await app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    asyncio.run(main())  # Run the async main function
+    # Configure Google Gemini API
+    if not GOOGLE_GEMINI_API_KEY or "YOUR_GOOGLE_GEMINI_API_KEY" in GOOGLE_GEMINI_API_KEY or "AIzaSy" not in GOOGLE_GEMINI_API_KEY:
+        logger.warning("Google Gemini API key is not set correctly.")
+    else:
+        try:
+            genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
+            logger.info("Google Gemini API configured successfully.")
+        except Exception as e:
+            logger.error(f"Failed to configure Google Gemini API: {str(e)}")
+
+    if not CUSTOM_GEMINI_PRO_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GEMINI_PRO_API_KEY or "sk-" not in CUSTOM_GEMINI_PRO_API_KEY:
+        logger.warning("Custom Gemini Pro API key is not set correctly.")
+
+    asyncio.run(main())
