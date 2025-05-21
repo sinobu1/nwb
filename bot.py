@@ -51,8 +51,8 @@ DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75
 DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0
 DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25
 PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
-DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 1 # Или другое значение для бесплатных попыток Grok
-DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25 # Или другое значение для подписчиков Grok
+DEFAULT_FREE_REQUESTS_GROK_DAILY = 1
+DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY = 25
 
 # --- КАНАЛ НОВОСТЕЙ И БОНУС ---
 NEWS_CHANNEL_USERNAME = "@timextech"
@@ -181,8 +181,8 @@ AVAILABLE_TEXT_MODELS = {
         "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
         "is_limited": True,  # Указывает, что модель имеет лимиты
         "limit_type": "subscription_custom_pro", # Тип лимита, обычно означает разные лимиты для подписчиков и не-подписчиков
-        "limit_if_no_subscription": 1,  # Количество попыток в день для пользователей БЕЗ подписки
-        "subscription_daily_limit": 25,  # Количество попыток в день для пользователей С ПОДПИСКОЙ
+        "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_GROK_DAILY,
+        "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY,
         "cost_category": "custom_api_grok_3_paid",
         "pricing_info": {}
     }
