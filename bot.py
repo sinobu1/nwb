@@ -725,8 +725,7 @@ class FirestorePersistence(BasePersistence):
     async def flush(self) -> None:
         # logger.debug("Вызван метод flush. Данные уже должны быть сохранены в Firestore при каждом update.")
         pass
-
-async def refresh_user_data(self, user_id: int) -> None:
+    async def refresh_user_data(self, user_id: int) -> None:
         """Обновляет данные для конкретного пользователя из Firestore."""
         if not self.store_user_data or not self._firestore_client:
             return
