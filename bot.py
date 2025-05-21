@@ -508,7 +508,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_mode_name = get_current_mode_details(context)['name']
     current_model_name = AVAILABLE_TEXT_MODELS[current_model_key]['name']
 
-    greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.<br>🧠 Агент: <b>{current_mode_name}</b><br>⚙️ Модель: <b>{current_model_name}</b><br><br>💬 Задавайте вопросы или используйте меню ниже!"
+    greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.\n🧠 Агент: <b>{current_mode_name}</b>\n⚙️ Модель: <b>{current_model_name}</b>\n\n💬 Задавайте вопросы или используйте меню ниже!"
     await update.message.reply_text(
         greeting,
         parse_mode=ParseMode.HTML,
