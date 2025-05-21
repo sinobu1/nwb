@@ -233,9 +233,20 @@ MENU_STRUCTURE = {
     }
 }
 
-# --- Инициализация Firebase ---
-cred = credentials.Certificate("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json")
-firebase_admin.initialize_app(cred)
+# Инициализация Firebase
+firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+if firebase_credentials:
+    try:
+        cred_dict = json.loads(firebase_credentials)
+        cred = credentials.Certificate(cred_dict)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse FIREBASE_CREDENTIALS: {e}")
+        raise
+else:
+    logger.warning("FIREBASE_CREDENTIALS not set, falling back to local file")
+    cred = credentials.Certificate("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json")
+
+initialize_app(cred)
 db = firestore.AsyncClient()
 
 # --- Вспомогательные функции для работы с Firestore ---
