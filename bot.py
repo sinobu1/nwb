@@ -311,9 +311,15 @@ async def set_bot_data(data: dict):
 async def get_current_mode_details(user_id: int) -> dict:
     user_data = await get_user_data(user_id)
     current_model_key = await get_current_model_key(user_id)
+    mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
+    # Reset to default if mode is invalid or grok_3_custom_mode
+    if mode_key not in AI_MODES or mode_key == "grok_3_custom_mode":
+        mode_key = DEFAULT_AI_MODE_KEY
+        user_data['current_ai_mode'] = mode_key
+        await set_user_data(user_id, user_data)
+        logger.info(f"Reset invalid mode '{mode_key}' to default for user {user_id}")
     if current_model_key == "custom_api_gemini_2_5_pro":
         return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
-    mode_key = user_data.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
     return AI_MODES.get(mode_key, AI_MODES[DEFAULT_AI_MODE_KEY])
 
 async def get_current_model_key(user_id: int) -> str:
@@ -965,6 +971,9 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 'selected_model_id': config["id"],
                 'selected_api_type': config["api_type"]
             })
+            # Reset current_ai_mode to default if selecting Grok 3
+            if target == "custom_api_grok_3":
+                user_data['current_ai_mode'] = DEFAULT_AI_MODE_KEY
             await set_user_data(user_id, user_data)
             bot_data = await get_bot_data()
             today_str = datetime.now().strftime("%Y-%m-%d")
@@ -1081,10 +1090,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if model_config["id"] == "grok-3-beta":
                 # Попробуем несколько возможных ключей для Grok
-                for key in ["output", "text", "choices", "message"]:
+                for key in ["output", "text", "choices", "message", "content"]:
                     if key in response_data:
                         if key == "choices" and isinstance(response_data[key], list) and len(response_data[key]) > 0:
                             extracted_text = response_data[key][0].get("message", {}).get("content", "").strip()
+                        elif key == "message" and isinstance(response_data[key], dict):
+                            extracted_text = response_data[key].get("content", "").strip()
                         else:
                             extracted_text = str(response_data[key]).strip()
                         break
@@ -1092,6 +1103,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # Дополнительная попытка для вложенных структур
                     if "message" in response_data and isinstance(response_data["message"], dict):
                         extracted_text = response_data["message"].get("content", "").strip()
+                    elif "choices" in response_data and isinstance(response_data["choices"], list) and len(response_data["choices"]) > 0:
+                        extracted_text = response_data["choices"][0].get("text", "").strip()
             elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
                 extracted_text = response_data.get("text", "").strip()
 
