@@ -1237,6 +1237,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Failed to notify admin {YOUR_ADMIN_ID}: {e}")
 
+# ... (all imports, configurations, and other functions remain unchanged) ...
+
 async def main():
     app = Application.builder().token(TOKEN).read_timeout(30).connect_timeout(30).build()
 
@@ -1263,26 +1265,38 @@ async def main():
     await app.bot.set_my_commands(bot_commands)
     logger.info("Bot commands set")
     
-    # Initialize and run polling in the existing event loop
+    # Initialize and run polling
     await app.initialize()
     await app.start()
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
-    
-    # Properly shut down the application
-    await app.stop()
-    await app.shutdown()
+    try:
+        await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+    finally:
+        # Ensure proper shutdown without closing the loop
+        await app.stop()
+        await app.shutdown()
+        logger.info("Application shutdown complete")
 
-def validate_api_keys():
-    keys = [
-        (GOOGLE_GEMINI_API_KEY, "Google Gemini API key", "AIzaSy"),
-        (CUSTOM_GEMINI_PRO_API_KEY, "Custom Gemini Pro API key", "sk-"),
-        (CUSTOM_GROK_3_API_KEY, "Custom Grok 3 API key", "sk-"),
-        (CUSTOM_GPT4O_MINI_API_KEY, "Custom GPT-4o mini API key", "sk-"),
-        (PAYMENT_PROVIDER_TOKEN, "Payment Provider Token", None)
-    ]
-    for key, name, prefix in keys:
-        if not key or (prefix and not key.startswith(prefix)) or "YOUR_" in key:
-            logger.warning(f"{name} is missing or incorrectly formatted.")
+if __name__ == '__main__':
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            logger.warning("Existing event loop is running, scheduling main task.")
+            loop.create_task(main())
+            # Keep the loop running indefinitely if it's already active
+            loop.run_forever()
+        else:
+            loop.run_until_complete(main())
+    except RuntimeError as e:
+        logger.error(f"Event loop error: {e}")
+        # Create a new loop if the existing one is unusable
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    finally:
+        # Avoid closing the loop to prevent RuntimeError
+        logger.info("Bot execution completed")
 
 if __name__ == '__main__':
     try:
