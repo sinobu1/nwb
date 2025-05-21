@@ -866,7 +866,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
             actual_l = get_user_actual_limit_for_model(user_id, target, context)
             limit_str = f'Лимит: {current_c_display}/{actual_l} в день'
-            new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b><br>{limit_str}"
+            new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b>\n{limit_str}"  # Заменили <br> на \n
         else:
             new_text = "⚠️ Ошибка: Модель не найдена."
         await update.message.reply_text(
