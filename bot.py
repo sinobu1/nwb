@@ -35,6 +35,7 @@ TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAq
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
 CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
 CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
+CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
 PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602")
 YOUR_ADMIN_ID = 489230152
 
@@ -55,6 +56,8 @@ PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
 NEWS_CHANNEL_USERNAME = "@timextech"
 NEWS_CHANNEL_LINK = "https://t.me/timextech"
 NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
+NEWS_CHANNEL_BONUS_GENERATIONS = 1
+NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_grok_3"
 NEWS_CHANNEL_BONUS_GENERATIONS = 1
 
 # --- РЕЖИМЫ РАБОТЫ ИИ ---
@@ -160,6 +163,19 @@ AVAILABLE_TEXT_MODELS = {
         "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY,
         "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY,
         "cost_category": "custom_api_pro_paid",
+        "pricing_info": {}
+    },
+    "custom_api_grok_3": {
+        "name": "Grok 3",
+        "id": "grok-3-beta",
+        "api_type": "custom_http_api",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
+        "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
+        "is_limited": True,
+        "limit_type": "subscription_custom_pro",
+        "limit_if_no_subscription": 0,  # Бесплатный лимит для Grok 3
+        "subscription_daily_limit": 25,  # Лимит для подписчиков
+        "cost_category": "custom_api_grok_3_paid",
         "pricing_info": {}
     }
 }
@@ -1037,14 +1053,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response_text = f"Ошибка API: {str(e)}"
             logger.error(f"API error for user {user_id}: {str(e)}")
     elif model_config["api_type"] == "custom_http_api":
+        api_key = CUSTOM_GEMINI_PRO_API_KEY if model_config["id"] == "gemini-2.5-pro-preview-03-25" else CUSTOM_GROK_3_API_KEY
         headers = {
-            "Authorization": f"Bearer {CUSTOM_GEMINI_PRO_API_KEY}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
         }
         payload = {
-            "prompt": full_prompt,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            "model": model_config["id"],
+            "is_sync": True,  # Синхронный режим для Grok 3
             "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB,
-            "model": model_config["id"]
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "n": 1
         }
         try:
             response = await asyncio.get_event_loop().run_in_executor(
@@ -1052,7 +1077,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             response.raise_for_status()
             response_data = response.json()
-            response_text = response_data.get("text", "Ответ не получен.").strip()
+            if model_config["id"] == "grok-3-beta" and response_data.get("status") == "success":
+                response_text = response_data.get("output", "Ответ не получен.").strip()
+            else:
+                response_text = response_data.get("text", "Ответ не получен.").strip()
         except requests.exceptions.RequestException as e:
             response_text = f"Ошибка API: {str(e)}"
             logger.error(f"Custom API error for user {user_id}: {str(e)}")
@@ -1155,5 +1183,8 @@ if __name__ == '__main__':
 
     if not CUSTOM_GEMINI_PRO_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GEMINI_PRO_API_KEY or "sk-" not in CUSTOM_GEMINI_PRO_API_KEY:
         logger.warning("Custom Gemini Pro API key is not set correctly.")
+
+    if not CUSTOM_GROK_3_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GROK_3_API_KEY or "sk-" not in CUSTOM_GROK_3_API_KEY:
+        logger.warning("Custom Grok 3 API key is not set correctly.")
 
     asyncio.run(main())
