@@ -371,7 +371,7 @@ def check_and_log_request_attempt(user_id: int, model_key: str, context: Context
             if not context.user_data.get('claimed_news_bonus', False):
                 message_parts.append(f'💡 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для бонусной генерации!')
             elif context.user_data.get('news_bonus_uses_left', 0) == 0:
-                message_parts.append("ℹ️ Бонус за подписку использован.")
+                message_parts.append(f"ℹ️ Бонус за подписку использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).")
         message_parts.append("Попробуйте завтра или купите подписку в меню «Подписка».")
         return False, "\n".join(message_parts), current_daily_count
     return True, "", current_daily_count
@@ -481,20 +481,13 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
     text = menu["title"]
     reply_markup = generate_menu_keyboard(menu_key, context)
     
-    try:
-        await update.message.reply_text(
-            text,
-            reply_markup=reply_markup,
-            parse_mode=None,
-            disable_web_page_preview=True
-        )
-        logger.info(f"Sent menu message for {menu_key}: {text}")
-    except telegram.error.BadRequest as e:
-        logger.error(f"Error sending menu message for {menu_key}: {e}")
-        await update.message.reply_text(
-            "Ошибка при отображении меню. Попробуйте снова.",
-            reply_markup=generate_menu_keyboard("main_menu", context)
-        )
+    await update.message.reply_text(
+        text,
+        reply_markup=reply_markup,
+        parse_mode=None,
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent menu message for {menu_key}: {text}")
 
 # --- Обработчики команд ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -516,22 +509,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_model_name = AVAILABLE_TEXT_MODELS[current_model_key]['name']
 
     greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.<br>🧠 Агент: <b>{current_mode_name}</b><br>⚙️ Модель: <b>{current_model_name}</b><br><br>💬 Задавайте вопросы или используйте меню ниже!"
-    try:
-        await update.message.reply_text(
-            greeting,
-            parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard("main_menu", context),
-            disable_web_page_preview=True
-        )
-        logger.info(f"Sent start message for user {user_id}: {greeting}")
-    except telegram.error.BadRequest as e:
-        logger.error(f"Error sending /start message: {e}")
-        plain_text = f"Привет! Я ИИ-бот Gemini.\nАгент: {current_mode_name}\nМодель: {current_model_name}\n\nЗадавайте вопросы или используйте меню!"
-        await update.message.reply_text(
-            plain_text,
-            reply_markup=generate_menu_keyboard("main_menu", context)
-        )
-    logger.info(f"Start command processed for user {user_id}.")
+    await update.message.reply_text(
+        greeting,
+        parse_mode=ParseMode.HTML,
+        reply_markup=generate_menu_keyboard("main_menu", context),
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent start message for user {user_id}: {greeting}")
 
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['user_command_message'] = {
@@ -572,6 +556,71 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     await try_delete_user_message(update, context)
     await show_help(update, context)
+
+async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    await try_delete_user_message(update, context)
+
+    user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
+    display_sub_level = "Бесплатный доступ"
+    subscription_active = False
+    if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
+        try:
+            valid_until_dt = datetime.fromisoformat(user_subscription_details['valid_until'])
+            if datetime.now(valid_until_dt.tzinfo).date() <= valid_until_dt.date():
+                display_sub_level = f"Подписка (до {valid_until_dt.strftime('%Y-%m-%d')})"
+                subscription_active = True
+            else:
+                display_sub_level = f"Подписка (истекла)"
+        except Exception:
+            display_sub_level = "Подписка (ошибка даты)"
+
+    usage_text_parts = [
+        "<b>📊 Ваши лимиты</b>",
+        f"Статус: <b>{display_sub_level}</b>",
+        "",
+        "Лимиты запросов:"
+    ]
+    for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
+        if model_c.get("is_limited"):
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
+            model_daily_usage = user_model_counts.get(model_k, {'date': '', 'count': 0})
+            current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
+            actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
+            bonus_note = ""
+            if model_k == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False) and context.user_data.get('news_bonus_uses_left', 0) > 0:
+                bonus_note = " (вкл. бонус)"
+            usage_text_parts.append(f"▫️ {model_c['name']}: <b>{current_c_display}/{actual_l}</b>{bonus_note}")
+
+    if NEWS_CHANNEL_USERNAME and NEWS_CHANNEL_USERNAME != "@YourNewsChannelHandle":
+        bonus_model_name = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', "бонусной модели")
+        bonus_info = ""
+        if not context.user_data.get('claimed_news_bonus', False):
+            bonus_info = f'🎁 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерации ({bonus_model_name})!'
+        elif (bonus_uses_left := context.user_data.get('news_bonus_uses_left', 0)) > 0:
+            bonus_info = f'🎁 У вас <b>{bonus_uses_left}</b> бонусных генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
+        else:
+            bonus_info = f'ℹ️ Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
+        usage_text_parts.append(bonus_info)
+
+    if not subscription_active:
+        usage_text_parts.append("Больше лимитов? Меню «Подписка».")
+
+    final_usage_text = "\n".join(usage_text_parts)
+    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
+
+    await update.message.reply_text(
+        final_usage_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent limits message: {final_usage_text}")
 
 async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -660,83 +709,6 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         )
         logger.error(f"BadRequest error checking channel membership: {e}")
         logger.info(f"Sent bonus error message: {reply_message_on_error}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for bonus error: {e}")
-            await update.message.reply_text(
-                reply_message_on_error,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
-
-async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    context.user_data['user_command_message'] = {
-        'message_id': update.message.message_id,
-        'timestamp': datetime.now().isoformat()
-    }
-    await try_delete_user_message(update, context)
-
-    user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
-    display_sub_level = "Бесплатный доступ"
-    subscription_active = False
-    if user_subscription_details.get('level') == PRO_SUBSCRIPTION_LEVEL_KEY and user_subscription_details.get('valid_until'):
-        try:
-            valid_until_dt = datetime.fromisoformat(user_subscription_details['valid_until'])
-            if datetime.now(valid_until_dt.tzinfo).date() <= valid_until_dt.date():
-                display_sub_level = f"Подписка (до {valid_until_dt.strftime('%Y-%m-%d')})"
-                subscription_active = True
-            else:
-                display_sub_level = f"Подписка (истекла)"
-        except Exception:
-            display_sub_level = "Подписка (ошибка даты)"
-
-    usage_text_parts = [
-        "<b>📊 Ваши лимиты</b>",
-        f"Статус: <b>{display_sub_level}</b>",
-        "",
-        "Лимиты запросов:"
-    ]
-    for model_k, model_c in AVAILABLE_TEXT_MODELS.items():
-        if model_c.get("is_limited"):
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            user_model_counts = context.bot_data.get('all_user_daily_counts', {}).get(user_id, {})
-            model_daily_usage = user_model_counts.get(model_k, {'date': '', 'count': 0})
-            current_c_display = model_daily_usage['count'] if model_daily_usage['date'] == today_str else 0
-            actual_l = get_user_actual_limit_for_model(user_id, model_k, context)
-            bonus_note = ""
-            if model_k == NEWS_CHANNEL_BONUS_MODEL_KEY and context.user_data.get('claimed_news_bonus', False) and context.user_data.get('news_bonus_uses_left', 0) > 0:
-                bonus_note = " (вкл. бонус)"
-            usage_text_parts.append(f"▫️ {model_c['name']}: <b>{current_c_display}/{actual_l}</b>{bonus_note}")
-
-    if NEWS_CHANNEL_USERNAME and NEWS_CHANNEL_USERNAME != "@YourNewsChannelHandle":
-        bonus_model_name = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', "бонусной модели")
-        bonus_info = ""
-        if not context.user_data.get('claimed_news_bonus', False):
-            bonus_info = f'🎁 Подпишитесь на <a href="{NEWS_CHANNEL_LINK}">канал</a> для <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> генерации ({bonus_model_name})!'
-        elif (bonus_uses_left := context.user_data.get('news_bonus_uses_left', 0)) > 0:
-            bonus_info = f'🎁 У вас <b>{bonus_uses_left}</b> бонусных генераций для {bonus_model_name} (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
-        else:
-            bonus_info = f'ℹ️ Бонус для {bonus_model_name} использован (<a href="{NEWS_CHANNEL_LINK}">канал</a>).'
-        usage_text_parts.append(bonus_info)
-
-    if not subscription_active:
-        usage_text_parts.append("Больше лимитов? Меню «Подписка».")
-
-    final_usage_text = "\n".join(usage_text_parts)
-    reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
-
-    await update.message.reply_text(
-        final_usage_text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=reply_markup,
-        disable_web_page_preview=True
-    )
-    logger.info(f"Sent limits message: {final_usage_text}")
-    except telegram.error.BadRequest as e:
-        logger.error(f"Error sending message for show_limits: {e}")
-        await update.message.reply_text(
-            final_usage_text.replace('<b>', '').replace('</b>', ''),
-            reply_markup=reply_markup
-        )
 
 async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -769,20 +741,13 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     final_sub_text = "\n".join(sub_text_parts)
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'subscription_submenu'), context)
 
-    try:
-        await update.message.reply_text(
-            final_sub_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
-            disable_web_page_preview=True
-        )
-        logger.info(f"Sent subscription message: {final_sub_text}")
-    except telegram.error.BadRequest as e:
-        logger.error(f"Error sending message for show_subscription: {e}")
-        await update.message.reply_text(
-            final_sub_text.replace('<b>', '').replace('</b>', ''),
-            reply_markup=reply_markup
-        )
+    await update.message.reply_text(
+        final_sub_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent subscription message: {final_sub_text}")
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['user_command_message'] = {
@@ -809,20 +774,13 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'help_submenu'), context)
 
-    try:
-        await update.message.reply_text(
-            help_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
-            disable_web_page_preview=True
-        )
-        logger.info(f"Sent help message: {help_text}")
-    except telegram.error.BadRequest as e:
-        logger.error(f"Error sending message for show_help: {e}")
-        await update.message.reply_text(
-            help_text.replace('<b>', '').replace('</b>', ''),
-            reply_markup=reply_markup
-        )
+    await update.message.reply_text(
+        help_text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent help message: {help_text}")
 
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -864,19 +822,12 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not selected_item:
         logger.warning(f"Button '{button_text}' not found in any menu. Current menu: {current_menu_key}")
         text = "Команда не распознана. Используйте кнопки меню."
-        try:
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(current_menu_key, context),
-                parse_mode=None
-            )
-            logger.info(f"Sent unrecognized command message: {text}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for unrecognized command: {e}")
-            await update.message.reply_text(
-                text,
-                reply_markup=generate_menu_keyboard(current_menu_key, context)
-            )
+        await update.message.reply_text(
+            text,
+            reply_markup=generate_menu_keyboard(current_menu_key, context),
+            parse_mode=None
+        )
+        logger.info(f"Sent unrecognized command message: {text}")
         return
 
     action = selected_item["action"]
@@ -891,29 +842,18 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             context.user_data['current_ai_mode'] = target
             details = AI_MODES[target]
             new_text = f"🤖 Агент изменён на: <b>{details['name']}</b><br><br>{details['welcome']}"
-            plain_fallback = f"Агент: {details['name']}.\n{details['welcome']}"
         elif target == "gemini_pro_custom_mode":
             new_text = "Режим для Gemini Pro выбирается автоматически."
-            plain_fallback = "Режим для Gemini Pro выбирается автоматически."
         else:
             new_text = "⚠️ Ошибка: Агент не найден."
-            plain_fallback = "⚠️ Ошибка: Агент не найден."
-        try:
-            await update.message.reply_text(
-                new_text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard(return_menu, context),
-                disable_web_page_preview=True
-            )
-            logger.info(f"Sent set_agent message for {target}: {new_text}")
-            context.user_data['current_menu'] = return_menu
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for set_agent {target}: {e}")
-            await update.message.reply_text(
-                plain_fallback,
-                reply_markup=generate_menu_keyboard(return_menu, context)
-            )
-            context.user_data['current_menu'] = return_menu
+        await update.message.reply_text(
+            new_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(return_menu, context),
+            disable_web_page_preview=True
+        )
+        logger.info(f"Sent set_agent message for {target}: {new_text}")
+        context.user_data['current_menu'] = return_menu
     elif action == "set_model":
         return_menu = current_menu.get("parent", "main_menu")
         if target in AVAILABLE_TEXT_MODELS:
@@ -927,26 +867,16 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             actual_l = get_user_actual_limit_for_model(user_id, target, context)
             limit_str = f'Лимит: {current_c_display}/{actual_l} в день'
             new_text = f"⚙️ Модель изменена на: <b>{config['name']}</b><br>{limit_str}"
-            plain_fallback = f"Модель: {config['name']}. {limit_str}."
         else:
             new_text = "⚠️ Ошибка: Модель не найдена."
-            plain_fallback = "⚠️ Ошибка: Модель не найдена."
-        try:
-            await update.message.reply_text(
-                new_text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard(return_menu, context),
-                disable_web_page_preview=True
-            )
-            logger.info(f"Sent set_model message for {target}: {new_text}")
-            context.user_data['current_menu'] = return_menu
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending message for set_model {target}: {e}")
-            await update.message.reply_text(
-                plain_fallback,
-                reply_markup=generate_menu_keyboard(return_menu, context)
-            )
-            context.user_data['current_menu'] = return_menu
+        await update.message.reply_text(
+            new_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(return_menu, context),
+            disable_web_page_preview=True
+        )
+        logger.info(f"Sent set_model message for {target}: {new_text}")
+        context.user_data['current_menu'] = return_menu
     elif action == "show_limits":
         await show_limits(update, context)
     elif action == "check_bonus":
@@ -967,19 +897,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(user_message) < MIN_AI_REQUEST_LENGTH:
         logger.info(f"Text '{user_message}' is too short for AI request, ignoring")
-        try:
-            await update.message.reply_text(
-                "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                parse_mode=None
-            )
-            logger.info(f"Sent short request message")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending short request message: {e}")
-            await update.message.reply_text(
-                "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+        await update.message.reply_text(
+            "Запрос слишком короткий. Пожалуйста, уточните ваш вопрос или используйте меню.",
+            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            parse_mode=None
+        )
+        logger.info(f"Sent short request message")
         return
 
     logger.info(f"Processing AI request: '{user_message}'")
@@ -989,105 +912,72 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     can_proceed, limit_message, current_count = check_and_log_request_attempt(user_id, current_model_key, context)
 
     if not can_proceed:
-        try:
-            await update.message.reply_text(
-                limit_message,
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                disable_web_page_preview=True
-            )
-            logger.info(f"Sent limit reached message: {limit_message}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending limit message: {e}")
-            await update.message.reply_text(
-                limit_message.replace('<b>', '').replace('</b>', ''),
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+        await update.message.reply_text(
+            limit_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+            disable_web_page_preview=True
+        )
+        logger.info(f"Sent limit reached message: {limit_message}")
         return
 
-    try:
-        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-        mode_details = get_current_mode_details(context)
-        system_prompt = mode_details["prompt"]
-        full_prompt = f"{system_prompt}\n\n**Пользовательский запрос:**\n{user_message}"
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    mode_details = get_current_mode_details(context)
+    system_prompt = mode_details["prompt"]
+    full_prompt = f"{system_prompt}\n\n**Пользовательский запрос:**\n{user_message}"
 
-        if model_config["api_type"] == "google_genai":
-            model = genai.GenerativeModel(
-                model_name=model_config["id"],
-                generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB}
-            )
-            try:
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: model.generate_content(full_prompt)
-                )
-                response_text = response.text.strip() if response.text else "Ответ не получен."
-            except google.api_core.exceptions.ResourceExhausted:
-                response_text = "Лимит API исчерпан. Попробуйте позже."
-                logger.error(f"ResourceExhausted for user {user_id} with model {model_config['id']}")
-            except Exception as e:
-                response_text = f"Ошибка API: {str(e)}"
-                logger.error(f"API error for user {user_id}: {str(e)}")
-        elif model_config["api_type"] == "custom_http_api":
-            headers = {
-                "Authorization": f"Bearer {CUSTOM_GEMINI_PRO_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "prompt": full_prompt,
-                "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB,
-                "model": model_config["id"]
-            }
-            try:
-                response = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
-                )
-                response.raise_for_status()
-                response_data = response.json()
-                response_text = response_data.get("text", "Ответ не получен.").strip()
-            except requests.exceptions.RequestException as e:
-                response_text = f"Ошибка API: {str(e)}"
-                logger.error(f"Custom API error for user {user_id}: {str(e)}")
-        else:
-            response_text = "Неизвестный тип API."
-            logger.error(f"Unknown api_type for model {current_model_key}")
-
-        response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
-        if was_truncated:
-            logger.info(f"Response for user {user_id} was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} characters")
-
-        increment_request_count(user_id, current_model_key, context)
+    if model_config["api_type"] == "google_genai":
+        model = genai.GenerativeModel(
+            model_name=model_config["id"],
+            generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB}
+        )
         try:
-            await update.message.reply_text(
-                response_text,
-                parse_mode=None,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                disable_web_page_preview=True
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: model.generate_content(full_prompt)
             )
-            logger.info(f"Sent AI response for request: '{user_message}': {response_text[:100]}...")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending AI response: {e}")
-            await update.message.reply_text(
-                "Ошибка при отправке ответа. Попробуйте снова.",
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
-
-    except Exception as e:
-        logger.error(f"Unexpected error processing text for user {user_id}: {str(e)}")
-        traceback.print_exc()
-        error_message = "Произошла ошибка при обработке запроса. Попробуйте снова."
+            response_text = response.text.strip() if response.text else "Ответ не получен."
+        except google.api_core.exceptions.ResourceExhausted:
+            response_text = "Лимит API исчерпан. Попробуйте позже."
+            logger.error(f"ResourceExhausted for user {user_id} with model {model_config['id']}")
+        except Exception as e:
+            response_text = f"Ошибка API: {str(e)}"
+            logger.error(f"API error for user {user_id}: {str(e)}")
+    elif model_config["api_type"] == "custom_http_api":
+        headers = {
+            "Authorization": f"Bearer {CUSTOM_GEMINI_PRO_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "prompt": full_prompt,
+            "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB,
+            "model": model_config["id"]
+        }
         try:
-            await update.message.reply_text(
-                error_message,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
-                parse_mode=None
+            response = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
             )
-            logger.info(f"Sent error message: {error_message}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending error message: {e}")
-            await update.message.reply_text(
-                error_message,
-                reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
-            )
+            response.raise_for_status()
+            response_data = response.json()
+            response_text = response_data.get("text", "Ответ не получен.").strip()
+        except requests.exceptions.RequestException as e:
+            response_text = f"Ошибка API: {str(e)}"
+            logger.error(f"Custom API error for user {user_id}: {str(e)}")
+    else:
+        response_text = "Неизвестный тип API."
+        logger.error(f"Unknown api_type for model {current_model_key}")
+
+    response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
+    if was_truncated:
+        logger.info(f"Response for user {user_id} was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} characters")
+
+    increment_request_count(user_id, current_model_key, context)
+    await update.message.reply_text(
+        response_text,
+        parse_mode=None,
+        reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent AI response for request: '{user_message}': {response_text[:100]}...")
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
@@ -1106,35 +996,25 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             'valid_until': valid_until.isoformat()
         })
         text = f"🎉 Подписка <b>Профи</b> активирована до <b>{valid_until.strftime('%Y-%m-%d')}</b>! Наслаждайтесь расширенными лимитами."
-        try:
-            await update.message.reply_text(
-                text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard('main_menu', context),
-                disable_web_page_preview=True
-            )
-            logger.info(f"Sent payment success message: {text}")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending payment success message: {e}")
-            await update.message.reply_text(
-                text.replace('<b>', '').replace('</b>', ''),
-                reply_markup=generate_menu_keyboard('main_menu', context)
-            )
+        await update.message.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard('main_menu', context),
+            disable_web_page_preview=True
+        )
+        logger.info(f"Sent payment success message: {text}")
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error: {context.error}")
     if update and update.effective_chat:
         chat_id = update.effective_chat.id
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="Произошла ошибка. Попробуйте снова или используйте /start.",
-                reply_markup=generate_menu_keyboard('main_menu', context),
-                parse_mode=None
-            )
-            logger.info(f"Sent error handler message")
-        except telegram.error.BadRequest as e:
-            logger.error(f"Error sending error message: {e}")
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Произошла ошибка. Попробуйте снова или используйте /start.",
+            reply_markup=generate_menu_keyboard('main_menu', context),
+            parse_mode=None
+        )
+        logger.info(f"Sent error handler message")
 
 def main():
     persistence = PicklePersistence(filepath="bot_persistence")
