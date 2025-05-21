@@ -1012,7 +1012,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Text '{user_message}' is a menu button, skipping handle_text")
         return
 
-    if len(user_message) < MIN_AI_REQUEST_LENGTH:
+    if len(user_message) < MIN_AI_REQUEST_LENGTH: #
         logger.info(f"Text '{user_message}' is too short for AI request, ignoring")
         user_data = await get_user_data(user_id)
         await update.message.reply_text(
@@ -1025,11 +1025,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"Processing AI request: '{user_message}'")
 
-    current_model_key = await get_current_model_key(user_id)
-    model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
-    can_proceed, limit_message, current_count = await check_and_log_request_attempt(user_id, current_model_key)
+    current_model_key = await get_current_model_key(user_id) #
+    model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]) #
+    can_proceed, limit_message, current_count = await check_and_log_request_attempt(user_id, current_model_key) #
 
-    if not can_proceed:
+    if not can_proceed: #
         user_data = await get_user_data(user_id)
         await update.message.reply_text(
             limit_message,
@@ -1040,98 +1040,111 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Sent limit reached message: {limit_message}")
         return
 
-    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-    mode_details = await get_current_mode_details(user_id)
-    system_prompt = mode_details["prompt"]
-    full_prompt = f"{system_prompt}\n\n**Пользовательский запрос:**\n{user_message}"
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING) #
+    mode_details = await get_current_mode_details(user_id) #
+    system_prompt = mode_details["prompt"] #
+    full_prompt = f"{system_prompt}\n\n**Пользовательский запрос:**\n{user_message}" #
 
-    if model_config["api_type"] == "google_genai":
+    # --- НАЧАЛО ПРЕДЛАГАЕМОГО ИСПРАВЛЕНИЯ ---
+    api_type_from_config = model_config.get("api_type") # Используем .get() для безопасного извлечения
+    if api_type_from_config:
+        api_type_from_config = api_type_from_config.strip() # Удаляем возможные начальные/конечные пробелы
+    # --- КОНЕЦ ПРЕДЛАГАЕМОГО ИСПРАВЛЕНИЯ ---
+
+    # Используем 'api_type_from_config' в условиях
+    if api_type_from_config == "google_genai": #
         model = genai.GenerativeModel(
-            model_name=model_config["id"],
-            generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB}
+            model_name=model_config["id"], #
+            generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB} #
         )
         try:
             response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: model.generate_content(full_prompt)
+                None, lambda: model.generate_content(full_prompt) #
             )
-            response_text = response.text.strip() if response.text else "Ответ не получен."
-        except google.api_core.exceptions.ResourceExhausted:
-            response_text = "Лимит API исчерпан. Попробуйте позже."
-            logger.error(f"ResourceExhausted for user {user_id} with model {model_config['id']}")
+            response_text = response.text.strip() if response.text else "Ответ не получен." #
+        except google.api_core.exceptions.ResourceExhausted: #
+            response_text = "Лимит API исчерпан. Попробуйте позже." #
+            logger.error(f"ResourceExhausted for user {user_id} with model {model_config['id']}") #
         except Exception as e:
-            response_text = f"Ошибка API: {str(e)}"
-            logger.error(f"API error for user {user_id}: {str(e)}")
-    elif model_config["api_type"] == "custom_http_api":
-        api_key = CUSTOM_GEMINI_PRO_API_KEY if model_config["id"] == "gemini-2.5-pro-preview-03-25" else CUSTOM_GROK_3_API_KEY
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json"
+            response_text = f"Ошибка API: {str(e)}" #
+            logger.error(f"API error for user {user_id}: {str(e)}") #
+    elif api_type_from_config == "custom_http_api": #
+        # Логика для custom_http_api остается прежней, но использует model_config для деталей
+        api_key = CUSTOM_GEMINI_PRO_API_KEY if model_config["id"] == "gemini-2.5-pro-preview-03-25" else CUSTOM_GROK_3_API_KEY #
+        headers = { #
+            "Authorization": f"Bearer {api_key}", #
+            "Content-Type": "application/json", #
+            "Accept": "application/json" #
         }
-        payload = {
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
+        payload = { #
+            "messages": [ #
+                {"role": "system", "content": system_prompt}, #
+                {"role": "user", "content": user_message} #
             ],
-            "model": model_config["id"],
-            "is_sync": True,
-            "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB,
-            "temperature": 1.0,
-            "top_p": 1.0,
-            "n": 1
+            "model": model_config["id"], #
+            "is_sync": True, #
+            "max_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB, #
+            "temperature": 1.0, #
+            "top_p": 1.0, #
+            "n": 1 #
         }
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
+            response_obj = await asyncio.get_event_loop().run_in_executor( # Используем response_obj чтобы не конфликтовать с response из google_genai
+                None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30) #
             )
-            response.raise_for_status()
-            response_data = response.json()
-            extracted_text = None
+            response_obj.raise_for_status() #
+            response_data = response_obj.json() #
+            extracted_text = None #
 
-            if model_config["id"] == "grok-3-beta":
-                # Try extracting from response array
-                if "response" in response_data and isinstance(response_data["response"], list) and len(response_data["response"]) > 0:
-                    completion = response_data["response"][0]
-                    if "choices" in completion and isinstance(completion["choices"], list) and len(completion["choices"]) > 0:
-                        choice = completion["choices"][0]
-                        if "message" in choice and isinstance(choice["message"], dict):
-                            extracted_text = choice["message"].get("content", "").strip()
-                # Fallback to other keys
-                if not extracted_text:
-                    for key in ["output", "text", "content"]:
-                        if key in response_data:
-                            extracted_text = str(response_data[key]).strip()
-                            break
-            elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
-                extracted_text = response_data.get("text", "").strip()
+            if model_config["id"] == "grok-3-beta": #
+                if "response" in response_data and isinstance(response_data["response"], list) and len(response_data["response"]) > 0: #
+                    completion = response_data["response"][0] #
+                    if "choices" in completion and isinstance(completion["choices"], list) and len(completion["choices"]) > 0: #
+                        choice = completion["choices"][0] #
+                        if "message" in choice and isinstance(choice["message"], dict): #
+                            extracted_text = choice["message"].get("content", "").strip() #
+                if not extracted_text: #
+                    for key_fb in ["output", "text", "content"]: #
+                        if key_fb in response_data: #
+                            extracted_text = str(response_data[key_fb]).strip() #
+                            break #
+            elif model_config["id"] == "gemini-2.5-pro-preview-03-25": #
+                extracted_text = response_data.get("text", "").strip() #
 
-            if extracted_text:
-                response_text = extracted_text
+            if extracted_text: #
+                response_text = extracted_text #
             else:
-                response_text = "Ответ не получен."
-                logger.warning(f"Could not extract text for model {model_config['id']}. Response data: {response_data}")
-        except requests.exceptions.RequestException as e:
-            response_text = f"Ошибка API: {str(e)}"
-            logger.error(f"Request error for model {model_config['id']}: {str(e)}")
-            logger.debug(f"Response content: {response.text if response else 'No response'}")
+                response_text = "Ответ не получен." #
+                logger.warning(f"Could not extract text for model {model_config['id']}. Response data: {response_data}") #
+        except requests.exceptions.RequestException as e: #
+            response_text = f"Ошибка API: {str(e)}" #
+            logger.error(f"Request error for model {model_config['id']}: {str(e)}") #
+            # Добавлена проверка существования response_obj перед доступом к .text
+            response_content_debug = 'No response object'
+            if 'response_obj' in locals() and response_obj:
+                 response_content_debug = response_obj.text
+            logger.debug(f"Response content: {response_content_debug}") #
             
-        else:
-            response_text = "Неизвестный тип API."
-            logger.error(f"Unknown api_type for model {current_model_key}")
+    else: #
+        # --- МОДИФИКАЦИЯ ЛОГИРОВАНИЯ ЗДЕСЬ ---
+        response_text = "Неизвестный тип API." #
+        # Логируем фактическое значение api_type, которое было проверено
+        logger.error(f"Unknown api_type '{api_type_from_config}' for model {current_model_key}. Please check model configuration.") #
 
-    response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
-    if was_truncated:
-        logger.info(f"Response for user {user_id} was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} characters")
 
-    await increment_request_count(user_id, current_model_key)
-    user_data = await get_user_data(user_id)
+    response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM) #
+    if was_truncated: #
+        logger.info(f"Response for user {user_id} was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} characters") #
+
+    await increment_request_count(user_id, current_model_key) #
+    user_data = await get_user_data(user_id) #
     await update.message.reply_text(
         response_text,
         parse_mode=None,
         reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')),
         disable_web_page_preview=True
     )
-    logger.info(f"Sent AI response for request: '{user_message}': {response_text[:100]}...")
+    logger.info(f"Sent AI response for request: '{user_message}': {response_text[:100]}...") 
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
