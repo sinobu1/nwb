@@ -403,6 +403,35 @@ def increment_request_count(user_id: int, model_key: str, context: ContextTypes.
     model_daily_usage['count'] += 1
     logger.info(f"User {user_id} count for {model_key} incremented to {model_daily_usage['count']}")
 
+# --- Удаление пользовательских сообщений с командами или кнопками ---
+async def try_delete_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_command_message = context.user_data.get('user_command_message', {})
+    message_id = user_command_message.get('message_id')
+    timestamp = user_command_message.get('timestamp')
+
+    if not message_id or not timestamp:
+        return
+
+    try:
+        msg_time = datetime.fromisoformat(timestamp)
+        if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
+            logger.info(f"User message {message_id} is older than 48 hours, clearing")
+            context.user_data.pop('user_command_message', None)
+            return
+    except Exception:
+        logger.warning("Invalid user message timestamp, clearing")
+        context.user_data.pop('user_command_message', None)
+        return
+
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        logger.info(f"Deleted user message {message_id}")
+        context.user_data.pop('user_command_message', None)
+    except telegram.error.BadRequest as e:
+        logger.warning(f"Failed to delete user message {message_id}: {e}")
+        context.user_data.pop('user_command_message', None)
+
 # --- Функции для меню на клавиатуре ---
 def generate_menu_keyboard(menu_key: str, context: ContextTypes.DEFAULT_TYPE) -> ReplyKeyboardMarkup:
     menu = MENU_STRUCTURE.get(menu_key)
@@ -437,36 +466,6 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
     text = escape_markdown(menu["title"], version=2)
     reply_markup = generate_menu_keyboard(menu_key, context)
     
-    chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
-    
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-    
-    # Пытаемся удалить старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for menu {menu_key}")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-    
-    # Отправляем новое сообщение
     try:
         message = await update.message.reply_text(
             text,
@@ -474,17 +473,13 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, menu_key
             parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-        logger.info(f"Sent new message {message.message_id} for menu {menu_key}")
-    except Exception as e:
-        logger.error(f"Error sending new message for menu {menu_key}: {e}")
+        logger.info(f"Sent menu message for {menu_key}")
+    except telegram.error.BadRequest as e:
+        logger.error(f"Error sending menu message for {menu_key}: {e}")
         message = await update.message.reply_text(
             "Ошибка при отображении меню. Попробуйте снова.",
             reply_markup=generate_menu_keyboard("main_menu", context)
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 # --- Обработчики команд ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -495,17 +490,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         default_model_conf = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
         context.user_data.update({'selected_model_id': default_model_conf["id"], 'selected_api_type': default_model_conf["api_type"]})
     
-    # Очищаем старые данные сообщения
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /start")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой, если оно есть
+    await try_delete_user_message(update, context)
     
     current_model_key = get_current_model_key(context)
     current_mode_name = get_current_mode_details(context)['name']
@@ -513,161 +505,126 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     greeting = f"👋 Привет! Я твой ИИ-бот на базе Gemini.\n🧠 Агент: *{escape_markdown(current_mode_name, version=2)}*\n⚙️ Модель: *{escape_markdown(current_model_name, version=2)}*\n\n💬 Задавайте вопросы или используйте меню ниже!"
     try:
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             greeting,
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=generate_menu_keyboard("main_menu", context),
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-        logger.info(f"Sent new message {message.message_id} for /start")
+        logger.info(f"Sent start message for user {user_id}")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending /start message: {e}")
         plain_text = f"Привет! Я ИИ-бот Gemini.\nАгент: {current_mode_name}\nМодель: {current_model_name}\n\nЗадавайте вопросы или используйте меню!"
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             plain_text,
             reply_markup=generate_menu_keyboard("main_menu", context)
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
     logger.info(f"Start command processed for user {user_id}.")
 
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /menu")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой
+    await try_delete_user_message(update, context)
+    
     await show_menu(update, context, "main_menu")
 
 async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /usage")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой
+    await try_delete_user_message(update, context)
+    
     await show_menu(update, context, "limits_submenu")
 
 async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /subscribe")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой
+    await try_delete_user_message(update, context)
+    
     await show_menu(update, context, "subscription_submenu")
 
 async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /bonus")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой
+    await try_delete_user_message(update, context)
+    
     await show_menu(update, context, "bonus_submenu")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message_id = context.user_data.get('menu_message_id')
-    chat_id = update.effective_chat.id
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for /help")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-        context.user_data.pop('menu_message_id', None)
-        context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем предыдущее сообщение с командой
+    await try_delete_user_message(update, context)
+    
     await show_menu(update, context, "help_submenu")
 
 async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
     
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for bonus logic")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем сообщение пользователя
+    await try_delete_user_message(update, context)
 
     if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle":
         text = "Функция бонуса не настроена."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for bonus not configured")
+            logger.info(f"Sent bonus not configured message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for bonus not configured: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         return
 
     bonus_model_config = AVAILABLE_TEXT_MODELS.get(NEWS_CHANNEL_BONUS_MODEL_KEY)
     if not bonus_model_config:
         text = "Ошибка: Бонусная модель не найдена."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for bonus model not found")
+            logger.info(f"Sent bonus model not found message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for bonus model not found: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         return
 
     bonus_model_name_md = escape_markdown(bonus_model_config['name'], version=2)
@@ -680,23 +637,19 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
         else:
             reply_text_claimed = f"Бонус для '{bonus_model_name_md}' использован.\nНаш [канал]({NEWS_CHANNEL_LINK})."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 reply_text_claimed,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for bonus already claimed")
+            logger.info(f"Sent bonus already claimed message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for bonus already claimed: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 reply_text_claimed.replace('*', ''),
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         return
 
     try:
@@ -706,48 +659,40 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
             context.user_data['news_bonus_uses_left'] = NEWS_CHANNEL_BONUS_GENERATIONS
             success_text = f"🎉 Спасибо за подписку на [канал]({NEWS_CHANNEL_LINK})!\nВам начислена *{NEWS_CHANNEL_BONUS_GENERATIONS}* генерация для '{bonus_model_name_md}'."
             try:
-                message = await update.message.reply_text(
+                await update.message.reply_text(
                     success_text,
                     parse_mode=ParseMode.MARKDOWN_V2,
                     reply_markup=generate_menu_keyboard('main_menu', context),
                     disable_web_page_preview=True
                 )
-                context.user_data['menu_message_id'] = message.message_id
-                context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-                logger.info(f"Sent new message {message.message_id} for bonus success")
+                logger.info(f"Sent bonus success message")
             except telegram.error.BadRequest as e:
                 logger.error(f"Error sending message for bonus success: {e}")
-                message = await update.message.reply_text(
+                await update.message.reply_text(
                     success_text.replace('*', ''),
                     reply_markup=generate_menu_keyboard('main_menu', context),
                     disable_web_page_preview=True
                 )
-                context.user_data['menu_message_id'] = message.message_id
-                context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         else:
             fail_text = f"Подпишитесь на [канал]({NEWS_CHANNEL_LINK}) и нажмите «Получить» снова."
             reply_markup_inline = InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"📢 Перейти на {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)]
             ])
             try:
-                message = await update.message.reply_text(
+                await update.message.reply_text(
                     fail_text,
                     parse_mode=ParseMode.MARKDOWN_V2,
                     reply_markup=reply_markup_inline,
                     disable_web_page_preview=True
                 )
-                context.user_data['menu_message_id'] = message.message_id
-                context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-                logger.info(f"Sent new message {message.message_id} for bonus subscription required")
+                logger.info(f"Sent bonus subscription required message")
             except telegram.error.BadRequest as e:
                 logger.error(f"Error sending message for bonus subscription required: {e}")
-                message = await update.message.reply_text(
+                await update.message.reply_text(
                     fail_text.replace('*', ''),
                     reply_markup=reply_markup_inline,
                     disable_web_page_preview=True
                 )
-                context.user_data['menu_message_id'] = message.message_id
-                context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
     except telegram.error.BadRequest as e:
         error_text_response = str(e).lower()
         reply_message_on_error = f"Ошибка проверки подписки: {escape_markdown(str(e), version=2)}. Попробуйте позже."
@@ -759,27 +704,32 @@ async def claim_news_bonus_logic(update: Update, context: ContextTypes.DEFAULT_T
             reply_message_on_error = f"Бот должен быть участником канала."
         logger.error(f"BadRequest error checking channel membership: {e}")
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 reply_message_on_error,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for bonus error")
+            logger.info(f"Sent bonus error message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for bonus error: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 reply_message_on_error.replace('*', ''),
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем сообщение пользователя
+    await try_delete_user_message(update, context)
+
     user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
     display_sub_level = "Бесплатный доступ"
     subscription_active = False
@@ -821,86 +771,33 @@ async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     final_usage_text_md = "\n".join(usage_text_parts)
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'limits_submenu'), context)
-    chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
 
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for show_limits")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-
-    # Отправляем новое сообщение
     try:
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             final_usage_text_md,
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-        logger.info(f"Sent new message {message.message_id} for show_limits")
+        logger.info(f"Sent limits message")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending message for show_limits: {e}")
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             final_usage_text_md.replace('*', ''),
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
-
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for show_subscription")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем сообщение пользователя
+    await try_delete_user_message(update, context)
 
     user_subscription_details = context.bot_data.setdefault('user_subscriptions', {}).get(user_id, {})
     sub_text_parts = [f"💎 *Подписка Профи*"]
@@ -926,54 +823,30 @@ async def show_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'subscription_submenu'), context)
 
     try:
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             final_sub_text,
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-        logger.info(f"Sent new message {message.message_id} for show_subscription")
+        logger.info(f"Sent subscription message")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending message for show_subscription: {e}")
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             final_sub_text.replace('*', ''),
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
-
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for show_help")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
+    # Сохраняем данные команды пользователя
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем сообщение пользователя
+    await try_delete_user_message(update, context)
 
     help_text = (
         "❓ *Помощь*\n\n"
@@ -994,58 +867,35 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = generate_menu_keyboard(context.user_data.get('current_menu', 'help_submenu'), context)
 
     try:
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             help_text,
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-        logger.info(f"Sent new message {message.message_id} for show_help")
+        logger.info(f"Sent help message")
     except telegram.error.BadRequest as e:
         logger.error(f"Error sending message for show_help: {e}")
-        message = await update.message.reply_text(
+        await update.message.reply_text(
             help_text.replace('*', ''),
             reply_markup=reply_markup,
             disable_web_page_preview=True
         )
-        context.user_data['menu_message_id'] = message.message_id
-        context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     button_text = update.message.text
     current_menu_key = context.user_data.get('current_menu', 'main_menu')
     current_menu = MENU_STRUCTURE.get(current_menu_key, MENU_STRUCTURE['main_menu'])
-    chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
-
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for button {button_text}")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
+    
+    # Сохраняем данные сообщения с кнопкой
+    context.user_data['user_command_message'] = {
+        'message_id': update.message.message_id,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    # Удаляем сообщение пользователя
+    await try_delete_user_message(update, context)
 
     # Обработка навигационных кнопок
     if button_text == "⬅️ Назад":
@@ -1064,21 +914,17 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not selected_item:
         text = "Команда не распознана. Используйте кнопки меню."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(current_menu_key, context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for unrecognized command")
+            logger.info(f"Sent unrecognized command message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for unrecognized command: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 reply_markup=generate_menu_keyboard(current_menu_key, context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         return
 
     action = selected_item["action"]
@@ -1100,24 +946,20 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             new_text = escape_markdown("⚠️ Ошибка: Агент не найден.", version=2)
             plain_fallback = "⚠️ Ошибка: Агент не найден."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 new_text,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard(return_menu, context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for set_agent {target}")
+            logger.info(f"Sent set_agent message for {target}")
             context.user_data['current_menu'] = return_menu
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for set_agent {target}: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 plain_fallback,
                 reply_markup=generate_menu_keyboard(return_menu, context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
             context.user_data['current_menu'] = return_menu
     elif action == "set_model":
         return_menu = current_menu.get("parent", "main_menu")
@@ -1137,24 +979,20 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             new_text = escape_markdown("⚠️ Ошибка: Модель не найдена.", version=2)
             plain_fallback = "⚠️ Ошибка: Модель не найдена."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 new_text,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard(return_menu, context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for set_model {target}")
+            logger.info(f"Sent set_model message for {target}")
             context.user_data['current_menu'] = return_menu
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending message for set_model {target}: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 plain_fallback,
                 reply_markup=generate_menu_keyboard(return_menu, context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
             context.user_data['current_menu'] = return_menu
     elif action == "show_limits":
         await show_limits(update, context)
@@ -1169,33 +1007,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_message = update.message.text.strip()
     chat_id = update.effective_chat.id
-    message_id = context.user_data.get('menu_message_id')
-    message_timestamp = context.user_data.get('menu_message_timestamp')
-
-    # Проверяем возраст сообщения
-    if message_timestamp:
-        try:
-            msg_time = datetime.fromisoformat(message_timestamp)
-            if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
-                logger.info(f"Message {message_id} is older than 48 hours, clearing")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
-                message_id = None
-        except Exception:
-            logger.warning("Invalid message timestamp, clearing")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
-            message_id = None
-
-    # Удаляем старое сообщение
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-            logger.info(f"Deleted message {message_id} for text input")
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete message {message_id}: {e}")
-            context.user_data.pop('menu_message_id', None)
-            context.user_data.pop('menu_message_timestamp', None)
 
     current_model_key = get_current_model_key(context)
     model_config = AVAILABLE_TEXT_MODELS.get(current_model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
@@ -1203,23 +1014,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not can_proceed:
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 limit_message,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for limit reached")
+            logger.info(f"Sent limit reached message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending limit message: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 limit_message.replace('*', ''),
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
         return
 
     try:
@@ -1274,44 +1081,36 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         increment_request_count(user_id, current_model_key, context)
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 response_text,
                 parse_mode=None,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for AI response")
+            logger.info(f"Sent AI response")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending AI response: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 "Ошибка при отправке ответа. Попробуйте снова.",
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
     except Exception as e:
         logger.error(f"Unexpected error processing text for user {user_id}: {str(e)}")
         traceback.print_exc()
         error_message = "Произошла ошибка при обработке запроса. Попробуйте снова."
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 error_message,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for error")
+            logger.info(f"Sent error message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending error message: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 error_message,
                 reply_markup=generate_menu_keyboard(context.user_data.get('current_menu', 'main_menu'), context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
@@ -1330,57 +1129,32 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             'valid_until': valid_until.isoformat()
         })
         text = f"🎉 Подписка *Профи* активирована до *{valid_until.strftime('%Y-%m-%d')}*! Наслаждайтесь расширенными лимитами."
-        chat_id = update.effective_chat.id
-        message_id = context.user_data.get('menu_message_id')
-        if message_id:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-                logger.info(f"Deleted message {message_id} for payment")
-            except telegram.error.BadRequest as e:
-                logger.warning(f"Failed to delete message {message_id}: {e}")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
         try:
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text,
                 parse_mode=ParseMode.MARKDOWN_V2,
                 reply_markup=generate_menu_keyboard('main_menu', context),
                 disable_web_page_preview=True
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for payment success")
+            logger.info(f"Sent payment success message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending payment success message: {e}")
-            message = await update.message.reply_text(
+            await update.message.reply_text(
                 text.replace('*', ''),
                 reply_markup=generate_menu_keyboard('main_menu', context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error: {context.error}")
     if update and update.effective_chat:
         chat_id = update.effective_chat.id
-        message_id = context.user_data.get('menu_message_id')
-        if message_id:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-                logger.info(f"Deleted message {message_id} for error")
-            except telegram.error.BadRequest as e:
-                logger.warning(f"Failed to delete message {message_id}: {e}")
-                context.user_data.pop('menu_message_id', None)
-                context.user_data.pop('menu_message_timestamp', None)
         try:
-            message = await context.bot.send_message(
+            await context.bot.send_message(
                 chat_id=chat_id,
                 text="Произошла ошибка. Попробуйте снова или используйте /start.",
                 reply_markup=generate_menu_keyboard('main_menu', context)
             )
-            context.user_data['menu_message_id'] = message.message_id
-            context.user_data['menu_message_timestamp'] = datetime.now().isoformat()
-            logger.info(f"Sent new message {message.message_id} for error handler")
+            logger.info(f"Sent error handler message")
         except telegram.error.BadRequest as e:
             logger.error(f"Error sending error message: {e}")
 
