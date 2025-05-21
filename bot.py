@@ -26,6 +26,8 @@ from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1 import AsyncClient
 from gemini_pro_handler import query_gemini_pro, GEMINI_PRO_CONFIG
+from gemini_pro_handler import query_gemini_pro, GEMINI_PRO_CONFIG
+from grok_3_handler import query_grok_3, GROK_3_CONFIG
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -160,19 +162,7 @@ AVAILABLE_TEXT_MODELS = {
         "cost_category": "google_flash_preview_flex"
     },
     "custom_api_gemini_2_5_pro": GEMINI_PRO_CONFIG,  # Ссылка на конфигурацию из модуля
-    "custom_api_grok_3": {
-        "name": "Grok 3",
-        "id": "grok-3-beta",
-        "api_type": "custom_http_api",
-        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
-        "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True,
-        "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_GROK_DAILY,
-        "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY,
-        "cost_category": "custom_api_grok_3_paid",
-        "pricing_info": {}
-    },
+    "custom_api_grok_3": GROK_3_CONFIG,  # Ссылка на конфигурацию из модуля
     "custom_api_gpt_4o_mini": {
         "name": "GPT-4o mini",
         "id": "gpt-4o-mini",
@@ -1472,6 +1462,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response_text_from_api, success = await query_gemini_pro(system_prompt_text, user_message)
                 if not success:
                     logger.warning(f"Gemini 2.5 Pro query failed for user {user_id}: {response_text_from_api}")
+            elif current_model_key == "custom_api_grok_3":
+                # Используем модуль grok_3_handler
+                response_text_from_api, success = await query_grok_3(system_prompt_text, user_message)
+                if not success:
+                    logger.warning(f"Grok 3 query failed for user {user_id}: {response_text_from_api}")
             else:
                 http_headers = {
                     "Authorization": f"Bearer {actual_api_key_value}",
@@ -1520,14 +1515,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     extracted_api_text = None
 
                     model_api_id = model_config["id"]
-                    if model_api_id == "grok-3-beta":
-                        if "response" in response_json_data and isinstance(response_json_data["response"], list) and response_json_data["response"]:
-                            completion = response_json_data["response"][0]
-                            if "choices" in completion and isinstance(completion["choices"], list) and completion["choices"]:
-                                choice = completion["choices"][0]
-                                if "message" in choice and isinstance(choice["message"], dict):
-                                    extracted_api_text = choice["message"].get("content", "").strip()
-                    elif model_api_id == "gpt-4o-mini":
+                    if model_api_id == "gpt-4o-mini":
                         if response_json_data.get("status") == "success":
                             raw_output_data = response_json_data.get("output")
                             if isinstance(raw_output_data, str):
