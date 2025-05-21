@@ -1097,13 +1097,26 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 response.raise_for_status()
                 data = response.json()
+                logger.debug(f"Raw API response for {model_config['id']}: {json.dumps(data, indent=2)}")  # Log raw response
                 if model_config["id"] == "grok-3-beta" and data.get("response", [{}])[0].get("choices"):
                     response_text = data["response"][0]["choices"][0]["message"]["content"].strip()
                 elif model_config["id"] == "gemini-2.5-pro-preview-03-25":
                     response_text = data.get("text", "").strip()
-                elif model_config["id"] == "gpt-4o-mini" and data.get("status") == "success":
-                    output = data.get("output", "")
-                    response_text = output.strip() if isinstance(output, str) else output.get("text", output.get("content", "")).strip()
+                elif model_config["id"] == "gpt-4o-mini":
+                    if data.get("status") == "success":
+                        output = data.get("output", "")
+                        if isinstance(output, str):
+                            response_text = output.strip()
+                        elif isinstance(output, dict):
+                            response_text = output.get("text", output.get("content", output.get("message", ""))).strip()
+                        elif isinstance(output, list) and output:
+                            response_text = output[0].get("text", output[0].get("content", "")).strip()
+                        else:
+                            response_text = ""
+                        if not response_text:
+                            response_text = "Ответ пуст: API вернул пустой или некорректный результат."
+                    else:
+                        response_text = f"Ошибка API: Статус '{data.get('status', 'unknown')}'."
                 else:
                     response_text = data.get("text", data.get("content", data.get("output", "Ответ пуст."))).strip()
             except requests.exceptions.HTTPError as e:
@@ -1123,7 +1136,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         disable_web_page_preview=True
     )
     logger.info(f"Sent response (model: {current_model_key}) to user {user_id}")
-
+    
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
     expected_prefix = f"subscription_{PRO_SUBSCRIPTION_LEVEL_KEY}_"
