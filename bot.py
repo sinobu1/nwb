@@ -1087,21 +1087,43 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "top_p": 1.0,
             "n": 1
         }
-        try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
-            )
-            response.raise_for_status()
-            response_data = response.json()
-            if model_config["id"] == "grok-3-beta" and response_data.get("status") == "success":
-                response_text = response_data.get("output", "Ответ не получен.").strip()
+        response = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: requests.post(model_config["endpoint"], headers=headers, json=payload, timeout=30)
+        )
+        response.raise_for_status() # Оставляем проверку на HTTP ошибки
+        response_data = response.json()
+        extracted_text = None # Переменная для найденного текста
+
+        if model_config["api_type"] == "custom_http_api":
+            if model_config["id"] == "grok-3-beta":
+                # Для Grok (is_sync: True):
+                # 1. Пробуем "output" (из документации Grok для успешного результата)
+                text_candidate = response_data.get("output")
+                if text_candidate:
+                    extracted_text = str(text_candidate).strip()
+                else:
+                    # 2. Если в "output" нет, пробуем "text" (на всякий случай, для унификации)
+                    text_candidate = response_data.get("text")
+                    if text_candidate:
+                        extracted_text = str(text_candidate).strip()
+
+            elif model_config["id"] == "gemini-2.5-pro-preview-03-25": # Или ваш ID для Gemini Pro
+                # Для Gemini Pro (работает с "text"):
+                text_candidate = response_data.get("text")
+                if text_candidate:
+                    extracted_text = str(text_candidate).strip()
+            
+            # Сюда можно добавить обработку других моделей, если они появятся
+
+            # Финальное присвоение
+            if extracted_text:
+                response_text = extracted_text
             else:
-                response_text = response_data.get("text", "Ответ не получен.").strip()
-        except requests.exceptions.RequestException as e:
-            response_text = f"Ошибка API: {str(e)}"
-            logger.error(f"Custom API error for user {user_id}: {str(e)}")
-    else:
-        response_text = "Неизвестный тип API."
+                response_text = "Ответ не получен."
+                # Если хотите видеть, что пришло, когда ответ не найден:
+                # logger.warning(f"Could not extract text for model {model_config['id']}. Response data: {response_data}")
+        else:
+            response_text = "Неизвестный тип API." # Для других api_type
         logger.error(f"Unknown api_type for model {current_model_key}")
 
     response_text, was_truncated = smart_truncate(response_text, MAX_MESSAGE_LENGTH_TELEGRAM)
