@@ -274,22 +274,22 @@ except Exception as e:
 # --- Вспомогательные функции для работы с Firestore ---
 async def get_user_data(user_id: int) -> dict:
     doc_ref = db.collection("users").document(str(user_id))
-    doc = doc_ref.get()  # Синхронный вызов
+    doc = await asyncio.to_thread(doc_ref.get)  # Выполняем в отдельном потоке
     return doc.to_dict() or {}
 
 async def set_user_data(user_id: int, data: dict):
     doc_ref = db.collection("users").document(str(user_id))
-    doc_ref.set(data, merge=True)  # Синхронный вызов
+    await asyncio.to_thread(doc_ref.set, data, merge=True)  # Выполняем в отдельном потоке
     logger.info(f"Updated user data for {user_id}: {data}")
 
 async def get_bot_data() -> dict:
     doc_ref = db.collection("bot_data").document("data")
-    doc = doc_ref.get()  # Синхронный вызов
+    doc = await asyncio.to_thread(doc_ref.get)  # Выполняем в отдельном потоке
     return doc.to_dict() or {}
 
 async def set_bot_data(data: dict):
     doc_ref = db.collection("bot_data").document("data")
-    doc_ref.set(data, merge=True)  # Синхронный вызов
+    await asyncio.to_thread(doc_ref.set, data, merge=True)  # Выполняем в отдельном потоке
     logger.info(f"Updated bot data: {data}")
 
 async def get_current_mode_details(user_id: int) -> dict:
