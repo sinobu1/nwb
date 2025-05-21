@@ -22,8 +22,8 @@ from telegram import LabeledPrice
 from typing import Optional
 import uuid
 import firebase_admin
-from firebase_admin import credentials, firestore
-from firebase_admin import initialize_app
+from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1 import AsyncClient
 
 nest_asyncio.apply()
@@ -235,20 +235,41 @@ MENU_STRUCTURE = {
 }
 
 # Инициализация Firebase
-firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
-if firebase_credentials:
-    try:
-        cred_dict = json.loads(firebase_credentials)
-        cred = credentials.Certificate(cred_dict)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse FIREBASE_CREDENTIALS: {e}")
-        raise
-else:
-    logger.warning("FIREBASE_CREDENTIALS not set, falling back to local file")
-    cred = credentials.Certificate("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json")
+try:
+    firebase_credentials = os.getenv("FIREBASE_CREDENTIALS")
+    if firebase_credentials:
+        try:
+            cred_dict = json.loads(firebase_credentials)
+            cred = credentials.Certificate(cred_dict)
+        except json.JSONDecodeError as e:
+            logger.error(f"Ошибка парсинга FIREBASE_CREDENTIALS: {e}")
+            raise ValueError("Неверный формат FIREBASE_CREDENTIALS. Проверьте JSON в переменной окружения.")
+    else:
+        logger.warning("FIREBASE_CREDENTIALS не установлена, пытаемся использовать локальный файл")
+        if os.path.exists("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"):
+            cred = credentials.Certificate("gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json")
+        else:
+            raise FileNotFoundError("Файл gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json не найден, и FIREBASE_CREDENTIALS не установлена.")
 
-initialize_app(cred)
-db = firestore.AsyncClient()
+    # Инициализация приложения Firebase
+    try:
+        initialize_app(cred)
+        logger.info("Firebase успешно инициализирован")
+    except ValueError as e:
+        if "already exists" in str(e).lower():
+            logger.info("Firebase уже инициализирован, пропускаем повторную инициализацию")
+        else:
+            raise
+    except FirebaseError as e:
+        logger.error(f"Ошибка инициализации Firebase: {e}")
+        raise
+
+    # Инициализация асинхронного клиента Firestore с явными учетными данными
+    db = firestore.AsyncClient(credentials=cred)
+    logger.info("Firestore AsyncClient успешно инициализирован")
+except Exception as e:
+    logger.error(f"Неизвестная ошибка при инициализации Firebase/Firestore: {e}")
+    raise
 
 # --- Вспомогательные функции для работы с Firestore ---
 async def get_user_data(user_id: int) -> dict:
