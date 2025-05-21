@@ -51,6 +51,8 @@ DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75
 DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0
 DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25
 PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
+DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 1 # Или другое значение для бесплатных попыток Grok
+DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25 # Или другое значение для подписчиков Grok
 
 # --- КАНАЛ НОВОСТЕЙ И БОНУС ---
 NEWS_CHANNEL_USERNAME = "@timextech"
@@ -172,20 +174,18 @@ AVAILABLE_TEXT_MODELS = {
         "pricing_info": {}
     },
     "custom_api_grok_3": {
-    "name": "Grok 3",
-    "id": "grok-3-beta",
-    "api_type": "custom_http_api",
-    "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
-    "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-    "is_limited": True,
-    "limit_type": "subscription_custom_pro",
-    # Изменено для использования константы
-    "limit_if_no_subscription": DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY,
-    # Изменено для использования константы
-    "subscription_daily_limit": DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY,
-    "cost_category": "custom_api_pro_paid",
-    "pricing_info": {}
-   }
+        "name": "Grok 3",
+        "id": "grok-3-beta",
+        "api_type": "custom_http_api",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
+        "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
+        "is_limited": True,  # Указывает, что модель имеет лимиты
+        "limit_type": "subscription_custom_pro", # Тип лимита, обычно означает разные лимиты для подписчиков и не-подписчиков
+        "limit_if_no_subscription": 1,  # Количество попыток в день для пользователей БЕЗ подписки
+        "subscription_daily_limit": 25,  # Количество попыток в день для пользователей С ПОДПИСКОЙ
+        "cost_category": "custom_api_grok_3_paid",
+        "pricing_info": {}
+    }
 }
 DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
