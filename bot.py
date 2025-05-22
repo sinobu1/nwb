@@ -443,7 +443,7 @@ def is_menu_button_text(text: str) -> bool:
     return False
 
 # --- МЕНЮ И КЛАВИАТУРА ---
-def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
+def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup: # Defined at line 429
     """Генерация клавиатуры для меню."""
     menu = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE["main_menu"])
     keyboard = []
@@ -463,6 +463,9 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
         keyboard.append(nav_row)
 
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+
+# ADD THE IMPORT HERE (e.g., after generate_menu_keyboard function, around line 447)
+from bonus_handler import claim_news_bonus_logic, try_delete_user_message
 
 async def show_menu(update: Update, user_id: int, menu_key: str):
     """Отображение меню пользователю."""
