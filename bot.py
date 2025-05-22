@@ -270,7 +270,7 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
 
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
     if not isinstance(text, str) or len(text) <= max_length:
-        return str(textව, False
+        return str(text, False
 
     suffix = "\n\n(...ответ был сокращен)"
     adjusted_max_length = max_length - len(suffix)
