@@ -107,7 +107,6 @@ class BotConstants:
 
 
 # --- ОПРЕДЕЛЕНИЯ РЕЖИМОВ И МОДЕЛЕЙ (как в оригинале, для краткости) ---
-AI_MODES = {
     AI_MODES = {
     "universal_ai_basic": {
         "name": "Универсальный",
