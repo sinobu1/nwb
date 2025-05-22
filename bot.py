@@ -590,12 +590,11 @@ async def show_limits(update: Update, user_id: int):
 
     parts = [f"<b>📊 Ваши текущие лимиты</b> (Статус: <b>{subscription_status_display}</b>)\n"]
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    all_user_daily_counts = bot_data_loc.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
-    user_counts_today = all_user_daily_counts.get(str(user_id), {})
+    all_user_daily_counts = bot_data_loc.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {}).get(str(user_id), {})
 
     for model_key, model_config in AVAILABLE_TEXT_MODELS.items():
         if model_config.get("is_limited"):
-            usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
+            usage_info = all_user_daily_counts.get(model_key, {'date': '', 'count': 0})
             current_day_usage = usage_info['count'] if usage_info['date'] == today_str else 0
             
             actual_limit = await get_user_actual_limit_for_model(user_id, model_key, user_data_loc, bot_data_loc)
@@ -1024,11 +1023,10 @@ async def main():
         logger.info("Webhook deleted with drop_pending_updates=True")
         # Небольшая задержка для обработки Telegram API
         await asyncio.sleep(2)
-        # Запускаем polling с обработкой конфликтов
+        # Запускаем polling
         await app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-            error_callback=lambda exc: logger.error(f"Polling error: {exc}", exc_info=True)
+            drop_pending_updates=True
         )
     except telegram.error.Conflict as ce:
         logger.error(f"Conflict error during polling: {ce}. Retrying in 10 seconds...")
@@ -1039,8 +1037,7 @@ async def main():
         await asyncio.sleep(2)
         await app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-            error_callback=lambda exc: logger.error(f"Polling error after retry: {exc}", exc_info=True)
+            drop_pending_updates=True
         )
     except Exception as e:
         logger.critical(f"Critical error in bot polling: {e}", exc_info=True)
