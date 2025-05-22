@@ -1556,7 +1556,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=generate_menu_keyboard(user_data_reply.get('current_menu', 'main_menu')),
         disable_web_page_preview=True
     )
-    logger.info(f"Sent AI response (model: {current_model_key}) to user {user_id}. Start of response: '{final_response_text[:100].replace('\n', ' ')}...'")
+    # Исправленная строка логирования
+    log_response_text = final_response_text[:100].replace('\n', ' ')
+    logger.info(f"Sent AI response (model: {current_model_key}) to user {user_id}. Start of response: '{log_response_text}...'")
 
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
