@@ -1,4 +1,3 @@
-```python
 import telegram
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, BotCommand, ParseMode, ChatAction
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, PreCheckoutQueryHandler
@@ -888,6 +887,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     api_type = model_config.get("api_type", "").strip()
     if api_type == "google_genai":
         full_prompt = f"{system_prompt}\n\n**Запрос:**\n{user_message}"
+        genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
         genai_model = genai.GenerativeModel(model_name=model_config["id"], generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB})
         try:
             logger.info(f"Запрос к Google GenAI: {model_config['id']} для {user_id}")
@@ -1132,30 +1132,11 @@ async def main():
     await app.bot.set_my_commands(commands)
     logger.info("Команды бота установлены.")
 
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+    await app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    # Configure Google Gemini API
-    if not GOOGLE_GEMINI_API_KEY or "YOUR_GOOGLE_GEMINI_API_KEY" in GOOGLE_GEMINI_API_KEY or not GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"):
-        logger.warning("Google Gemini API key (GOOGLE_GEMINI_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
-    else:
-        try:
-            genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
-            logger.info("Google Gemini API configured successfully.")
-        except Exception as e:
-            logger.error(f"Failed to configure Google Gemini API with key starting '{GOOGLE_GEMINI_API_KEY[:10]}...': {str(e)}")
-
-    # Check Custom API Keys
-    if not CUSTOM_GROK_3_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GROK_3_API_KEY or not CUSTOM_GROK_3_API_KEY.startswith("sk-"):
-        logger.warning("Custom Grok 3 API key (CUSTOM_GROK_3_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
-
-    if not CUSTOM_GPT4O_MINI_API_KEY or "YOUR_GPT4O_MINI_KEY_HERE" in CUSTOM_GPT4O_MINI_API_KEY or not CUSTOM_GPT4O_MINI_API_KEY.startswith("sk-"):
-        logger.warning("Custom GPT-4o mini API key (CUSTOM_GPT4O_MINI_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
-
-    if not PAYMENT_PROVIDER_TOKEN or "YOUR_PAYMENT_PROVIDER_TOKEN" in PAYMENT_PROVIDER_TOKEN:
-        logger.warning("Payment Provider Token (PAYMENT_PROVIDER_TOKEN) appears to be missing or a placeholder. Payments will not work.")
-    
-    if not db:
-        logger.critical("Firestore database (db) is not initialized. Bot may not function correctly. Check Firebase setup.")
-
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
+        raise
