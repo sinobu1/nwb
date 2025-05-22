@@ -6,7 +6,7 @@ from telegram import (
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler, DispatcherHandlerStop
+    ContextTypes, PreCheckoutQueryHandler # DispatcherHandlerStop убран
 )
 import google.generativeai as genai
 import google.api_core.exceptions
@@ -17,7 +17,7 @@ import os
 import asyncio
 import nest_asyncio
 import json
-from datetime import datetime, timedelta, timezone # Импортируем timezone
+from datetime import datetime, timedelta, timezone
 from telegram import LabeledPrice
 from typing import Optional, Dict, Any
 
@@ -62,7 +62,6 @@ CONFIG = {
     "DEFAULT_MODEL_KEY": "google_gemini_2_0_flash",
 }
 
-# Глобальные переменные для ключей (для удобства доступа в коде, инициализируются из CONFIG)
 TOKEN = CONFIG["TELEGRAM_TOKEN"]
 GOOGLE_GEMINI_API_KEY = CONFIG["GOOGLE_GEMINI_API_KEY"]
 CUSTOM_GEMINI_PRO_API_KEY = CONFIG["CUSTOM_GEMINI_PRO_API_KEY"]
@@ -70,7 +69,7 @@ CUSTOM_GEMINI_PRO_ENDPOINT = CONFIG["CUSTOM_GEMINI_PRO_ENDPOINT"]
 CUSTOM_GROK_3_API_KEY = CONFIG["CUSTOM_GROK_3_API_KEY"]
 CUSTOM_GPT4O_MINI_API_KEY = CONFIG["CUSTOM_GPT4O_MINI_API_KEY"]
 PAYMENT_PROVIDER_TOKEN = CONFIG["PAYMENT_PROVIDER_TOKEN"]
-YOUR_ADMIN_ID = CONFIG["ADMIN_ID"] # Сохраняем старое имя для совместимости с текущим кодом
+YOUR_ADMIN_ID = CONFIG["ADMIN_ID"]
 
 AI_MODES = {
     "universal_ai_basic": {
@@ -212,7 +211,7 @@ MENU_STRUCTURE = {
     "help_submenu": {"title": "Помощь", "items": [{"text": "❓ Справка", "action": "show_help", "target": "help"}], "parent": "main_menu", "is_submenu": True}
 }
 
-db: Optional[firestore.Client] = None # Используем firestore.Client, так как AsyncClient не импортирован и не используется
+db: Optional[firestore.Client] = None
 try:
     firebase_creds_json = CONFIG["FIREBASE_CREDENTIALS_JSON_STR"]
     cred_obj = None
@@ -271,25 +270,16 @@ async def set_bot_data(data: Dict[str, Any]):
     await _firestore_op(doc_ref.set, data, merge=True)
     logger.debug(f"Bot data updated with keys: {list(data.keys())}")
 
-
 async def _store_and_try_delete_message(update: Update, user_id: int, is_command_to_keep: bool = False):
-    """Сохраняет и/или пытается удалить сообщение пользователя."""
     if not update.message: return
 
     message_id_to_process = update.message.message_id
     timestamp_now_iso = datetime.now(timezone.utc).isoformat()
     chat_id = update.effective_chat.id
     
-    user_data_for_msg_handling = await get_user_data(user_id) # Свежие данные для этой операции
+    user_data_for_msg_handling = await get_user_data(user_id)
 
-    if is_command_to_keep: # Для /start, только сохраняем
-        user_data_for_msg_handling['user_command_message_to_keep'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
-        }
-        await set_user_data(user_id, user_data_for_msg_handling)
-        return
-
-    # Для остальных команд/кнопок - сначала пытаемся удалить предыдущее сохраненное (если есть)
+    # Сначала пытаемся удалить предыдущее сохраненное сообщение (если оно не "to_keep")
     prev_command_info = user_data_for_msg_handling.pop('user_command_to_delete', None)
     if prev_command_info and prev_command_info.get('message_id'):
         try:
@@ -298,38 +288,33 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
             if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
                 await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-            else:
-                logger.info(f"Previous user message {prev_command_info['message_id']} older than 48h, not deleting.")
+        except (telegram.error.BadRequest, ValueError) as e: # Объединяем ошибки
+            logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
+    
+    # Если текущее сообщение не "to_keep", сохраняем его для следующего раза И ПЫТАЕМСЯ УДАЛИТЬ СРАЗУ
+    if not is_command_to_keep:
+        user_data_for_msg_handling['user_command_to_delete'] = { # Сохраняем для следующего раза, если удаление не удастся
+            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
+        }
+        try:
+            await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
+            logger.info(f"Successfully deleted current user message {message_id_to_process}")
+            user_data_for_msg_handling.pop('user_command_to_delete', None) # Очищаем, если удачно удалили
         except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete previous user message {prev_command_info.get('message_id')}: {e}")
-        except ValueError:
-            logger.warning(f"Invalid timestamp for previous user message {prev_command_info.get('message_id')}")
+            logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time.")
+    else: # Если is_command_to_keep (например, /start), просто сохраняем его как "неудаляемое"
+         user_data_for_msg_handling['user_command_message_to_keep'] = {
+            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
+        }
 
-    # Затем сохраняем текущее сообщение для последующего удаления
-    user_data_for_msg_handling['user_command_to_delete'] = {
-        'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
-    }
     await set_user_data(user_id, user_data_for_msg_handling)
 
-    # И сразу пытаемся удалить текущее (если это кнопка или команда, которую нужно удалить)
-    try:
-        await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
-        logger.info(f"Successfully deleted current user message {message_id_to_process}")
-        # Если успешно удалили, можно очистить user_command_to_delete, но это не обязательно,
-        # т.к. при следующем вызове оно перезапишется или удалится как prev_command_info
-        user_data_after_delete = await get_user_data(user_id) # Получаем снова, т.к. могли быть изменения
-        user_data_after_delete.pop('user_command_to_delete', None)
-        await set_user_data(user_id, user_data_after_delete)
-
-    except telegram.error.BadRequest as e:
-        logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}")
-    # Если не удалось удалить, оно останется в 'user_command_to_delete' для следующей попытки
 
 async def auto_delete_message_decorator(is_command_to_keep: bool = False):
-    """Декоратор для управления удалением сообщений."""
     def decorator(func):
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            await _store_and_try_delete_message(update, update.effective_user.id, is_command_to_keep)
+            if update.effective_user: # Убедимся, что есть пользователь
+                 await _store_and_try_delete_message(update, update.effective_user.id, is_command_to_keep)
             return await func(update, context)
         return wrapper
     return decorator
@@ -375,8 +360,10 @@ def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
     trunc_text = text[:adj_max_len]
     for sep in ['\n\n', '. ', '! ', '? ', '\n', ' ']:
         pos = trunc_text.rfind(sep)
-        if pos != -1 and (actual_pos := pos + (len(sep) if sep != ' ' else 0)) > 0 and actual_pos > adj_max_len * 0.3:
-            return text[:actual_pos].strip() + suffix, True
+        if pos != -1:
+            actual_pos = pos + (len(sep) if sep != ' ' else 0)
+            if actual_pos > 0 and actual_pos > adj_max_len * 0.3:
+                 return text[:actual_pos].strip() + suffix, True
     return text[:adj_max_len].strip() + suffix, True
 
 def is_user_profi_subscriber(sub_details: Dict[str, Any]) -> bool:
@@ -426,7 +413,7 @@ async def check_and_log_request_attempt(user_id: int, model_key: str) -> tuple[b
     if model_usage['date'] != today: model_usage = {'date': today, 'count': 0}
     
     current_cnt = model_usage['count']
-    limit_comp = 0 # Лимит для сравнения (без бонуса)
+    limit_comp = 0 
     if model_cfg.get("limit_type") == "daily_free": limit_comp = model_cfg.get("limit",0)
     elif model_cfg.get("limit_type") == "subscription_or_daily_free": limit_comp = model_cfg.get("subscription_daily_limit",0) if is_profi_user else model_cfg.get("limit_if_no_subscription",0)
     elif model_cfg.get("limit_type") == "subscription_custom_pro": limit_comp = model_cfg.get("subscription_daily_limit",0) if is_profi_user else model_cfg.get("limit_if_no_subscription",0)
@@ -439,13 +426,13 @@ async def check_and_log_request_attempt(user_id: int, model_key: str) -> tuple[b
             if not user_data_loc.get('claimed_news_bonus', False): msg_parts.append(f'💡 Подписка на <a href="{CONFIG["NEWS_CHANNEL_LINK"]}">канал</a> даст бонус ({CONFIG["NEWS_CHANNEL_BONUS_GENERATIONS"]} для {bonus_name})!')
             elif user_data_loc.get('news_bonus_uses_left', 0) == 0: msg_parts.append(f"ℹ️ Бонус с <a href='{CONFIG['NEWS_CHANNEL_LINK']}'>канала</a> использован.")
         if not is_profi_user: msg_parts.append("Попробуйте завтра или оформите <a href='https://t.me/gemini_oracle_bot?start=subscribe'>подписку</a>.")
-        if model_usage['date'] == today and user_counts.get(model_key) != model_usage: # Сохраняем сброс даты, если он был
+        if model_usage['date'] == today and user_counts.get(model_key) != model_usage:
             user_counts[model_key] = model_usage
             all_counts[str(user_id)] = user_counts
             await set_bot_data({'all_user_daily_counts': all_counts})
         return False, "\n".join(msg_parts), current_cnt
     
-    if model_usage['date'] == today and user_counts.get(model_key) != model_usage: # Сохраняем сброс даты
+    if model_usage['date'] == today and user_counts.get(model_key) != model_usage:
         user_counts[model_key] = model_usage
         all_counts[str(user_id)] = user_counts
         await set_bot_data({'all_user_daily_counts': all_counts})
@@ -498,18 +485,22 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
         kbd_rows.append(nav_row)
     return ReplyKeyboardMarkup(kbd_rows, resize_keyboard=True, one_time_keyboard=False)
 
-async def show_menu(update: Update, user_id: int, menu_key: str, user_data: Optional[Dict[str, Any]] = None):
+async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None): # Renamed user_data to user_data_param
     menu_cfg = MENU_STRUCTURE.get(menu_key)
     if not menu_cfg:
+        logger.error(f"Menu key '{menu_key}' not found. Defaulting for user {user_id}.")
         await update.message.reply_text("Ошибка: Меню не найдено.", reply_markup=generate_menu_keyboard("main_menu"))
         await set_user_data(user_id, {'current_menu': 'main_menu'})
         return
-    await set_user_data(user_id, {'current_menu': menu_key}) # Обновляем только current_menu
+
+    # user_data не используется здесь, кроме как для обновления current_menu, что делается ниже.
+    # Если user_data_param был передан, он уже должен содержать актуальные данные.
+    await set_user_data(user_id, {'current_menu': menu_key})
+    
     await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     logger.info(f"User {user_id} shown menu '{menu_key}'.")
 
-# --- ОБРАБОТЧИКИ КОМАНД ---
-@auto_delete_message_decorator(is_command_to_keep=True) # /start сообщение не удаляем сразу
+@auto_delete_message_decorator(is_command_to_keep=True)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data_loc = await get_user_data(user_id)
@@ -521,7 +512,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'selected_api_type' not in user_data_loc: updates_to_user_data['selected_api_type'] = default_model_cfg["api_type"]
     if updates_to_user_data: await set_user_data(user_id, updates_to_user_data)
     
-    # Обновляем user_data_loc после возможных изменений
     if updates_to_user_data: user_data_loc.update(updates_to_user_data)
 
     current_model_k = await get_current_model_key(user_id, user_data_loc)
@@ -538,7 +528,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @auto_delete_message_decorator()
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_menu(update, update.effective_user.id, "main_menu")
+    user_data_loc = await get_user_data(update.effective_user.id) # Получаем user_data для show_menu
+    await show_menu(update, update.effective_user.id, "main_menu", user_data_loc)
 
 @auto_delete_message_decorator()
 async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -599,7 +590,13 @@ async def show_limits(update: Update, user_id: int):
 async def claim_news_bonus_logic(update: Update, user_id: int):
     user_data_loc = await get_user_data(user_id)
     parent_menu_k = user_data_loc.get('current_menu', 'bonus_submenu')
-    if parent_menu_k not in MENU_STRUCTURE or not MENU_STRUCTURE[parent_menu_k].get("is_submenu"): parent_menu_k = MENU_STRUCTURE.get(parent_menu_k,{}).get("parent","main_menu")
+    # Проверка, если current_menu не является подменю, а мы хотим вернуться в "родительское"
+    current_menu_details = MENU_STRUCTURE.get(parent_menu_k, MENU_STRUCTURE["main_menu"])
+    if not current_menu_details.get("is_submenu"):
+        parent_menu_k = "main_menu" # Если текущее не подменю, возвращаемся в главное
+    else: # Если подменю, пытаемся найти родителя, иначе главное
+        parent_menu_k = current_menu_details.get("parent", "main_menu")
+
 
     bonus_model_cfg = AVAILABLE_TEXT_MODELS.get(CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"])
     if not bonus_model_cfg:
@@ -657,15 +654,18 @@ async def show_help(update: Update, user_id: int):
     await update.message.reply_text(help_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu','help_submenu')), disable_web_page_preview=True)
 
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text: return
+    if not update.message or not update.message.text:
+        return 
+
     user_id = update.effective_user.id
     button_text = update.message.text.strip()
 
     if not is_menu_button_text(button_text):
-        return # Не кнопка меню, позволяем другим обработчикам (handle_text) работать
+        # Это не кнопка меню. Ничего не делаем, позволяем `handle_text` обработать.
+        return
 
-    # Это кнопка меню, обрабатываем и останавливаем дальнейшую обработку этого сообщения
-    await _store_and_try_delete_message(update, user_id) # Удаляем сообщение с текстом кнопки
+    # Это кнопка меню. Обрабатываем ее.
+    await _store_and_try_delete_message(update, user_id) 
 
     user_data_loc = await get_user_data(user_id)
     current_menu_k = user_data_loc.get('current_menu', 'main_menu')
@@ -678,31 +678,41 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await show_menu(update, user_id, "main_menu", user_data_loc)
     else:
         action_item_found = None
-        for item in MENU_STRUCTURE.get(current_menu_k, {}).get("items", []):
-            if item["text"] == button_text: action_item_found = item; break
-        if not action_item_found: # Поиск во всех меню на всякий случай
-            for menu_cfg_iter in MENU_STRUCTURE.values():
-                for item_iter in menu_cfg_iter["items"]:
-                    if item_iter["text"] == button_text: action_item_found = item_iter; break
-                if action_item_found: break
+        for item_list in [MENU_STRUCTURE.get(current_menu_k, {}).get("items", [])] + \
+                         [m_cfg["items"] for m_cfg in MENU_STRUCTURE.values() if m_cfg.get("items")]: # Поиск по всем меню
+            for item in item_list:
+                if item["text"] == button_text:
+                    action_item_found = item
+                    break
+            if action_item_found:
+                break
         
         if not action_item_found:
-            logger.warning(f"Button '{button_text}' by user {user_id} not matched to action.")
+            logger.warning(f"Button '{button_text}' by user {user_id} not matched to action despite is_menu_button_text=True.")
             await update.message.reply_text("Неизвестная команда.", reply_markup=generate_menu_keyboard(current_menu_k))
         else:
             action, target = action_item_found["action"], action_item_found["target"]
-            return_menu_k = MENU_STRUCTURE.get(current_menu_k, {}).get("parent", "main_menu")
-            response_msg_txt = "Действие выполнено." # Default
+            # Определяем меню для возврата более надежно
+            parent_menu_for_action = MENU_STRUCTURE.get(current_menu_k,{}).get("parent")
+            if not parent_menu_for_action and current_menu_k != "main_menu": # Если у текущего нет родителя, но это не главное меню
+                parent_menu_for_action = "main_menu"
+            elif not parent_menu_for_action and current_menu_k == "main_menu": # Если это главное меню, то и возвращаемся в него
+                 parent_menu_for_action = "main_menu"
 
-            if action == "submenu": await show_menu(update, user_id, target, user_data_loc)
+
+            response_msg_txt = "Действие выполнено." 
+
+            if action == "submenu": 
+                await show_menu(update, user_id, target, user_data_loc)
+                # После show_menu не нужен return, т.к. это уже финальное действие для кнопки
             elif action == "set_agent":
                 if target in AI_MODES and target != "gemini_pro_custom_mode":
                     await set_user_data(user_id, {'current_ai_mode': target})
                     agent_details_loc = AI_MODES[target]
                     response_msg_txt = f"🤖 Агент: <b>{agent_details_loc['name']}</b>.\n{agent_details_loc.get('welcome', '')}"
                 else: response_msg_txt = "⚠️ Ошибка: Агент не найден."
-                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-                await set_user_data(user_id, {'current_menu': return_menu_k})
+                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(parent_menu_for_action or "main_menu"), disable_web_page_preview=True)
+                await set_user_data(user_id, {'current_menu': parent_menu_for_action or "main_menu"})
             elif action == "set_model":
                 if target in AVAILABLE_TEXT_MODELS:
                     model_info = AVAILABLE_TEXT_MODELS[target]
@@ -710,35 +720,36 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     if target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
                         update_p['current_ai_mode'] = DEFAULT_AI_MODE_KEY
                     await set_user_data(user_id, update_p)
+                    user_data_loc.update(update_p) # Обновляем локальную копию для get_user_actual_limit_for_model
                     
-                    # Показ лимита для новой модели
                     bot_data_c = await get_bot_data()
                     today_s_val = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                     user_model_c = bot_data_c.get('all_user_daily_counts', {}).get(str(user_id), {})
                     model_daily_u = user_model_c.get(target, {'date': '', 'count': 0})
                     current_u_s = model_daily_u['count'] if model_daily_u['date'] == today_s_val else 0
-                    actual_l_s = await get_user_actual_limit_for_model(user_id, target, user_data_loc, bot_data_c) # Передаем обновленный user_data_loc
+                    actual_l_s = await get_user_actual_limit_for_model(user_id, target, user_data_loc, bot_data_c)
                     limit_s_str = f"{current_u_s}/{actual_l_s if actual_l_s != float('inf') else '∞'}"
                     response_msg_txt = f"⚙️ Модель: <b>{model_info['name']}</b>.\nЛимит: {limit_s_str}."
                 else: response_msg_txt = "⚠️ Ошибка: Модель не найдена."
-                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-                await set_user_data(user_id, {'current_menu': return_menu_k})
+                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(parent_menu_for_action or "main_menu"), disable_web_page_preview=True)
+                await set_user_data(user_id, {'current_menu': parent_menu_for_action or "main_menu"})
             elif action == "show_limits": await show_limits(update, user_id)
             elif action == "check_bonus": await claim_news_bonus_logic(update, user_id)
             elif action == "show_subscription": await show_subscription(update, user_id)
             elif action == "show_help": await show_help(update, user_id)
             else: logger.warning(f"Unknown action '{action}' for button '{button_text}' user {user_id}.")
     
-    raise DispatcherHandlerStop # Останавливаем обработку этого обновления здесь
+    # Если кнопка была обработана, функция завершается здесь (неявно возвращая None).
+    # Это должно предотвратить дальнейшую обработку обновления хэндлерами из других групп.
+    return
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not update.message or not update.message.text: return
     user_msg_txt = update.message.text.strip()
 
-    # Дополнительная проверка, хотя menu_button_handler должен был остановить обработку
-    if is_menu_button_text(user_msg_txt):
-        logger.info(f"User {user_id} sent menu button text '{user_msg_txt}' that reached handle_text. Ignoring.")
+    if is_menu_button_text(user_msg_txt): # Дополнительная защита
+        logger.debug(f"User {user_id} sent menu button text '{user_msg_txt}' that reached handle_text. Explicitly ignoring.")
         return
 
     if len(user_msg_txt) < CONFIG["MIN_AI_REQUEST_LENGTH"]:
@@ -747,10 +758,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     logger.info(f"User {user_id} AI request: '{user_msg_txt[:100]}...'")
-    user_data_c = await get_user_data(user_id) # Кэшируем
+    user_data_c = await get_user_data(user_id) 
     current_model_k_val = await get_current_model_key(user_id, user_data_c)
     model_cfg_val = AVAILABLE_TEXT_MODELS.get(current_model_k_val)
-    if not model_cfg_val: # Аварийный случай
+    if not model_cfg_val: 
         await update.message.reply_text("Критическая ошибка модели. Сообщите администратору.", reply_markup=generate_menu_keyboard(user_data_c.get('current_menu','main_menu')))
         return
 
@@ -776,7 +787,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif api_type_val == "custom_http_api":
         api_key_name = model_cfg_val.get("api_key_var_name")
         key_actual = globals().get(api_key_name)
-        if not key_actual or "YOUR_" in key_actual or not (key_actual.startswith("sk-") or key_actual.startswith("AIzaSy")): # AIzaSy для Gemini ключей
+        if not key_actual or "YOUR_" in key_actual or not (key_actual.startswith("sk-") or key_actual.startswith("AIzaSy")):
             response_txt_val = f"Ошибка ключа API для «{model_cfg_val.get('name', current_model_k_val)}»."
         else:
             hdrs = {"Authorization": f"Bearer {key_actual}", "Content-Type": "application/json", "Accept": "application/json"}
@@ -792,16 +803,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 json_resp = resp_custom.json()
                 extracted_txt = None
                 model_api_id_check = model_cfg_val["id"]
-                if model_api_id_check == "grok-3-beta" and "response" in json_resp and json_resp["response"] and "choices" in json_resp["response"][0] and json_resp["response"][0]["choices"]: extracted_txt = json_resp["response"][0]["choices"][0].get("message",{}).get("content","").strip()
+                if model_api_id_check == "grok-3-beta" and "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"] and "choices" in json_resp["response"][0] and isinstance(json_resp["response"][0]["choices"], list) and json_resp["response"][0]["choices"]: extracted_txt = json_resp["response"][0]["choices"][0].get("message",{}).get("content","").strip()
                 elif model_api_id_check == "gemini-2.5-pro-preview-03-25": extracted_txt = json_resp.get("text","").strip()
                 elif model_api_id_check == "gpt-4o-mini":
                     if json_resp.get("status") == "success":
-                        output = json_resp.get("output")
-                        if isinstance(output, str): extracted_txt = output.strip()
-                        elif isinstance(output, dict): extracted_txt = output.get("text", output.get("content", "")).strip()
-                        elif output is not None: extracted_txt = str(output).strip()
+                        output_val = json_resp.get("output") # Renamed to avoid conflict
+                        if isinstance(output_val, str): extracted_txt = output_val.strip()
+                        elif isinstance(output_val, dict): extracted_txt = output_val.get("text", output_val.get("content", "")).strip()
+                        elif output_val is not None: extracted_txt = str(output_val).strip()
                     else: extracted_txt = f"Ошибка API GPT-4o mini: {json_resp.get('status','N/A')}. {json_resp.get('error_message','')}"
-                if extracted_txt is None: # Fallback
+                if extracted_txt is None: 
                     for k_check in ["text", "content", "message", "output", "response"]:
                         if isinstance(json_resp.get(k_check),str) and (extracted_txt := json_resp[k_check].strip()): break
                 response_txt_val = extracted_txt if extracted_txt else "Ответ API не содержит текста."
@@ -825,7 +836,6 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     user_id = update.effective_user.id
     payment_info_obj = update.message.successful_payment
     logger.info(f"Successful payment from {user_id}. Payload: {payment_info_obj.invoice_payload}")
-    # Здесь должна быть логика определения длительности подписки из payload
     sub_days = 30 
     bot_data_upd = await get_bot_data()
     user_subs_upd = bot_data_upd.get('user_subscriptions',{})
@@ -837,7 +847,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             prev_valid = datetime.fromisoformat(current_sub['valid_until'])
             if prev_valid.tzinfo is None: prev_valid = prev_valid.replace(tzinfo=timezone.utc)
             if prev_valid > now_utc_val: start_ext_date = prev_valid
-        except ValueError: pass # Ошибка формата даты, используем now_utc_val
+        except ValueError: pass 
     new_valid_date = start_ext_date + timedelta(days=sub_days)
     user_subs_upd[str(user_id)] = {'level': CONFIG["PRO_SUBSCRIPTION_LEVEL_KEY"], 'valid_until': new_valid_date.isoformat(), 'last_payment_amount': payment_info_obj.total_amount, 'currency': payment_info_obj.currency, 'purchase_date': now_utc_val.isoformat()}
     await set_bot_data({'user_subscriptions': user_subs_upd})
@@ -851,7 +861,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
     tb_str = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-    logger.error(f"Full Traceback:\n{tb_str}")
+    # logger.error(f"Full Traceback:\n{tb_str}") # Уже логируется через exc_info=context.error
     if isinstance(update, Update) and update.effective_chat:
         user_data_err = await get_user_data(update.effective_user.id) if update.effective_user else {}
         try: await context.bot.send_message(update.effective_chat.id, "Произошла ошибка. Попробуйте /start.", reply_markup=generate_menu_keyboard(user_data_err.get('current_menu','main_menu')))
@@ -875,7 +885,7 @@ async def main():
     app.add_handler(CommandHandler("help", help_command), group=0)
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2) # Будет вызван только если menu_button_handler не остановил обработку
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
     
     app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
