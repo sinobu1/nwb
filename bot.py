@@ -1,5 +1,6 @@
 import telegram
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, BotCommand, ParseMode, ChatAction
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, BotCommand, ChatAction
+from telegram.constants import ParseMode  # Импорт ParseMode из telegram.constants
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, PreCheckoutQueryHandler
 import google.generativeai as genai
 import google.api_core.exceptions
