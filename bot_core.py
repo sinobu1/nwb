@@ -12,7 +12,7 @@ import google.generativeai as genai
 import google.api_core.exceptions
 import requests
 from telegram import ReplyKeyboardMarkup, KeyboardButton # Только для generate_menu_keyboard, если она останется тут
-
+import asyncio
 
 logger = logging.getLogger(__name__)
 
