@@ -26,7 +26,6 @@ from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1 import AsyncClient
 from gemini_pro_handler import query_gemini_pro, GEMINI_PRO_CONFIG
-from gemini_pro_handler import query_gemini_pro, GEMINI_PRO_CONFIG
 from grok_3_handler import query_grok_3, GROK_3_CONFIG
 
 nest_asyncio.apply()
@@ -36,11 +35,8 @@ logger = logging.getLogger(__name__)
 # --- КЛЮЧИ API И ТОКЕНЫ ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
 GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
-CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
 CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-# --- НОВЫЙ КЛЮЧ API ДЛЯ GPT-4o mini ---
-CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P") # Замените на ваш ключ или переменную окружения
+CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
 PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602")
 YOUR_ADMIN_ID = 489230152
 
@@ -1353,26 +1349,19 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if not update.message or not update.message.text: # Should not happen with text filter but good practice
+    if not update.message or not update.message.text:
         return
         
     user_message = update.message.text.strip()
     chat_id = update.effective_chat.id
 
-    # Check if the incoming text is actually a menu button text.
-    # This can happen if menu_button_handler has higher priority but doesn't consume the update,
-    # or if priorities are managed such that this is a fallback.
-    # Given `is_menu_button_text` is also called at the start of `menu_button_handler`,
-    # this check here acts as a failsafe or if `handle_text` somehow gets a button press.
     if is_menu_button_text(user_message):
         logger.info(f"User {user_id} sent text '{user_message}' which is a menu button. Re-routing or ignoring in handle_text.")
-        # Potentially call menu_button_handler here if it wasn't caught, or simply return.
-        # For now, return, assuming menu_button_handler (group 1) should have caught it.
         return
 
     if len(user_message) < MIN_AI_REQUEST_LENGTH:
         logger.info(f"User {user_id} sent a message too short for AI: '{user_message}'")
-        user_data_short_req = await get_user_data(user_id) # Use new var name
+        user_data_short_req = await get_user_data(user_id)
         await update.message.reply_text(
             "Ваш запрос слишком короткий. Пожалуйста, сформулируйте его более подробно или воспользуйтесь меню.",
             reply_markup=generate_menu_keyboard(user_data_short_req.get('current_menu', 'main_menu')),
@@ -1381,31 +1370,27 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    logger.info(f"User {user_id} sent AI request: '{user_message[:100]}...'") # Log truncated message
+    logger.info(f"User {user_id} sent AI request: '{user_message[:100]}...'")
 
     current_model_key = await get_current_model_key(user_id)
-    model_config = AVAILABLE_TEXT_MODELS.get(current_model_key) # It should always exist due to get_current_model_key fallback
-    if not model_config: # Should ideally not happen
+    model_config = AVAILABLE_TEXT_MODELS.get(current_model_key)
+    if not model_config:
         logger.error(f"CRITICAL: Model configuration not found for key '{current_model_key}' for user {user_id}. Defaulting to emergency fallback.")
-        # This is a critical state, might indicate issues with DEFAULT_MODEL_KEY or AVAILABLE_TEXT_MODELS structure.
-        # As an emergency fallback, try to use the absolute default model if current_model_key resolution failed badly.
         current_model_key = DEFAULT_MODEL_KEY
         model_config = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
-        # Notify admin if possible, or send a very generic error to user.
         user_data = await get_user_data(user_id)
         await update.message.reply_text("Произошла критическая ошибка конфигурации модели. Пожалуйста, сообщите администратору.",
                                         reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu')))
         return
 
-
-    can_proceed, limit_message_text, current_req_count = await check_and_log_request_attempt(user_id, current_model_key) # Use new var name
+    can_proceed, limit_message_text, current_req_count = await check_and_log_request_attempt(user_id, current_model_key)
 
     if not can_proceed:
         logger.info(f"User {user_id} hit limit for model {current_model_key}. Message: {limit_message_text}")
-        user_data_limit = await get_user_data(user_id) # Use new var name
+        user_data_limit = await get_user_data(user_id)
         await update.message.reply_text(
             limit_message_text,
-            parse_mode=ParseMode.HTML, # limit_message_text often contains HTML
+            parse_mode=ParseMode.HTML,
             reply_markup=generate_menu_keyboard(user_data_limit.get('current_menu', 'main_menu')),
             disable_web_page_preview=True
         )
@@ -1413,36 +1398,31 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     
-    mode_details_for_prompt = await get_current_mode_details(user_id) # Use new var name
-    system_prompt_text = mode_details_for_prompt["prompt"] # Use new var name
-    # For google_genai, the full prompt includes the system prompt.
-    # For custom_http_api, system_prompt is often sent as a separate message in the payload.
+    mode_details_for_prompt = await get_current_mode_details(user_id)
+    system_prompt_text = mode_details_for_prompt["prompt"]
     
-    response_text_from_api = "К сожалению, не удалось получить ответ от ИИ." # Default error message
+    response_text_from_api = "К сожалению, не удалось получить ответ от ИИ."
 
-    # --- ИЗМЕНЕНИЕ: ИСПОЛЬЗОВАНИЕ api_type ИЗ КОНФИГУРАЦИИ МОДЕЛИ ---
     api_type_from_config = model_config.get("api_type", "").strip()
 
     if api_type_from_config == "google_genai":
-        # Construct the full prompt for Google GenAI, including the system instructions
         full_prompt_for_google = f"{system_prompt_text}\n\n**Пользовательский запрос:**\n{user_message}"
         
-        genai_model = genai.GenerativeModel( # Use new var name
+        genai_model = genai.GenerativeModel(
             model_name=model_config["id"],
             generation_config={"max_output_tokens": MAX_OUTPUT_TOKENS_GEMINI_LIB}
-            # safety_settings can be added here if needed
         )
         try:
             logger.info(f"Sending request to Google GenAI model: {model_config['id']} for user {user_id}")
-            genai_response = await asyncio.get_event_loop().run_in_executor( # Use new var name
+            genai_response = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: genai_model.generate_content(full_prompt_for_google)
             )
             response_text_from_api = genai_response.text.strip() if genai_response.text else "Ответ от Google GenAI пуст."
             logger.info(f"Google GenAI response received for user {user_id}. Length: {len(response_text_from_api)}")
-        except google.api_core.exceptions.ResourceExhausted as e_res_exh: # Use new var name
+        except google.api_core.exceptions.ResourceExhausted as e_res_exh:
             response_text_from_api = "Лимит использования Google API на данный момент исчерпан. Пожалуйста, попробуйте позже."
             logger.error(f"Google API ResourceExhausted for user {user_id}, model {model_config['id']}: {e_res_exh}")
-        except Exception as e_google: # Use new var name
+        except Exception as e_google:
             response_text_from_api = f"Произошла ошибка при обращении к Google API: {type(e_google).__name__}. Попробуйте позже."
             logger.error(f"Google GenAI API error for user {user_id}, model {model_config['id']}: {e_google}", exc_info=True)
 
@@ -1458,12 +1438,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Custom API key error: Variable name '{api_key_variable_name}' for model '{current_model_key}' not found in globals, is None, or seems to be a placeholder.")
         else:
             if current_model_key == "custom_api_gemini_2_5_pro":
-                # Используем модуль gemini_pro_handler
                 response_text_from_api, success = await query_gemini_pro(system_prompt_text, user_message)
                 if not success:
                     logger.warning(f"Gemini 2.5 Pro query failed for user {user_id}: {response_text_from_api}")
             elif current_model_key == "custom_api_grok_3":
-                # Используем модуль grok_3_handler
                 response_text_from_api, success = await query_grok_3(system_prompt_text, user_message)
                 if not success:
                     logger.warning(f"Grok 3 query failed for user {user_id}: {response_text_from_api}")
@@ -1561,30 +1539,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     response_text_from_api = f"Неожиданная ошибка при работе с Custom API: {type(e_custom_other).__name__}."
                     logger.error(f"Unexpected error with Custom API model {model_config['id']}: {e_custom_other}", exc_info=True)
 
-
-    else: # Unknown api_type
+    else:
         response_text_from_api = "Ошибка конфигурации: Неизвестный тип API для выбранной модели. Обратитесь к администратору."
         logger.error(f"Unknown api_type '{api_type_from_config}' for model {current_model_key}. Please check model configuration in AVAILABLE_TEXT_MODELS.")
 
-    # Truncate if necessary and increment count (even if API errored, the attempt was made)
-    final_response_text, was_truncated_flag = smart_truncate(response_text_from_api, MAX_MESSAGE_LENGTH_TELEGRAM) # Use new var names
+    final_response_text, was_truncated_flag = smart_truncate(response_text_from_api, MAX_MESSAGE_LENGTH_TELEGRAM)
     if was_truncated_flag:
         logger.info(f"Response for user {user_id} (model {current_model_key}) was truncated to {MAX_MESSAGE_LENGTH_TELEGRAM} chars.")
 
-    # Increment count regardless of success/failure of the API call itself, as an attempt was made
-    # unless the failure was due to API key config before the call.
-    # The check_and_log_request_attempt ensures user has quota.
-    # Increment count here, after the API call attempt.
     await increment_request_count(user_id, current_model_key)
     
-    user_data_reply = await get_user_data(user_id) # Use new var name
+    user_data_reply = await get_user_data(user_id)
     await update.message.reply_text(
         final_response_text,
-        parse_mode=None, # Send as plain text to avoid issues with special chars in AI response
+        parse_mode=None,
         reply_markup=generate_menu_keyboard(user_data_reply.get('current_menu', 'main_menu')),
         disable_web_page_preview=True
     )
-    logger.info(f"Sent AI response (model: {current_model_key}) to user {user_id}. Start of response: '{final_response_text[:100].replacechr(10, ' ')}...'")
+    logger.info(f"Sent AI response (model: {current_model_key}) to user {user_id}. Start of response: '{final_response_text[:100].replace('\n', ' ')}...'")
 
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1806,23 +1778,17 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Failed to configure Google Gemini API with key starting '{GOOGLE_GEMINI_API_KEY[:10]}...': {str(e)}")
 
-    # Check Custom API Keys (log warnings if they seem like placeholders)
-    if not CUSTOM_GEMINI_PRO_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GEMINI_PRO_API_KEY or not CUSTOM_GEMINI_PRO_API_KEY.startswith("sk-"):
-        logger.warning("Custom Gemini Pro API key (CUSTOM_GEMINI_PRO_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
-    
+    # Check Custom API Keys
     if not CUSTOM_GROK_3_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GROK_3_API_KEY or not CUSTOM_GROK_3_API_KEY.startswith("sk-"):
         logger.warning("Custom Grok 3 API key (CUSTOM_GROK_3_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
 
-    # --- НОВАЯ ПРОВЕРКА КЛЮЧА ДЛЯ GPT-4o mini ---
-    if not CUSTOM_GPT4O_MINI_API_KEY or "YOUR_GPT4O_MINI_KEY_HERE" in CUSTOM_GPT4O_MINI_API_KEY or not CUSTOM_GPT4O_MINI_API_KEY.startswith("sk-"): # Assuming it also starts with "sk-" or similar
-        logger.warning("Custom GPT-4o mini API key (CUSTOM_GPT4O_MINI_API_KEY) appears to be missing, a placeholder, or incorrectly formatted. Please set it.")
+    if not CUSTOM_GPT4O_MINI_API_KEY or "YOUR_GPT4O_MINI_KEY_HERE" in CUSTOM_GPT4O_MINI_API_KEY or not CUSTOM_GPT4O_MINI_API_KEY.startswith("sk-"):
+        logger.warning("Custom GPT-4o mini API key (CUSTOM_GPT4O_MINI_API_KEY) appears to be missing, a placeholder, or incorrectly formatted.")
 
     if not PAYMENT_PROVIDER_TOKEN or "YOUR_PAYMENT_PROVIDER_TOKEN" in PAYMENT_PROVIDER_TOKEN:
         logger.warning("Payment Provider Token (PAYMENT_PROVIDER_TOKEN) appears to be missing or a placeholder. Payments will not work.")
     
     if not db:
         logger.critical("Firestore database (db) is not initialized. Bot may not function correctly. Check Firebase setup.")
-        # Depending on criticality, you might exit or run with limited functionality.
-        # For now, it will run but Firestore operations will be skipped.
 
     asyncio.run(main())
