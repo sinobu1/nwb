@@ -1,2 +1,2 @@
-web: python main_core.py
+web: python main_bot.py
 web: python bot_core.py
