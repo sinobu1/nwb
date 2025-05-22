@@ -20,11 +20,11 @@ import json
 from datetime import datetime, timedelta, timezone
 from telegram import LabeledPrice
 from typing import Optional, Dict, Any
-import uuid # Был импортирован, но не использовался. Оставим на всякий случай.
+import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
-from google.cloud.firestore_v1.client import Client as FirestoreClient # <--- ИЗМЕНЕНИЕ: Явный импорт для аннотации
+from google.cloud.firestore_v1.client import Client as FirestoreClient
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -216,8 +216,7 @@ MENU_STRUCTURE = {
     "help_submenu": {"title": "Помощь", "items": [{"text": "❓ Справка", "action": "show_help", "target": "help"}], "parent": "main_menu", "is_submenu": True}
 }
 
-# --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
-db: Optional[FirestoreClient] = None # <--- ИЗМЕНЕНИЕ: Используем импортированный FirestoreClient для аннотации
+db: Optional[FirestoreClient] = None
 try:
     firebase_creds_json = CONFIG["FIREBASE_CREDENTIALS_JSON_STR"]
     cred_obj = None
@@ -239,7 +238,7 @@ try:
         logger.info("Firebase app successfully initialized.")
     else:
         logger.info("Firebase app already initialized.")
-    db = firestore.client() # Это возвращает экземпляр FirestoreClient
+    db = firestore.client()
     logger.info("Firestore client successfully initialized.")
 except Exception as e:
     logger.error(f"Critical error during Firebase/Firestore initialization: {e}", exc_info=True)
@@ -312,7 +311,8 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
         }
     await set_user_data(user_id, user_data_for_msg_handling)
 
-async def auto_delete_message_decorator(is_command_to_keep: bool = False):
+# ИЗМЕНЕНИЕ: auto_delete_message_decorator теперь обычная функция
+def auto_delete_message_decorator(is_command_to_keep: bool = False):
     def decorator(func):
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if update.effective_user:
@@ -509,7 +509,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'selected_model_id' not in user_data_loc: updates_to_user_data['selected_model_id'] = default_model_cfg["id"]
     if 'selected_api_type' not in user_data_loc: updates_to_user_data['selected_api_type'] = default_model_cfg["api_type"]
     if updates_to_user_data: await set_user_data(user_id, updates_to_user_data)
-    if updates_to_user_data: user_data_loc.update(updates_to_user_data) # Обновляем локальную копию user_data_loc
+    if updates_to_user_data: user_data_loc.update(updates_to_user_data)
 
     current_model_k = await get_current_model_key(user_id, user_data_loc)
     mode_details_res = await get_current_mode_details(user_id, user_data_loc)
@@ -647,7 +647,6 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not is_menu_button_text(button_text):
         return # Не кнопка меню, передаем управление дальше (в handle_text)
 
-    # Это кнопка меню, обрабатываем.
     await _store_and_try_delete_message(update, user_id) 
     user_data_loc = await get_user_data(user_id)
     current_menu_k = user_data_loc.get('current_menu', 'main_menu')
@@ -656,8 +655,10 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if button_text == "⬅️ Назад":
         parent_k = MENU_STRUCTURE.get(current_menu_k, {}).get("parent", "main_menu")
         await show_menu(update, user_id, parent_k, user_data_loc)
+        return # Обработано
     elif button_text == "🏠 Главное меню":
         await show_menu(update, user_id, "main_menu", user_data_loc)
+        return # Обработано
     else:
         action_item_found = None
         for item_list in [MENU_STRUCTURE.get(current_menu_k, {}).get("items", [])] + \
@@ -668,58 +669,52 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if not action_item_found:
             logger.warning(f"Button '{button_text}' by user {user_id} not matched despite is_menu_button_text=True.")
             await update.message.reply_text("Неизвестная команда.", reply_markup=generate_menu_keyboard(current_menu_k))
-        else:
-            action, target = action_item_found["action"], action_item_found["target"]
-            # Определяем меню для возврата
-            action_origin_menu_key = current_menu_k # Предполагаем, что действие из текущего меню
-            for menu_key_search, menu_config_search in MENU_STRUCTURE.items():
-                for item_search in menu_config_search.get("items", []):
-                    if item_search.get("text") == button_text and item_search.get("action") == action and item_search.get("target") == target:
-                        action_origin_menu_key = menu_key_search
-                        break
-                if action_origin_menu_key == menu_key_search:
-                    break
-            
-            return_menu_k = MENU_STRUCTURE.get(action_origin_menu_key, {}).get("parent", "main_menu")
-            if action_origin_menu_key == "main_menu" : return_menu_k = "main_menu" # Если из главного, то и возвращаемся в главное
+            return # Обработано (показали ошибку)
+        
+        action, target = action_item_found["action"], action_item_found["target"]
+        action_origin_menu_key = current_menu_k
+        for menu_key_search, menu_config_search in MENU_STRUCTURE.items():
+            for item_search in menu_config_search.get("items", []):
+                if item_search.get("text") == button_text and item_search.get("action") == action and item_search.get("target") == target:
+                    action_origin_menu_key = menu_key_search; break
+            if action_origin_menu_key == menu_key_search: break
+        return_menu_k = MENU_STRUCTURE.get(action_origin_menu_key, {}).get("parent", "main_menu")
+        if action_origin_menu_key == "main_menu" : return_menu_k = "main_menu"
 
-
-            if action == "submenu": await show_menu(update, user_id, target, user_data_loc)
-            elif action == "set_agent":
-                response_msg_txt = "⚠️ Ошибка: Агент не найден."
-                if target in AI_MODES and target != "gemini_pro_custom_mode":
-                    await set_user_data(user_id, {'current_ai_mode': target})
-                    agent_details_loc = AI_MODES[target]
-                    response_msg_txt = f"🤖 Агент: <b>{agent_details_loc['name']}</b>.\n{agent_details_loc.get('welcome', '')}"
-                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-                await set_user_data(user_id, {'current_menu': return_menu_k})
-            elif action == "set_model":
-                response_msg_txt = "⚠️ Ошибка: Модель не найдена."
-                if target in AVAILABLE_TEXT_MODELS:
-                    model_info = AVAILABLE_TEXT_MODELS[target]
-                    update_p = {'selected_model_id': model_info["id"], 'selected_api_type': model_info["api_type"]}
-                    if target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
-                        update_p['current_ai_mode'] = DEFAULT_AI_MODE_KEY
-                    await set_user_data(user_id, update_p)
-                    user_data_loc.update(update_p)
-                    bot_data_c = await get_bot_data()
-                    today_s_val = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                    user_model_c = bot_data_c.get('all_user_daily_counts', {}).get(str(user_id), {})
-                    model_daily_u = user_model_c.get(target, {'date': '', 'count': 0})
-                    current_u_s = model_daily_u['count'] if model_daily_u['date'] == today_s_val else 0
-                    actual_l_s = await get_user_actual_limit_for_model(user_id, target, user_data_loc, bot_data_c)
-                    limit_s_str = f"{current_u_s}/{actual_l_s if actual_l_s != float('inf') else '∞'}"
-                    response_msg_txt = f"⚙️ Модель: <b>{model_info['name']}</b>.\nЛимит: {limit_s_str}."
-                await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-                await set_user_data(user_id, {'current_menu': return_menu_k})
-            elif action == "show_limits": await show_limits(update, user_id)
-            elif action == "check_bonus": await claim_news_bonus_logic(update, user_id)
-            elif action == "show_subscription": await show_subscription(update, user_id)
-            elif action == "show_help": await show_help(update, user_id)
-            else: logger.warning(f"Unknown action '{action}' for button '{button_text}' user {user_id}.")
-    # После обработки кнопки, функция завершается. Неявный return None.
-    # Это должно предотвратить переход к handle_text в группе 2.
-    return
+        if action == "submenu": await show_menu(update, user_id, target, user_data_loc)
+        elif action == "set_agent":
+            response_msg_txt = "⚠️ Ошибка: Агент не найден."
+            if target in AI_MODES and target != "gemini_pro_custom_mode":
+                await set_user_data(user_id, {'current_ai_mode': target})
+                agent_details_loc = AI_MODES[target]
+                response_msg_txt = f"🤖 Агент: <b>{agent_details_loc['name']}</b>.\n{agent_details_loc.get('welcome', '')}"
+            await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
+            await set_user_data(user_id, {'current_menu': return_menu_k})
+        elif action == "set_model":
+            response_msg_txt = "⚠️ Ошибка: Модель не найдена."
+            if target in AVAILABLE_TEXT_MODELS:
+                model_info = AVAILABLE_TEXT_MODELS[target]
+                update_p = {'selected_model_id': model_info["id"], 'selected_api_type': model_info["api_type"]}
+                if target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
+                    update_p['current_ai_mode'] = DEFAULT_AI_MODE_KEY
+                await set_user_data(user_id, update_p)
+                user_data_loc.update(update_p)
+                bot_data_c = await get_bot_data()
+                today_s_val = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                user_model_c = bot_data_c.get('all_user_daily_counts', {}).get(str(user_id), {})
+                model_daily_u = user_model_c.get(target, {'date': '', 'count': 0})
+                current_u_s = model_daily_u['count'] if model_daily_u['date'] == today_s_val else 0
+                actual_l_s = await get_user_actual_limit_for_model(user_id, target, user_data_loc, bot_data_c)
+                limit_s_str = f"{current_u_s}/{actual_l_s if actual_l_s != float('inf') else '∞'}"
+                response_msg_txt = f"⚙️ Модель: <b>{model_info['name']}</b>.\nЛимит: {limit_s_str}."
+            await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
+            await set_user_data(user_id, {'current_menu': return_menu_k})
+        elif action == "show_limits": await show_limits(update, user_id)
+        elif action == "check_bonus": await claim_news_bonus_logic(update, user_id)
+        elif action == "show_subscription": await show_subscription(update, user_id)
+        elif action == "show_help": await show_help(update, user_id)
+        else: logger.warning(f"Unknown action '{action}' for button '{button_text}' user {user_id}.")
+    return # Явный return в конце обработки кнопки
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
