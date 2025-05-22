@@ -270,7 +270,7 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
 
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
     if not isinstance(text, str) or len(text) <= max_length:
-        return str(text), False
+        return str(textව, False
 
     suffix = "\n\n(...ответ был сокращен)"
     adjusted_max_length = max_length - len(suffix)
@@ -865,7 +865,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await firestore_service.set_user_data(user_id, {'current_menu': return_menu_key_after_action})
 
     elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL:
-        response_message_text = "⚠️ Произошла ошибка: Выбранная модель не найдена или не доступна."
+        response_message_text = "⚠️ Произошла ошибка: Выбранная модель не найдена или не доступен."
         if action_target in AVAILABLE_TEXT_MODELS:
             model_info = AVAILABLE_TEXT_MODELS[action_target]
             update_payload = {
@@ -1007,6 +1007,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
+    # Регистрация обработчиков
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("menu", open_menu_command))
     app.add_handler(CommandHandler("usage", usage_command))
@@ -1018,7 +1019,29 @@ async def main():
 
     try:
         logger.info("Starting bot polling...")
-        await app.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Удаляем вебхук с очисткой очереди обновлений
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook deleted with drop_pending_updates=True")
+        # Небольшая задержка для обработки Telegram API
+        await asyncio.sleep(2)
+        # Запускаем polling с обработкой конфликтов
+        await app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            error_callback=lambda exc: logger.error(f"Polling error: {exc}", exc_info=True)
+        )
+    except telegram.error.Conflict as ce:
+        logger.error(f"Conflict error during polling: {ce}. Retrying in 10 seconds...")
+        await asyncio.sleep(10)
+        # Повторная попытка удаления вебхука
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Retried webhook deletion with drop_pending_updates=True")
+        await asyncio.sleep(2)
+        await app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+            error_callback=lambda exc: logger.error(f"Polling error after retry: {exc}", exc_info=True)
+        )
     except Exception as e:
         logger.critical(f"Critical error in bot polling: {e}", exc_info=True)
         raise
