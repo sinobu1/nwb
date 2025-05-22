@@ -1,16 +1,17 @@
 import telegram
 from telegram import (
     ReplyKeyboardMarkup, KeyboardButton, Update,
-    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup,
+    LabeledPrice
 )
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
+    ContextTypes, PreCheckoutQueryHandler, CallbackQueryHandler # Добавлен CallbackQueryHandler
 )
 import google.generativeai as genai
 import google.api_core.exceptions
-import requests
+import requests # Оставлен, если используется для других целей, иначе можно удалить
 import logging
 import traceback
 import os
@@ -18,867 +19,757 @@ import asyncio
 import nest_asyncio
 import json
 from datetime import datetime, timedelta, timezone
-from telegram import LabeledPrice
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, List # Улучшены аннотации типов
 import uuid
+
+# Firebase
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
-from google.cloud.firestore_v1.client import Client as FirestoreClient
+from google.cloud.firestore_v1.client import Client as FirestoreClient # Явный импорт для ясности
 
 nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# --- Глобальная конфигурация логирования ---
+# Принцип: Ясность и Стандартизация
+# Логирование настраивается один раз и используется во всем приложении.
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-# --- КОНФИГУРАЦИЯ ---
-CONFIG = {
-    "TELEGRAM_TOKEN": os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0"),
-    "GOOGLE_GEMINI_API_KEY": os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"),
-    "CUSTOM_GEMINI_PRO_API_KEY": os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P"),
-    "CUSTOM_GEMINI_PRO_ENDPOINT": os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro"),
-    "CUSTOM_GROK_3_API_KEY": os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P"),
-    "CUSTOM_GPT4O_MINI_API_KEY": os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P"),
-    "PAYMENT_PROVIDER_TOKEN": os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602"),
-    "ADMIN_ID": int(os.getenv("ADMIN_ID", "489230152")),
-    "FIREBASE_CREDENTIALS_JSON_STR": os.getenv("FIREBASE_CREDENTIALS"),
-    "FIREBASE_CERT_PATH": "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json",
+# --- КОНСТАНТЫ ---
+# Принцип: DRY (Don't Repeat Yourself) и Читаемость
+# Использование констант вместо "магических строк" улучшает читаемость и упрощает изменения.
 
-    "MAX_OUTPUT_TOKENS_GEMINI_LIB": 2048,
-    "MAX_MESSAGE_LENGTH_TELEGRAM": 4000,
-    "MIN_AI_REQUEST_LENGTH": 4,
+# Ключи конфигурации
+CONFIG_TELEGRAM_TOKEN = "TELEGRAM_TOKEN"
+CONFIG_GEMINI_API_KEY = "GOOGLE_GEMINI_API_KEY"
+CONFIG_FIREBASE_CRED_PATH = "FIREBASE_CREDENTIALS_PATH"
+CONFIG_FIREBASE_DB_URL = "FIREBASE_DATABASE_URL" # Пример, если используется Realtime Database URL
+CONFIG_ADMIN_USER_ID = "ADMIN_USER_ID"
+CONFIG_FREE_DAILY_LIMIT = "FREE_DAILY_LIMIT"
+CONFIG_BONUS_CHANNEL_ID = "BONUS_CHANNEL_ID"
+CONFIG_BONUS_CHANNEL_LINK = "BONUS_CHANNEL_LINK"
+CONFIG_PAYMENT_PROVIDER_TOKEN = "PAYMENT_PROVIDER_TOKEN"
+CONFIG_PRICE_AMOUNT_RUB = "PRICE_AMOUNT_RUB" # Сумма в копейках (e.g., 10000 for 100 RUB)
+CONFIG_PRICE_LABEL = "PRICE_LABEL"
+CONFIG_PRICE_DESCRIPTION = "PRICE_DESCRIPTION"
+CONFIG_CURRENCY = "RUB" # Валюта платежа
 
-    "DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY": 72,
-    "DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY": 48,
-    "DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY": 75,
-    "DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY": 0,
-    "DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY": 25,
-    "PRO_SUBSCRIPTION_LEVEL_KEY": "profi_access_v1",
-    "DEFAULT_FREE_REQUESTS_GROK_DAILY": 3,
-    "DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY": 25,
-    "DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY": 3,
-    "DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY": 25,
+# Названия коллекций Firestore
+FIRESTORE_USERS_COLLECTION = "users"
+FIRESTORE_PAYMENTS_COLLECTION = "payments"
 
-    "NEWS_CHANNEL_USERNAME": "@timextech",
-    "NEWS_CHANNEL_LINK": "https://t.me/timextech",
-    "NEWS_CHANNEL_BONUS_MODEL_KEY": "custom_api_gemini_2_5_pro",
-    "NEWS_CHANNEL_BONUS_GENERATIONS": 1,
+# Тексты для кнопок и сообщений (примеры)
+TEXT_MENU_BUTTON = "📋 Открыть меню"
+TEXT_USAGE_BUTTON = "📊 Мои лимиты"
+TEXT_SUBSCRIBE_BUTTON = "💎 О подписке"
+# ... другие тексты
 
-    "DEFAULT_AI_MODE_KEY": "universal_ai_basic",
-    "DEFAULT_MODEL_KEY": "google_gemini_2_0_flash",
-}
+# Callback data префиксы (для Inline кнопок)
+CALLBACK_PREFIX_ACTION = "action:"
+# ... другие префиксы
 
-TOKEN = CONFIG["TELEGRAM_TOKEN"]
-GOOGLE_GEMINI_API_KEY = CONFIG["GOOGLE_GEMINI_API_KEY"]
-CUSTOM_GEMINI_PRO_API_KEY = CONFIG["CUSTOM_GEMINI_PRO_API_KEY"]
-CUSTOM_GEMINI_PRO_ENDPOINT = CONFIG["CUSTOM_GEMINI_PRO_ENDPOINT"]
-CUSTOM_GROK_3_API_KEY = CONFIG["CUSTOM_GROK_3_API_KEY"]
-CUSTOM_GPT4O_MINI_API_KEY = CONFIG["CUSTOM_GPT4O_MINI_API_KEY"]
-PAYMENT_PROVIDER_TOKEN = CONFIG["PAYMENT_PROVIDER_TOKEN"]
-YOUR_ADMIN_ID = CONFIG["ADMIN_ID"]
+# --- ЗАГРУЗКА КОНФИГУРАЦИИ ---
+# Принцип: Централизация конфигурации, KISS
+# Загрузка конфигурации из переменных окружения или значений по умолчанию.
+def load_config() -> Dict[str, Any]:
+    """Загружает конфигурацию из переменных окружения."""
+    # Путь к файлу Firebase credentials из переменной окружения или по умолчанию
+    default_firebase_creds_path = os.path.join(os.path.dirname(__file__), "firebase_credentials.json")
 
-AI_MODES = {
-    "universal_ai_basic": {
-        "name": "Универсальный",
-        "prompt": (
-            "Ты — Gemini, продвинутый ИИ-ассистент от Google."
-            "Твоя цель — эффективно помогать пользователю с широким спектром задач:"
-            "отвечать на вопросы, генерировать текст, объяснять,"
-            "анализировать и предоставлять информацию."
-            "Всегда будь вежлив, объективен, точен и полезен."
-            "Предупреждай, если твои знания ограничены по времени."
-            "ОФОРМЛЕНИЕ ОТВЕТА:"
-            "1. Структура и ясность: Ответ должен быть понятным, хорошо структурированным и легким для восприятия. Четко разделяй смысловые блоки абзацами, используя одну или две пустые строки между ними."
-            "2. Списки: Для перечислений используй нумерованные списки, например 1., 2., или маркированные списки, например -, *, со стандартными символами."
-            "3. Заголовки: Для крупных смысловых блоков можешь использовать краткие поясняющие заголовки на отдельной строке, можно ЗАГЛАВНЫМИ БУКВАМИ."
-            "4. Чистота текста: Генерируй только ясный, чистый текст без избыточных символов или пунктуации, не несущей смысловой нагрузки или не требуемой грамматикой."
-            "5. Полнота: Старайся давать полные ответы. Убедись, что пункты списков завершены, и не начинай новый, если не уверен, что сможешь его закончить."
-        ),
-        "welcome": "Активирован агент 'Универсальный'. Какой у вас запрос?"
-    },
-    "gemini_pro_custom_mode": {
-        "name": "Продвинутый",
-        "prompt": (
-            "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент."
-            "Твоя задача — предоставлять точные, развернутые и полезные ответы на запросы пользователя."
-            "Соблюдай вежливость и объективность."
-            "Формулируй ответы ясно и структурированно, используя абзацы и списки при необходимости."
-            "Если твои знания ограничены по времени, укажи это."
-        ),
-        "welcome": "Активирован агент 'Продвинутый'. Какой у вас запрос?"
-    },
-    "creative_helper": {
-        "name": "Творческий",
-        "prompt": (
-            "Ты — Gemini, креативный ИИ-партнёр и писатель. "
-            "Твоя миссия — вдохновлять, помогать в создании оригинального контента (тексты, идеи, сценарии, стихи и т.д.) и развивать творческие замыслы пользователя."
-            "Будь смелым в идеях, предлагай неожиданные решения, но всегда оставайся в рамках этики и здравого смысла."
-            "Форматирование: 1. Абзацы: Для прозы и описаний — четкое разделение на абзацы."
-            "2. Стихи: Соблюдай строфы и строки, если это подразумевается заданием."
-            "3. Диалоги: Оформляй диалоги стандартным образом, например: - Привет! - сказал он. или с новой строки для каждого персонажа."
-            "4. Язык: Используй богатый и выразительный язык, соответствующий творческой задаче."
-            "6. Завершённость: Старайся доводить творческие произведения до логического конца в рамках одного ответа, если это подразумевается задачей."
-        ),
-        "welcome": "Агент 'Творческий' к вашим услугам! Над какой задачей поработаем?"
-    },
-    "analyst": {
-        "name": "Аналитик",
-        "prompt": (
-            "Ты — ИИ-аналитик на базе Gemini, специализирующийся на анализе данных, фактов и трендов."
-            "Твоя задача — предоставлять точные, логически обоснованные и структурированные ответы на запросы, связанные с анализом информации, статистики или бизнес-вопросов."
-            "Используй структурированный подход:"
-            "1. Анализ: Разбери запрос на ключевые аспекты."
-            "2. Выводы: Предоставь четкие выводы или рекомендации."
-            "3. Обоснование: Объясни свои рассуждения, если требуется."
-            "Если данных недостаточно, укажи, что нужно для более точного анализа."
-        ),
-        "welcome": "Агент 'Аналитик' активирован. Какую задачу проанализировать?"
-    },
-    "joker": {
-        "name": "Шутник",
-        "prompt": (
-            "Ты — ИИ с чувством юмора, основанный на Gemini."
-            "Твоя задача — отвечать на запросы с легкостью, остроумием и юмором, сохраняя при этом полезность."
-            "Добавляй шутки, анекдоты или забавные комментарии, но оставайся в рамках приличия."
-            "Форматируй ответы так, чтобы они были веселыми и читабельными."
-        ),
-        "welcome": "Агент 'Шутник' включен! 😄 Готов ответить с улыбкой!"
+    config = {
+        CONFIG_TELEGRAM_TOKEN: os.getenv(CONFIG_TELEGRAM_TOKEN, "YOUR_TELEGRAM_TOKEN"), # Замените на ваш токен
+        CONFIG_GEMINI_API_KEY: os.getenv(CONFIG_GEMINI_API_KEY, "YOUR_GEMINI_API_KEY"), # Замените на ваш ключ
+        CONFIG_FIREBASE_CRED_PATH: os.getenv(CONFIG_FIREBASE_CRED_PATH, default_firebase_creds_path),
+        CONFIG_FIREBASE_DB_URL: os.getenv(CONFIG_FIREBASE_DB_URL, ""), # Если используете Firestore, это может не понадобиться
+        CONFIG_ADMIN_USER_ID: int(os.getenv(CONFIG_ADMIN_USER_ID, "0")), # Замените на ваш ID администратора
+        CONFIG_FREE_DAILY_LIMIT: int(os.getenv(CONFIG_FREE_DAILY_LIMIT, 5)),
+        CONFIG_BONUS_CHANNEL_ID: os.getenv(CONFIG_BONUS_CHANNEL_ID, ""),
+        CONFIG_BONUS_CHANNEL_LINK: os.getenv(CONFIG_BONUS_CHANNEL_LINK, ""),
+        CONFIG_PAYMENT_PROVIDER_TOKEN: os.getenv(CONFIG_PAYMENT_PROVIDER_TOKEN, "YOUR_PAYMENT_PROVIDER_TOKEN"),
+        CONFIG_PRICE_AMOUNT_RUB: int(os.getenv(CONFIG_PRICE_AMOUNT_RUB, 10000)), # Пример: 100 рублей
+        CONFIG_PRICE_LABEL: os.getenv(CONFIG_PRICE_LABEL, "Подписка на бота"),
+        CONFIG_PRICE_DESCRIPTION: os.getenv(CONFIG_PRICE_DESCRIPTION, "Доступ ко всем функциям на 30 дней"),
     }
-}
-DEFAULT_AI_MODE_KEY = CONFIG["DEFAULT_AI_MODE_KEY"]
 
-AVAILABLE_TEXT_MODELS = {
-    "google_gemini_2_0_flash": {
-        "name": "Gemini 2.0", "id": "gemini-2.0-flash", "api_type": "google_genai",
-        "is_limited": True, "limit_type": "daily_free", "limit": CONFIG["DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY"],
-        "cost_category": "google_flash_free"
-    },
-    "google_gemini_2_5_flash_preview": {
-        "name": "Gemini 2.5", "id": "gemini-2.5-flash-preview-04-17", "api_type": "google_genai",
-        "is_limited": True, "limit_type": "subscription_or_daily_free",
-        "limit_if_no_subscription": CONFIG["DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY"],
-        "subscription_daily_limit": CONFIG["DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY"],
-        "cost_category": "google_flash_preview_flex"
-    },
-    "custom_api_gemini_2_5_pro": {
-        "name": "Gemini Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": "custom_http_api",
-        "endpoint": CONFIG["CUSTOM_GEMINI_PRO_ENDPOINT"], "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG["DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY"],
-        "subscription_daily_limit": CONFIG["DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY"],
-        "cost_category": "custom_api_pro_paid", "pricing_info": {}
-    },
-    "custom_api_grok_3": {
-        "name": "Grok 3", "id": "grok-3-beta", "api_type": "custom_http_api",
-        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG["DEFAULT_FREE_REQUESTS_GROK_DAILY"],
-        "subscription_daily_limit": CONFIG["DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY"],
-        "cost_category": "custom_api_grok_3_paid", "pricing_info": {}
-    },
-    "custom_api_gpt_4o_mini": {
-        "name": "GPT-4o mini", "id": "gpt-4o-mini", "api_type": "custom_http_api",
-        "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG["DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY"],
-        "subscription_daily_limit": CONFIG["DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY"],
-        "cost_category": "custom_api_gpt4o_mini_paid", "pricing_info": {}
-    }
-}
-DEFAULT_MODEL_KEY = CONFIG["DEFAULT_MODEL_KEY"]
-DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]["id"]
+    # Валидация критичных конфигурационных параметров
+    if "YOUR_" in config[CONFIG_TELEGRAM_TOKEN] or not config[CONFIG_TELEGRAM_TOKEN]:
+        logger.critical(f"{CONFIG_TELEGRAM_TOKEN} не настроен должным образом. Завершение работы.")
+        raise ValueError(f"{CONFIG_TELEGRAM_TOKEN} не настроен.")
+    if "YOUR_" in config[CONFIG_GEMINI_API_KEY] or not config[CONFIG_GEMINI_API_KEY]:
+        logger.warning(f"{CONFIG_GEMINI_API_KEY} не настроен или указан неверно.")
+    # Добавьте другие важные проверки
 
-MENU_STRUCTURE = {
-    "main_menu": {
-        "title": "📋 Главное меню", "items": [
-            {"text": "🤖 Агенты ИИ", "action": "submenu", "target": "ai_modes_submenu"},
-            {"text": "⚙️ Модели ИИ", "action": "submenu", "target": "models_submenu"},
-            {"text": "📊 Лимиты", "action": "submenu", "target": "limits_submenu"},
-            {"text": "🎁 Бонус", "action": "submenu", "target": "bonus_submenu"},
-            {"text": "💎 Подписка", "action": "submenu", "target": "subscription_submenu"},
-            {"text": "❓ Помощь", "action": "submenu", "target": "help_submenu"}
-        ], "parent": None, "is_submenu": False
-    },
-    "ai_modes_submenu": {
-        "title": "Выберите агент ИИ", "items": [
-            {"text": mode["name"], "action": "set_agent", "target": key}
-            for key, mode in AI_MODES.items() if key != "gemini_pro_custom_mode"
-        ], "parent": "main_menu", "is_submenu": True
-    },
-    "models_submenu": {
-        "title": "Выберите модель ИИ", "items": [
-            {"text": model["name"], "action": "set_model", "target": key}
-            for key, model in AVAILABLE_TEXT_MODELS.items()
-        ], "parent": "main_menu", "is_submenu": True
-    },
-    "limits_submenu": {"title": "Ваши лимиты", "items": [{"text": "📊 Показать", "action": "show_limits", "target": "usage"}], "parent": "main_menu", "is_submenu": True},
-    "bonus_submenu": {"title": "Бонус за подписку", "items": [{"text": "🎁 Получить", "action": "check_bonus", "target": "news_bonus"}], "parent": "main_menu", "is_submenu": True},
-    "subscription_submenu": {"title": "Подписка Профи", "items": [{"text": "💎 Купить", "action": "show_subscription", "target": "subscribe"}], "parent": "main_menu", "is_submenu": True},
-    "help_submenu": {"title": "Помощь", "items": [{"text": "❓ Справка", "action": "show_help", "target": "help"}], "parent": "main_menu", "is_submenu": True}
-}
+    return config
 
-db: Optional[FirestoreClient] = None
-try:
-    firebase_creds_json = CONFIG["FIREBASE_CREDENTIALS_JSON_STR"]
-    cred_obj = None
-    if firebase_creds_json:
-        try:
-            cred_obj = credentials.Certificate(json.loads(firebase_creds_json))
-            logger.info("Firebase credentials loaded from JSON string.")
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing FIREBASE_CREDENTIALS_JSON_STR: {e}. Check JSON env var.")
-            raise
-    elif os.path.exists(CONFIG["FIREBASE_CERT_PATH"]):
-        cred_obj = credentials.Certificate(CONFIG["FIREBASE_CERT_PATH"])
-        logger.info(f"Firebase credentials loaded from file: {CONFIG['FIREBASE_CERT_PATH']}.")
-    else:
-        raise FileNotFoundError("Firebase credentials not configured (JSON string or cert file).")
+CONFIG = load_config()
 
-    if not firebase_admin._apps:
-        initialize_app(cred_obj)
-        logger.info("Firebase app successfully initialized.")
-    else:
-        logger.info("Firebase app already initialized.")
-    db = firestore.client()
-    logger.info("Firestore client successfully initialized.")
-except Exception as e:
-    logger.error(f"Critical error during Firebase/Firestore initialization: {e}", exc_info=True)
-    db = None
+# --- ИНИЦИАЛИЗАЦИЯ FIREBASE ---
+# Принцип: SRP (Single Responsibility Principle), Обработка ошибок
+# Отдельная функция для инициализации Firebase.
+db: Optional[FirestoreClient] = None # Глобальная переменная для клиента Firestore
 
-async def _firestore_op(func, *args, **kwargs):
-    if not db:
-        logger.warning(f"Firestore (db) is not initialized. Operation '{func.__name__}' skipped.")
-        return None
-    return await asyncio.get_event_loop().run_in_executor(None, lambda: func(*args, **kwargs))
-
-async def get_user_data(user_id: int, user_data_cache: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    if user_data_cache is not None: return user_data_cache
-    if not db: return {}
-    doc_ref = db.collection("users").document(str(user_id))
-    doc = await _firestore_op(doc_ref.get)
-    return doc.to_dict() if doc and doc.exists else {}
-
-async def set_user_data(user_id: int, data: Dict[str, Any]):
-    if not db: return
-    doc_ref = db.collection("users").document(str(user_id))
-    await _firestore_op(doc_ref.set, data, merge=True)
-    logger.debug(f"User data for {user_id} updated with keys: {list(data.keys())}")
-
-async def get_bot_data() -> Dict[str, Any]:
-    if not db: return {}
-    doc_ref = db.collection("bot_data").document("data")
-    doc = await _firestore_op(doc_ref.get)
-    return doc.to_dict() if doc and doc.exists else {}
-
-async def set_bot_data(data: Dict[str, Any]):
-    if not db: return
-    doc_ref = db.collection("bot_data").document("data")
-    await _firestore_op(doc_ref.set, data, merge=True)
-    logger.debug(f"Bot data updated with keys: {list(data.keys())}")
-
-async def _store_and_try_delete_message(update: Update, user_id: int, is_command_to_keep: bool = False):
-    if not update.message: return
-
-    message_id_to_process = update.message.message_id
-    timestamp_now_iso = datetime.now(timezone.utc).isoformat()
-    chat_id = update.effective_chat.id
-    
-    user_data_for_msg_handling = await get_user_data(user_id)
-
-    prev_command_info = user_data_for_msg_handling.pop('user_command_to_delete', None)
-    if prev_command_info and prev_command_info.get('message_id'):
-        try:
-            prev_msg_time = datetime.fromisoformat(prev_command_info['timestamp'])
-            if prev_msg_time.tzinfo is None: prev_msg_time = prev_msg_time.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
-                await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
-                logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-        except (telegram.error.BadRequest, ValueError) as e:
-            logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
-    
-    if not is_command_to_keep:
-        user_data_for_msg_handling['user_command_to_delete'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
-        }
-        try:
-            await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
-            logger.info(f"Successfully deleted current user message {message_id_to_process}")
-            user_data_for_msg_handling.pop('user_command_to_delete', None)
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time.")
-    else:
-         user_data_for_msg_handling['user_command_message_to_keep'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
-        }
-    await set_user_data(user_id, user_data_for_msg_handling)
-
-# ИЗМЕНЕНИЕ: auto_delete_message_decorator теперь обычная функция
-def auto_delete_message_decorator(is_command_to_keep: bool = False):
-    def decorator(func):
-        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if update.effective_user:
-                 await _store_and_try_delete_message(update, update.effective_user.id, is_command_to_keep)
-            return await func(update, context)
-        return wrapper
-    return decorator
-
-async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> str:
-    user_data_loc = user_data or await get_user_data(user_id)
-    selected_id = user_data_loc.get('selected_model_id', DEFAULT_MODEL_ID)
-    selected_api_type = user_data_loc.get('selected_api_type')
-
-    if selected_api_type:
-        for key, info in AVAILABLE_TEXT_MODELS.items():
-            if info["id"] == selected_id and info.get("api_type") == selected_api_type: return key
-    for key, info in AVAILABLE_TEXT_MODELS.items():
-        if info["id"] == selected_id:
-            if user_data_loc.get('selected_api_type') != info.get("api_type"):
-                await set_user_data(user_id, {'selected_api_type': info.get("api_type")})
-            return key
-    default_cfg = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
-    await set_user_data(user_id, {'selected_model_id': default_cfg["id"], 'selected_api_type': default_cfg["api_type"]})
-    return DEFAULT_MODEL_KEY
-
-async def get_selected_model_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    model_key = await get_current_model_key(user_id, user_data)
-    return AVAILABLE_TEXT_MODELS.get(model_key, AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY])
-
-async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    user_data_loc = user_data or await get_user_data(user_id)
-    current_model_k_loc = await get_current_model_key(user_id, user_data_loc)
-    mode_k_loc = user_data_loc.get('current_ai_mode', DEFAULT_AI_MODE_KEY)
-
-    if mode_k_loc not in AI_MODES:
-        mode_k_loc = DEFAULT_AI_MODE_KEY
-        await set_user_data(user_id, {'current_ai_mode': mode_k_loc})
-    if current_model_k_loc == "custom_api_gemini_2_5_pro":
-        return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[DEFAULT_AI_MODE_KEY])
-    return AI_MODES.get(mode_k_loc, AI_MODES[DEFAULT_AI_MODE_KEY])
-
-def smart_truncate(text: str, max_length: int) -> tuple[str, bool]:
-    if not isinstance(text, str) or len(text) <= max_length: return str(text), False
-    suffix = "\n\n(...ответ был сокращен)"
-    adj_max_len = max_length - len(suffix)
-    if adj_max_len <= 0: return text[:max_length-len("...")] + "...", True
-    trunc_text = text[:adj_max_len]
-    for sep in ['\n\n', '. ', '! ', '? ', '\n', ' ']:
-        pos = trunc_text.rfind(sep)
-        if pos != -1:
-            actual_pos = pos + (len(sep) if sep != ' ' else 0)
-            if actual_pos > 0 and actual_pos > adj_max_len * 0.3:
-                 return text[:actual_pos].strip() + suffix, True
-    return text[:adj_max_len].strip() + suffix, True
-
-def is_user_profi_subscriber(sub_details: Dict[str, Any]) -> bool:
-    if sub_details.get('level') == CONFIG["PRO_SUBSCRIPTION_LEVEL_KEY"] and sub_details.get('valid_until'):
-        try:
-            valid_dt = datetime.fromisoformat(sub_details['valid_until'])
-            if valid_dt.tzinfo is None: valid_dt = valid_dt.replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc).date() <= valid_dt.date()
-        except ValueError: return False
-    return False
-
-async def get_user_actual_limit_for_model(user_id: int, model_key: str, user_data: Optional[Dict[str, Any]] = None, bot_data_c: Optional[Dict[str, Any]] = None) -> int:
-    model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg: return 0
-    bot_data_loc = bot_data_c or await get_bot_data()
-    user_subs = bot_data_loc.get('user_subscriptions', {}).get(str(user_id), {})
-    is_profi_user = is_user_profi_subscriber(user_subs)
-    limit_type = model_cfg.get("limit_type")
-    base_lmt = 0
-    if limit_type == "daily_free": base_lmt = model_cfg.get("limit", 0)
-    elif limit_type == "subscription_or_daily_free": base_lmt = model_cfg.get("subscription_daily_limit", 0) if is_profi_user else model_cfg.get("limit_if_no_subscription", 0)
-    elif limit_type == "subscription_custom_pro": base_lmt = model_cfg.get("subscription_daily_limit", 0) if is_profi_user else model_cfg.get("limit_if_no_subscription", 0)
-    elif not model_cfg.get("is_limited", False): return float('inf')
-    else: return 0
-    user_data_loc = user_data or await get_user_data(user_id)
-    if model_key == CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"] and not is_profi_user and user_data_loc.get('claimed_news_bonus', False):
-        base_lmt += user_data_loc.get('news_bonus_uses_left', 0)
-    return base_lmt
-
-async def check_and_log_request_attempt(user_id: int, model_key: str) -> tuple[bool, str, int]:
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg or not model_cfg.get("is_limited"): return True, "", 0
-
-    user_data_loc = await get_user_data(user_id)
-    bot_data_loc = await get_bot_data()
-    user_subs = bot_data_loc.get('user_subscriptions', {}).get(str(user_id), {})
-    is_profi_user = is_user_profi_subscriber(user_subs)
-
-    if model_key == CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"] and not is_profi_user and \
-       user_data_loc.get('claimed_news_bonus', False) and user_data_loc.get('news_bonus_uses_left', 0) > 0:
-        return True, "bonus_available", 0
-
-    all_counts = bot_data_loc.get('all_user_daily_counts', {})
-    user_counts = all_counts.get(str(user_id), {})
-    model_usage = user_counts.get(model_key, {'date': '', 'count': 0})
-    if model_usage['date'] != today: model_usage = {'date': today, 'count': 0}
-    
-    current_cnt = model_usage['count']
-    limit_comp = 0 
-    if model_cfg.get("limit_type") == "daily_free": limit_comp = model_cfg.get("limit",0)
-    elif model_cfg.get("limit_type") == "subscription_or_daily_free": limit_comp = model_cfg.get("subscription_daily_limit",0) if is_profi_user else model_cfg.get("limit_if_no_subscription",0)
-    elif model_cfg.get("limit_type") == "subscription_custom_pro": limit_comp = model_cfg.get("subscription_daily_limit",0) if is_profi_user else model_cfg.get("limit_if_no_subscription",0)
-
-    if current_cnt >= limit_comp:
-        display_lmt = await get_user_actual_limit_for_model(user_id, model_key, user_data_loc, bot_data_loc)
-        msg_parts = [f"Достигнут дневной лимит ({current_cnt}/{display_lmt}) для {model_cfg['name']}."]
-        if model_key == CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"] and not is_profi_user:
-            bonus_name = AVAILABLE_TEXT_MODELS.get(CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"],{}).get("name","бонусной модели")
-            if not user_data_loc.get('claimed_news_bonus', False): msg_parts.append(f'💡 Подписка на <a href="{CONFIG["NEWS_CHANNEL_LINK"]}">канал</a> даст бонус ({CONFIG["NEWS_CHANNEL_BONUS_GENERATIONS"]} для {bonus_name})!')
-            elif user_data_loc.get('news_bonus_uses_left', 0) == 0: msg_parts.append(f"ℹ️ Бонус с <a href='{CONFIG['NEWS_CHANNEL_LINK']}'>канала</a> использован.")
-        if not is_profi_user: msg_parts.append("Попробуйте завтра или оформите <a href='https://t.me/gemini_oracle_bot?start=subscribe'>подписку</a>.")
-        if model_usage['date'] == today and user_counts.get(model_key) != model_usage:
-            user_counts[model_key] = model_usage
-            all_counts[str(user_id)] = user_counts
-            await set_bot_data({'all_user_daily_counts': all_counts})
-        return False, "\n".join(msg_parts), current_cnt
-    
-    if model_usage['date'] == today and user_counts.get(model_key) != model_usage:
-        user_counts[model_key] = model_usage
-        all_counts[str(user_id)] = user_counts
-        await set_bot_data({'all_user_daily_counts': all_counts})
-    return True, "", current_cnt
-
-async def increment_request_count(user_id: int, model_key: str):
-    model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg or not model_cfg.get("is_limited"): return
-
-    user_data_loc = await get_user_data(user_id)
-    bot_data_loc = await get_bot_data()
-    user_subs = bot_data_loc.get('user_subscriptions', {}).get(str(user_id), {})
-    is_profi_user = is_user_profi_subscriber(user_subs)
-
-    if model_key == CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"] and not is_profi_user and \
-       user_data_loc.get('claimed_news_bonus', False) and (bonus_left := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
-        await set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
-        logger.info(f"User {user_id} consumed bonus for {model_key}. Left: {bonus_left - 1}")
-        return
-
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    all_counts = bot_data_loc.get('all_user_daily_counts', {})
-    user_counts = all_counts.get(str(user_id), {})
-    model_usage = user_counts.get(model_key, {'date': today, 'count': 0})
-    if model_usage['date'] != today: model_usage = {'date': today, 'count': 0}
-    model_usage['count'] += 1
-    user_counts[model_key] = model_usage
-    all_counts[str(user_id)] = user_counts
-    await set_bot_data({'all_user_daily_counts': all_counts})
-    logger.info(f"User {user_id} daily count for {model_key} to {model_usage['count']}")
-
-def is_menu_button_text(text: str) -> bool:
-    if text in ["⬅️ Назад", "🏠 Главное меню"]: return True
-    for menu_data in MENU_STRUCTURE.values():
-        for item in menu_data["items"]:
-            if item["text"] == text: return True
-    return False
-
-def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
-    menu_cfg = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE["main_menu"])
-    kbd_rows = []
-    items = menu_cfg["items"]
-    if menu_key in ["main_menu", "models_submenu"]:
-        for i in range(0, len(items), 2): kbd_rows.append([KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))])
-    else:
-        for item in items: kbd_rows.append([KeyboardButton(item["text"])])
-    if menu_cfg.get("is_submenu", False):
-        nav_row = [KeyboardButton("🏠 Главное меню")]
-        if menu_cfg.get("parent"): nav_row.insert(0, KeyboardButton("⬅️ Назад"))
-        kbd_rows.append(nav_row)
-    return ReplyKeyboardMarkup(kbd_rows, resize_keyboard=True, one_time_keyboard=False)
-
-async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None):
-    menu_cfg = MENU_STRUCTURE.get(menu_key)
-    if not menu_cfg:
-        logger.error(f"Menu key '{menu_key}' not found. Defaulting for user {user_id}.")
-        await update.message.reply_text("Ошибка: Меню не найдено.", reply_markup=generate_menu_keyboard("main_menu"))
-        await set_user_data(user_id, {'current_menu': 'main_menu'})
-        return
-    await set_user_data(user_id, {'current_menu': menu_key})
-    await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
-    logger.info(f"User {user_id} shown menu '{menu_key}'.")
-
-@auto_delete_message_decorator(is_command_to_keep=True)
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_data_loc = await get_user_data(user_id)
-    updates_to_user_data = {}
-    if 'current_ai_mode' not in user_data_loc: updates_to_user_data['current_ai_mode'] = DEFAULT_AI_MODE_KEY
-    if 'current_menu' not in user_data_loc: updates_to_user_data['current_menu'] = 'main_menu'
-    default_model_cfg = AVAILABLE_TEXT_MODELS[DEFAULT_MODEL_KEY]
-    if 'selected_model_id' not in user_data_loc: updates_to_user_data['selected_model_id'] = default_model_cfg["id"]
-    if 'selected_api_type' not in user_data_loc: updates_to_user_data['selected_api_type'] = default_model_cfg["api_type"]
-    if updates_to_user_data: await set_user_data(user_id, updates_to_user_data)
-    if updates_to_user_data: user_data_loc.update(updates_to_user_data)
-
-    current_model_k = await get_current_model_key(user_id, user_data_loc)
-    mode_details_res = await get_current_mode_details(user_id, user_data_loc)
-    model_details_res = AVAILABLE_TEXT_MODELS.get(current_model_k)
-    mode_name = mode_details_res['name'] if mode_details_res else "N/A"
-    model_name = model_details_res['name'] if model_details_res else "N/A"
-    greeting = (f"👋 Привет, {update.effective_user.first_name}!\n"
-                f"🤖 Агент: <b>{mode_name}</b> | ⚙️ Модель: <b>{model_name}</b>\n"
-                "💬 Задавай вопросы или используй меню!")
-    await update.message.reply_text(greeting, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard("main_menu"), disable_web_page_preview=True)
-    logger.info(f"User {user_id} started bot.")
-
-@auto_delete_message_decorator()
-async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data_loc = await get_user_data(update.effective_user.id)
-    await show_menu(update, update.effective_user.id, "main_menu", user_data_loc)
-
-@auto_delete_message_decorator()
-async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_limits(update, update.effective_user.id)
-
-@auto_delete_message_decorator()
-async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_subscription(update, update.effective_user.id)
-
-@auto_delete_message_decorator()
-async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await claim_news_bonus_logic(update, update.effective_user.id)
-
-@auto_delete_message_decorator()
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_help(update, update.effective_user.id)
-
-async def show_limits(update: Update, user_id: int):
-    user_data_loc = await get_user_data(user_id)
-    bot_data_loc = await get_bot_data()
-    user_subs = bot_data_loc.get('user_subscriptions', {}).get(str(user_id), {})
-    is_profi = is_user_profi_subscriber(user_subs)
-    sub_level_disp = "Бесплатный"
-    if is_profi:
-        valid_dt = datetime.fromisoformat(user_subs['valid_until'])
-        if valid_dt.tzinfo is None: valid_dt = valid_dt.replace(tzinfo=timezone.utc)
-        sub_level_disp = f"Профи (до {valid_dt.strftime('%d.%m.%Y')})"
-    elif user_subs.get('level') == CONFIG["PRO_SUBSCRIPTION_LEVEL_KEY"]:
-        valid_dt = datetime.fromisoformat(user_subs['valid_until'])
-        if valid_dt.tzinfo is None: valid_dt = valid_dt.replace(tzinfo=timezone.utc)
-        sub_level_disp = f"Профи (истекла {valid_dt.strftime('%d.%m.%Y')})"
-    parts = [f"<b>📊 Ваши лимиты</b> (Статус: <b>{sub_level_disp}</b>)\n"]
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    all_counts = bot_data_loc.get('all_user_daily_counts', {})
-    user_counts = all_counts.get(str(user_id), {})
-    for mk, mc in AVAILABLE_TEXT_MODELS.items():
-        if mc.get("is_limited"):
-            usage = user_counts.get(mk, {'date': '', 'count': 0})
-            count_disp = usage['count'] if usage['date'] == today else 0
-            actual_lmt = await get_user_actual_limit_for_model(user_id, mk, user_data_loc, bot_data_loc)
-            bonus_n = ""
-            if mk == CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"] and not is_profi and \
-               user_data_loc.get('claimed_news_bonus', False) and (b_left := user_data_loc.get('news_bonus_uses_left',0)) > 0:
-                bonus_n = f" (+{b_left} бонус)"
-            parts.append(f"▫️ {mc['name']}: <b>{count_disp}/{actual_lmt if actual_lmt != float('inf') else '∞'}</b>{bonus_n}")
-    parts.append("")
-    bonus_model_n = AVAILABLE_TEXT_MODELS.get(CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"],{}).get('name',"бонусной модели")
-    if not user_data_loc.get('claimed_news_bonus', False): parts.append(f'🎁 <a href="{CONFIG["NEWS_CHANNEL_LINK"]}">Канал новостей</a>: бонус ({CONFIG["NEWS_CHANNEL_BONUS_GENERATIONS"]} для {bonus_model_n})!')
-    elif (b_left := user_data_loc.get('news_bonus_uses_left',0)) > 0: parts.append(f"✅ Бонус с канала: <b>{b_left}</b> для {bonus_model_n}.")
-    else: parts.append(f"ℹ️ Бонус с канала для {bonus_model_n} использован.")
-    if not is_profi: parts.append("\n💎 Больше лимитов? /subscribe")
-    await update.message.reply_text("\n".join(parts), parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu','limits_submenu')), disable_web_page_preview=True)
-
-async def claim_news_bonus_logic(update: Update, user_id: int):
-    user_data_loc = await get_user_data(user_id)
-    parent_menu_k = user_data_loc.get('current_menu', 'bonus_submenu')
-    current_menu_details = MENU_STRUCTURE.get(parent_menu_k, MENU_STRUCTURE["main_menu"])
-    if not current_menu_details.get("is_submenu"): parent_menu_k = "main_menu"
-    else: parent_menu_k = current_menu_details.get("parent", "main_menu")
-    bonus_model_cfg = AVAILABLE_TEXT_MODELS.get(CONFIG["NEWS_CHANNEL_BONUS_MODEL_KEY"])
-    if not bonus_model_cfg:
-        await update.message.reply_text("Ошибка: Бонусная модель не настроена.", reply_markup=generate_menu_keyboard(parent_menu_k))
-        return
-    bonus_model_n = bonus_model_cfg['name']
-    if user_data_loc.get('claimed_news_bonus', False):
-        uses_l = user_data_loc.get('news_bonus_uses_left',0)
-        reply = f"Бонус уже активирован. Осталось: <b>{uses_l}</b> для {bonus_model_n}." if uses_l > 0 else f"Бонус для {bonus_model_n} использован."
-        await update.message.reply_text(reply, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(parent_menu_k), disable_web_page_preview=True)
-        return
+def initialize_firebase_app() -> Optional[FirestoreClient]:
+    """Инициализирует Firebase приложение и возвращает клиент Firestore."""
+    global db
     try:
-        member = await update.get_bot().get_chat_member(chat_id=CONFIG["NEWS_CHANNEL_USERNAME"], user_id=user_id)
-        if member.status in ['member','administrator','creator']:
-            await set_user_data(user_id, {'claimed_news_bonus':True, 'news_bonus_uses_left':CONFIG["NEWS_CHANNEL_BONUS_GENERATIONS"]})
-            success_txt = f'🎉 Спасибо за подписку на <a href="{CONFIG["NEWS_CHANNEL_LINK"]}">{CONFIG["NEWS_CHANNEL_USERNAME"]}</a>! Бонус: <b>{CONFIG["NEWS_CHANNEL_BONUS_GENERATIONS"]}</b> для {bonus_model_n}.'
-            await update.message.reply_text(success_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard('main_menu'), disable_web_page_preview=True)
+        cred_path = CONFIG[CONFIG_FIREBASE_CRED_PATH]
+        if not os.path.exists(cred_path):
+            logger.error(f"Файл Firebase credentials не найден по пути: {cred_path}")
+            return None
+
+        cred = credentials.Certificate(cred_path)
+        # Проверяем, не инициализировано ли уже приложение по умолчанию
+        if not firebase_admin._apps:
+            firebase_options = {'databaseURL': CONFIG[CONFIG_FIREBASE_DB_URL]} if CONFIG[CONFIG_FIREBASE_DB_URL] else {}
+            initialize_app(cred, options=firebase_options)
+            logger.info("Firebase приложение успешно инициализировано.")
         else:
-            fail_txt = f'Подпишитесь на <a href="{CONFIG["NEWS_CHANNEL_LINK"]}">{CONFIG["NEWS_CHANNEL_USERNAME"]}</a>, затем «🎁 Получить».'
-            kbd = InlineKeyboardMarkup([[InlineKeyboardButton(f"📢 В канал {CONFIG['NEWS_CHANNEL_USERNAME']}", url=CONFIG["NEWS_CHANNEL_LINK"])]])
-            await update.message.reply_text(fail_txt, parse_mode=ParseMode.HTML, reply_markup=kbd, disable_web_page_preview=True)
+            logger.info("Firebase приложение уже было инициализировано.")
+
+        db = firestore.client()
+        logger.info("Клиент Firestore успешно получен.")
+        return db
+    except FirebaseError as e:
+        logger.error(f"Ошибка инициализации Firebase: {e}")
+        logger.error(traceback.format_exc())
     except Exception as e:
-        logger.error(f"Error claiming bonus for user {user_id}: {e}", exc_info=True)
-        await update.message.reply_text("Ошибка при проверке подписки. Попробуйте позже.", reply_markup=generate_menu_keyboard(parent_menu_k))
+        logger.error(f"Непредвиденная ошибка при инициализации Firebase: {e}")
+        logger.error(traceback.format_exc())
+    return None
 
-async def show_subscription(update: Update, user_id: int):
-    user_data_loc = await get_user_data(user_id)
-    user_subs = (await get_bot_data()).get('user_subscriptions',{}).get(str(user_id),{})
-    is_active = is_user_profi_subscriber(user_subs)
-    parts = ["<b>💎 Подписка Профи</b>"]
-    if is_active:
-        valid_dt = datetime.fromisoformat(user_subs['valid_until'])
-        if valid_dt.tzinfo is None: valid_dt = valid_dt.replace(tzinfo=timezone.utc)
-        parts.append(f"\n✅ Активна до <b>{valid_dt.strftime('%d.%m.%Y')}</b>. Расширенные лимиты доступны.")
-    else:
-        if user_subs.get('level') == CONFIG["PRO_SUBSCRIPTION_LEVEL_KEY"]: parts.append(f"\n⚠️ Истекла <b>{datetime.fromisoformat(user_subs['valid_until']).strftime('%d.%m.%Y')}</b>.")
-        parts.extend(["\nС подпиской <b>Профи</b>:", "▫️ Увеличенные лимиты.",
-                      f"▫️ Доступ к {AVAILABLE_TEXT_MODELS['custom_api_gemini_2_5_pro']['name']}.",
-                      f"▫️ Доступ к {AVAILABLE_TEXT_MODELS['custom_api_grok_3']['name']}."])
-        if "custom_api_gpt_4o_mini" in AVAILABLE_TEXT_MODELS: parts.append(f"▫️ Доступ к {AVAILABLE_TEXT_MODELS['custom_api_gpt_4o_mini']['name']}.")
-        parts.append("\nДля оформления: /subscribe или кнопка в меню.")
-    await update.message.reply_text("\n".join(parts), parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu','subscription_submenu')), disable_web_page_preview=True)
-
-async def show_help(update: Update, user_id: int):
-    user_data_loc = await get_user_data(user_id)
-    help_txt = ("<b>❓ Справка</b>\n\n"
-                "▫️ <b>Запросы ИИ</b>: Пишите текст для ответа.\n"
-                "▫️ <b>Агенты ИИ</b>: «🤖 Агенты ИИ» для выбора роли.\n"
-                "▫️ <b>Модели ИИ</b>: «⚙️ Модели ИИ» для выбора модели.\n"
-                "▫️ <b>Лимиты</b>: «📊 Лимиты» или /usage.\n"
-                "▫️ <b>Бонус</b>: «🎁 Бонус» за подписку на канал.\n"
-                "▫️ <b>Подписка</b>: «💎 Подписка» или /subscribe.\n\n"
-                "<b>Команды:</b> /start, /menu, /usage, /subscribe, /bonus, /help")
-    await update.message.reply_text(help_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu','help_submenu')), disable_web_page_preview=True)
-
-async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return 
-    user_id = update.effective_user.id
-    button_text = update.message.text.strip()
-    if not is_menu_button_text(button_text):
-        return # Не кнопка меню, передаем управление дальше (в handle_text)
-
-    await _store_and_try_delete_message(update, user_id) 
-    user_data_loc = await get_user_data(user_id)
-    current_menu_k = user_data_loc.get('current_menu', 'main_menu')
-    logger.info(f"User {user_id} menu button '{button_text}' from '{current_menu_k}'.")
-
-    if button_text == "⬅️ Назад":
-        parent_k = MENU_STRUCTURE.get(current_menu_k, {}).get("parent", "main_menu")
-        await show_menu(update, user_id, parent_k, user_data_loc)
-        return # Обработано
-    elif button_text == "🏠 Главное меню":
-        await show_menu(update, user_id, "main_menu", user_data_loc)
-        return # Обработано
-    else:
-        action_item_found = None
-        for item_list in [MENU_STRUCTURE.get(current_menu_k, {}).get("items", [])] + \
-                         [m_cfg["items"] for m_cfg in MENU_STRUCTURE.values() if m_cfg.get("items")]:
-            for item in item_list:
-                if item["text"] == button_text: action_item_found = item; break
-            if action_item_found: break
-        if not action_item_found:
-            logger.warning(f"Button '{button_text}' by user {user_id} not matched despite is_menu_button_text=True.")
-            await update.message.reply_text("Неизвестная команда.", reply_markup=generate_menu_keyboard(current_menu_k))
-            return # Обработано (показали ошибку)
-        
-        action, target = action_item_found["action"], action_item_found["target"]
-        action_origin_menu_key = current_menu_k
-        for menu_key_search, menu_config_search in MENU_STRUCTURE.items():
-            for item_search in menu_config_search.get("items", []):
-                if item_search.get("text") == button_text and item_search.get("action") == action and item_search.get("target") == target:
-                    action_origin_menu_key = menu_key_search; break
-            if action_origin_menu_key == menu_key_search: break
-        return_menu_k = MENU_STRUCTURE.get(action_origin_menu_key, {}).get("parent", "main_menu")
-        if action_origin_menu_key == "main_menu" : return_menu_k = "main_menu"
-
-        if action == "submenu": await show_menu(update, user_id, target, user_data_loc)
-        elif action == "set_agent":
-            response_msg_txt = "⚠️ Ошибка: Агент не найден."
-            if target in AI_MODES and target != "gemini_pro_custom_mode":
-                await set_user_data(user_id, {'current_ai_mode': target})
-                agent_details_loc = AI_MODES[target]
-                response_msg_txt = f"🤖 Агент: <b>{agent_details_loc['name']}</b>.\n{agent_details_loc.get('welcome', '')}"
-            await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-            await set_user_data(user_id, {'current_menu': return_menu_k})
-        elif action == "set_model":
-            response_msg_txt = "⚠️ Ошибка: Модель не найдена."
-            if target in AVAILABLE_TEXT_MODELS:
-                model_info = AVAILABLE_TEXT_MODELS[target]
-                update_p = {'selected_model_id': model_info["id"], 'selected_api_type': model_info["api_type"]}
-                if target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
-                    update_p['current_ai_mode'] = DEFAULT_AI_MODE_KEY
-                await set_user_data(user_id, update_p)
-                user_data_loc.update(update_p)
-                bot_data_c = await get_bot_data()
-                today_s_val = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                user_model_c = bot_data_c.get('all_user_daily_counts', {}).get(str(user_id), {})
-                model_daily_u = user_model_c.get(target, {'date': '', 'count': 0})
-                current_u_s = model_daily_u['count'] if model_daily_u['date'] == today_s_val else 0
-                actual_l_s = await get_user_actual_limit_for_model(user_id, target, user_data_loc, bot_data_c)
-                limit_s_str = f"{current_u_s}/{actual_l_s if actual_l_s != float('inf') else '∞'}"
-                response_msg_txt = f"⚙️ Модель: <b>{model_info['name']}</b>.\nЛимит: {limit_s_str}."
-            await update.message.reply_text(response_msg_txt, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(return_menu_k), disable_web_page_preview=True)
-            await set_user_data(user_id, {'current_menu': return_menu_k})
-        elif action == "show_limits": await show_limits(update, user_id)
-        elif action == "check_bonus": await claim_news_bonus_logic(update, user_id)
-        elif action == "show_subscription": await show_subscription(update, user_id)
-        elif action == "show_help": await show_help(update, user_id)
-        else: logger.warning(f"Unknown action '{action}' for button '{button_text}' user {user_id}.")
-    return # Явный return в конце обработки кнопки
-
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not update.message or not update.message.text: return
-    user_msg_txt = update.message.text.strip()
-
-    if is_menu_button_text(user_msg_txt): 
-        logger.debug(f"User {user_id} sent menu button text '{user_msg_txt}' that reached handle_text. Explicitly ignoring.")
-        return
-
-    if len(user_msg_txt) < CONFIG["MIN_AI_REQUEST_LENGTH"]:
-        user_data_c = await get_user_data(user_id)
-        await update.message.reply_text("Запрос слишком короткий.", reply_markup=generate_menu_keyboard(user_data_c.get('current_menu','main_menu')))
-        return
-
-    logger.info(f"User {user_id} AI request: '{user_msg_txt[:100]}...'")
-    user_data_c = await get_user_data(user_id) 
-    current_model_k_val = await get_current_model_key(user_id, user_data_c)
-    model_cfg_val = AVAILABLE_TEXT_MODELS.get(current_model_k_val)
-    if not model_cfg_val: 
-        await update.message.reply_text("Критическая ошибка модели. Сообщите администратору.", reply_markup=generate_menu_keyboard(user_data_c.get('current_menu','main_menu')))
-        return
-
-    can_proceed, limit_msg_val, _ = await check_and_log_request_attempt(user_id, current_model_k_val)
-    if not can_proceed:
-        await update.message.reply_text(limit_msg_val, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_c.get('current_menu','main_menu')), disable_web_page_preview=True)
-        return
-
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    mode_details_val = await get_current_mode_details(user_id, user_data_c)
-    system_prompt_val = mode_details_val["prompt"]
-    response_txt_val = "К сожалению, не удалось получить ответ от ИИ."
-
-    api_type_val = model_cfg_val.get("api_type", "").strip()
-    if api_type_val == "google_genai":
-        prompt_full = f"{system_prompt_val}\n\n**Запрос:**\n{user_msg_txt}"
+# --- ИНИЦИАЛИЗАЦИЯ GOOGLE GEMINI ---
+# Принцип: SRP, Обработка ошибок
+def configure_gemini_api():
+    """Конфигурирует Google Gemini API."""
+    api_key = CONFIG[CONFIG_GEMINI_API_KEY]
+    if api_key and "YOUR_" not in api_key and api_key.startswith("AIzaSy"):
         try:
-            model_genai = genai.GenerativeModel(model_cfg_val["id"], generation_config={"max_output_tokens": CONFIG["MAX_OUTPUT_TOKENS_GEMINI_LIB"]})
-            resp_genai = await asyncio.get_event_loop().run_in_executor(None, lambda: model_genai.generate_content(prompt_full))
-            response_txt_val = resp_genai.text.strip() if resp_genai.text else "Ответ Google GenAI пуст."
-        except google.api_core.exceptions.ResourceExhausted as e: response_txt_val = f"Лимит Google API исчерпан: {e}"
-        except Exception as e: response_txt_val = f"Ошибка Google API: {type(e).__name__}"; logger.error(f"Google GenAI API error: {e}", exc_info=True)
-    elif api_type_val == "custom_http_api":
-        api_key_name = model_cfg_val.get("api_key_var_name")
-        key_actual = globals().get(api_key_name)
-        if not key_actual or "YOUR_" in key_actual or not (key_actual.startswith("sk-") or key_actual.startswith("AIzaSy")):
-            response_txt_val = f"Ошибка ключа API для «{model_cfg_val.get('name', current_model_k_val)}»."
+            genai.configure(api_key=api_key)
+            logger.info("Google Gemini API успешно сконфигурирован.")
+        except Exception as e:
+            logger.error(f"Ошибка конфигурации Google Gemini API: {e}")
+            logger.error(traceback.format_exc())
+    else:
+        logger.warning(f"{CONFIG_GEMINI_API_KEY} не настроен или указан неверно. Функциональность Gemini будет недоступна.")
+
+# --- УТИЛИТЫ FIREBASE ---
+# Принцип: DRY, SRP, Читаемость, Обработка ошибок
+# Функции для работы с Firestore, инкапсулирующие логику доступа к данным.
+
+async def get_user_data(user_id: int) -> Optional[Dict[str, Any]]:
+    """Получает данные пользователя из Firestore."""
+    if not db:
+        logger.error("Клиент Firestore не инициализирован. Невозможно получить данные пользователя.")
+        return None
+    try:
+        user_ref = db.collection(FIRESTORE_USERS_COLLECTION).document(str(user_id))
+        doc = await asyncio.to_thread(user_ref.get) # Используем asyncio.to_thread для синхронных вызовов
+        if doc.exists:
+            return doc.to_dict()
+        return None
+    except FirebaseError as e:
+        logger.error(f"Firebase ошибка при получении данных пользователя {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка при получении данных пользователя {user_id}: {e}")
+    return None
+
+async def update_user_data(user_id: int, data: Dict[str, Any], merge: bool = True) -> bool:
+    """Обновляет или создает данные пользователя в Firestore."""
+    if not db:
+        logger.error("Клиент Firestore не инициализирован. Невозможно обновить данные пользователя.")
+        return False
+    try:
+        user_ref = db.collection(FIRESTORE_USERS_COLLECTION).document(str(user_id))
+        await asyncio.to_thread(user_ref.set, data, merge=merge)
+        logger.info(f"Данные пользователя {user_id} обновлены: {data if not merge else '(merged)'}")
+        return True
+    except FirebaseError as e:
+        logger.error(f"Firebase ошибка при обновлении данных пользователя {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка при обновлении данных пользователя {user_id}: {e}")
+    return False
+
+async def check_or_create_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[Dict[str, Any]]:
+    """Проверяет наличие пользователя в БД, создает запись если отсутствует."""
+    if not update.effective_user:
+        return None
+
+    user_id = update.effective_user.id
+    user_data = await get_user_data(user_id)
+
+    if not user_data:
+        new_user_data = {
+            "user_id": user_id,
+            "username": update.effective_user.username or "",
+            "first_name": update.effective_user.first_name or "",
+            "last_name": update.effective_user.last_name or "",
+            "registration_date": firestore.SERVER_TIMESTAMP,
+            "last_activity_date": firestore.SERVER_TIMESTAMP,
+            "requests_today": 0,
+            "subscription_until": None, # Дата окончания подписки
+            "is_bonus_claimed": False
+        }
+        if await update_user_data(user_id, new_user_data, merge=False):
+            logger.info(f"Создан новый пользователь: {user_id}")
+            return new_user_data
         else:
-            hdrs = {"Authorization": f"Bearer {key_actual}", "Content-Type": "application/json", "Accept": "application/json"}
-            is_gpt4o = (model_cfg_val["id"] == "gpt-4o-mini")
-            msgs_payload = []
-            if system_prompt_val: msgs_payload.append({"role": "system", "content": [{"type": "text", "text": system_prompt_val}] if is_gpt4o else system_prompt_val})
-            msgs_payload.append({"role": "user", "content": [{"type": "text", "text": user_msg_txt}] if is_gpt4o else user_msg_txt})
-            payload_api = {"messages": msgs_payload, "model": model_cfg_val["id"], "is_sync": True, "max_tokens": model_cfg_val.get("max_tokens", CONFIG["MAX_OUTPUT_TOKENS_GEMINI_LIB"])}
-            if model_cfg_val.get("parameters"): payload_api.update(model_cfg_val["parameters"])
+            logger.error(f"Не удалось создать запись для нового пользователя: {user_id}")
+            return None
+    else:
+        # Обновляем дату последней активности
+        await update_user_data(user_id, {"last_activity_date": firestore.SERVER_TIMESTAMP})
+        return user_data
+    return user_data # Возвращаем данные пользователя
+
+# --- УТИЛИТЫ GEMINI API ---
+# Принцип: SRP, Обработка ошибок
+async def generate_text_with_gemini(prompt: str) -> Optional[str]:
+    """Генерирует текст с помощью Google Gemini API."""
+    if not genai._configured: # Проверяем, сконфигурирован ли API
+        logger.warning("Gemini API не сконфигурирован. Генерация текста невозможна.")
+        return None
+    try:
+        # Убедитесь, что используете модель, подходящую для ваших задач
+        # Например, 'gemini-pro' для текстовых задач
+        model = genai.GenerativeModel('gemini-1.5-flash-latest') # или другая актуальная модель
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        return response.text
+    except google.api_core.exceptions.GoogleAPIError as e:
+        logger.error(f"Ошибка Google Gemini API: {e}")
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка при генерации текста Gemini: {e}")
+    return None
+
+# --- УТИЛИТЫ TELEGRAM (КЛАВИАТУРЫ, СООБЩЕНИЯ) ---
+# Принцип: DRY, Читаемость
+def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+    """Возвращает клавиатуру главного меню."""
+    keyboard = [
+        [InlineKeyboardButton(TEXT_USAGE_BUTTON, callback_data=f"{CALLBACK_PREFIX_ACTION}usage")],
+        [InlineKeyboardButton(TEXT_SUBSCRIBE_BUTTON, callback_data=f"{CALLBACK_PREFIX_ACTION}subscribe_info")],
+        # Добавьте другие кнопки по необходимости
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def send_typing_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет действие 'печатает...'."""
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+
+# --- ОБРАБОТЧИКИ КОМАНД ---
+# Принцип: SRP, Читаемость, KISS
+# Каждый обработчик отвечает за свою команду. Сложная логика выносится в утилиты.
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /start. Приветствует пользователя и показывает меню."""
+    user = update.effective_user
+    if not user: return
+
+    await check_or_create_user(update, context) # Проверка и создание пользователя
+
+    logger.info(f"Пользователь {user.id} ({user.username}) запустил команду /start.")
+    reply_text = f"👋 Привет, {user.first_name}!\nЯ твой бот-помощник. Чем могу помочь?"
+    await update.message.reply_html(reply_text, reply_markup=get_main_menu_keyboard())
+
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /menu. Показывает главное меню."""
+    user = update.effective_user
+    if not user: return
+
+    await check_or_create_user(update, context)
+
+    logger.info(f"Пользователь {user.id} ({user.username}) запросил меню.")
+    await update.message.reply_html("📋 **Главное меню:**", reply_markup=get_main_menu_keyboard())
+
+async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /usage. Показывает лимиты пользователя."""
+    user = update.effective_user
+    if not user: return
+
+    user_data = await check_or_create_user(update, context)
+    if not user_data:
+        await update.message.reply_text("Не удалось получить ваши данные. Попробуйте позже.")
+        return
+
+    requests_today = user_data.get("requests_today", 0)
+    daily_limit = CONFIG[CONFIG_FREE_DAILY_LIMIT]
+    subscription_until_ts = user_data.get("subscription_until")
+    subscription_status = "не активна"
+
+    if subscription_until_ts:
+        # Преобразуем Timestamp Firebase в datetime
+        if isinstance(subscription_until_ts, datetime):
+            subscription_until_dt = subscription_until_ts.replace(tzinfo=timezone.utc)
+        else: # Предполагаем, что это google.cloud.firestore_v1.base_document.SERVER_TIMESTAMP или уже datetime
+             # Для простоты, если это не datetime, считаем, что подписка неактивна или требует конвертации
             try:
-                resp_custom = await asyncio.get_event_loop().run_in_executor(None, lambda: requests.post(model_cfg_val["endpoint"], headers=hdrs, json=payload_api, timeout=45))
-                resp_custom.raise_for_status()
-                json_resp = resp_custom.json()
-                extracted_txt = None
-                model_api_id_check = model_cfg_val["id"]
-                if model_api_id_check == "grok-3-beta" and "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"] and "choices" in json_resp["response"][0] and isinstance(json_resp["response"][0]["choices"], list) and json_resp["response"][0]["choices"]: extracted_txt = json_resp["response"][0]["choices"][0].get("message",{}).get("content","").strip()
-                elif model_api_id_check == "gemini-2.5-pro-preview-03-25": extracted_txt = json_resp.get("text","").strip()
-                elif model_api_id_check == "gpt-4o-mini":
-                    if json_resp.get("status") == "success":
-                        output_val = json_resp.get("output")
-                        if isinstance(output_val, str): extracted_txt = output_val.strip()
-                        elif isinstance(output_val, dict): extracted_txt = output_val.get("text", output_val.get("content", "")).strip()
-                        elif output_val is not None: extracted_txt = str(output_val).strip()
-                    else: extracted_txt = f"Ошибка API GPT-4o mini: {json_resp.get('status','N/A')}. {json_resp.get('error_message','')}"
-                if extracted_txt is None: 
-                    for k_check in ["text", "content", "message", "output", "response"]:
-                        if isinstance(json_resp.get(k_check),str) and (extracted_txt := json_resp[k_check].strip()): break
-                response_txt_val = extracted_txt if extracted_txt else "Ответ API не содержит текста."
-            except requests.exceptions.HTTPError as e: response_txt_val = f"Ошибка сети Custom API ({e.response.status_code})."; logger.error(f"Custom API HTTPError: {e}", exc_info=True)
-            except requests.exceptions.RequestException as e: response_txt_val = f"Сетевая ошибка Custom API: {type(e).__name__}."; logger.error(f"Custom API RequestException: {e}", exc_info=True)
-            except Exception as e: response_txt_val = f"Неожиданная ошибка Custom API: {type(e).__name__}."; logger.error(f"Unexpected Custom API error: {e}", exc_info=True)
-    else: response_txt_val = "Ошибка: Неизвестный тип API."
+                # Попытка конвертации, если это стандартный timestamp Firestore
+                subscription_until_dt = datetime.fromtimestamp(subscription_until_ts.seconds, tz=timezone.utc)
+            except AttributeError: # Если это не Timestamp объект
+                 subscription_until_dt = None
 
-    final_txt_reply, _ = smart_truncate(response_txt_val, CONFIG["MAX_MESSAGE_LENGTH_TELEGRAM"])
-    await increment_request_count(user_id, current_model_k_val)
-    await update.message.reply_text(final_txt_reply, reply_markup=generate_menu_keyboard(user_data_c.get('current_menu','main_menu')), disable_web_page_preview=True)
-    logger.info(f"Sent AI response (model: {current_model_k_val}) to user {user_id}.")
 
-async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.pre_checkout_query
-    expected_payload_part = f"subscription_{CONFIG['PRO_SUBSCRIPTION_LEVEL_KEY']}"
-    if expected_payload_part in query.invoice_payload: await query.answer(ok=True)
-    else: await query.answer(ok=False, error_message="Неверный запрос на оплату.")
+        if subscription_until_dt and subscription_until_dt > datetime.now(timezone.utc):
+            subscription_status = f"активна до {subscription_until_dt.strftime('%d.%m.%Y %H:%M')} UTC"
+            # Если подписка активна, лимиты могут быть другими или отсутствовать
+            # Это нужно реализовать в логике проверки лимитов
+            # Для примера, пока оставим так:
+            limit_text = f"У вас активная подписка! Лимиты не действуют."
+        else:
+            limit_text = f"Использовано сегодня: {requests_today} из {daily_limit} (бесплатных)."
+    else:
+        limit_text = f"Использовано сегодня: {requests_today} из {daily_limit} (бесплатных)."
 
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    reply_text = (
+        f"📊 **Ваши лимиты:**\n\n"
+        f"{limit_text}\n"
+        f"Подписка: {subscription_status}"
+    )
+    await update.message.reply_html(reply_text)
+
+
+async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /subscribe. Информация о подписке и кнопка оплаты."""
+    user = update.effective_user
+    if not user: return
+
+    await check_or_create_user(update, context)
+
+    price_label = CONFIG[CONFIG_PRICE_LABEL]
+    price_description = CONFIG[CONFIG_PRICE_DESCRIPTION]
+    price_amount = CONFIG[CONFIG_PRICE_AMOUNT_RUB] # в копейках
+    currency = CONFIG[CONFIG_CURRENCY]
+
+    reply_text = (
+        f"💎 **Информация о подписке:**\n\n"
+        f"Получите неограниченный доступ ко всем функциям бота!\n"
+        f"Стоимость: {price_amount / 100:.2f} {currency} на 30 дней.\n\n"
+        f"Нажмите кнопку ниже, чтобы оформить подписку."
+    )
+
+    # Создаем инвойс
+    payload = f"subscribe_payload_{user.id}_{uuid.uuid4()}" # Уникальный payload для отслеживания
+    
+    # Кнопка оплаты
+    keyboard = [[InlineKeyboardButton("💳 Оплатить подписку", pay=True)]] # pay=True не работает так для инвойсов
+                                                                        # Вместо этого, мы отправим инвойс отдельной командой
+    
+    # Правильный способ - отправить инвойс
+    # await context.bot.send_invoice(...)
+    # Для простоты примера, покажем информацию и предложим команду для оплаты
+    # или кнопку, которая вызовет send_invoice
+    
+    payment_button = InlineKeyboardButton(
+        f"💳 Оплатить {price_amount / 100:.2f} {currency}",
+        callback_data=f"{CALLBACK_PREFIX_ACTION}pay_subscription"
+    )
+    reply_markup = InlineKeyboardMarkup([[payment_button]])
+
+    await update.message.reply_html(reply_text, reply_markup=reply_markup)
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /help."""
+    user = update.effective_user
+    if not user: return
+    await check_or_create_user(update, context)
+    
+    help_text = (
+        "❓ **Справка по боту:**\n\n"
+        "/start - Перезапуск и главное меню\n"
+        "/menu - Открыть главное меню\n"
+        "/usage - Узнать текущие лимиты\n"
+        "/subscribe - Информация о подписке\n"
+        "/help - Эта справка\n\n"
+        # Добавьте описание других функций
+        "Если у вас возникли проблемы, обратитесь к администратору." # (укажите контакт, если нужно)
+    )
+    await update.message.reply_html(help_text)
+
+# --- ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ ---
+async def message_handler_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает текстовые сообщения от пользователя."""
+    user = update.effective_user
+    if not user or not update.message or not update.message.text:
+        return
+
+    user_input = update.message.text
+    logger.info(f"Пользователь {user.id} ({user.username}) отправил текст: '{user_input}'")
+
+    user_data = await check_or_create_user(update, context)
+    if not user_data:
+        await update.message.reply_text("Произошла ошибка при обработке вашего профиля. Попробуйте позже.")
+        return
+
+    # Проверка лимитов
+    requests_today = user_data.get("requests_today", 0)
+    daily_limit = CONFIG[CONFIG_FREE_DAILY_LIMIT]
+    subscription_until_ts = user_data.get("subscription_until")
+    is_subscribed = False
+
+    if subscription_until_ts:
+        if isinstance(subscription_until_ts, datetime):
+            subscription_until_dt = subscription_until_ts.replace(tzinfo=timezone.utc)
+        else:
+            try:
+                subscription_until_dt = datetime.fromtimestamp(subscription_until_ts.seconds, tz=timezone.utc)
+            except AttributeError:
+                subscription_until_dt = None
+        
+        if subscription_until_dt and subscription_until_dt > datetime.now(timezone.utc):
+            is_subscribed = True
+
+    if not is_subscribed and requests_today >= daily_limit:
+        await update.message.reply_text(
+            "Вы достигли дневного лимита бесплатных запросов. "
+            "Чтобы продолжить, оформите подписку (/subscribe) или попробуйте завтра."
+        )
+        return
+
+    await send_typing_action(update, context) # Показываем, что бот "думает"
+
+    # Генерация ответа с помощью Gemini
+    # Пример простого промпта. Адаптируйте под свои нужды.
+    prompt = f"Ответь на следующий вопрос пользователя: {user_input}"
+    bot_response = await generate_text_with_gemini(prompt)
+
+    if bot_response:
+        await update.message.reply_text(bot_response)
+        if not is_subscribed: # Увеличиваем счетчик только для бесплатных пользователей
+            await update_user_data(user.id, {"requests_today": requests_today + 1})
+    else:
+        await update.message.reply_text("К сожалению, не удалось сгенерировать ответ. Попробуйте позже.")
+
+
+# --- ОБРАБОТЧИК CALLBACK QUERIES (Inline кнопки) ---
+async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает нажатия на inline-кнопки."""
+    query = update.callback_query
+    await query.answer() # Важно ответить на callback, чтобы кнопка перестала "грузиться"
+
+    user = update.effective_user
+    if not user or not query.data: return
+
+    logger.info(f"Пользователь {user.id} нажал кнопку с callback_data: {query.data}")
+    
+    # Проверка и создание пользователя (на всякий случай, если это первое взаимодействие через кнопку)
+    await check_or_create_user(update, context)
+
+    # Разбор callback_data
+    if query.data.startswith(CALLBACK_PREFIX_ACTION):
+        action = query.data.split(CALLBACK_PREFIX_ACTION, 1)[1]
+
+        if action == "usage":
+            # Переиспользуем существующий обработчик команды, если логика идентична
+            # Для этого создадим "фиктивное" сообщение для usage_command
+            class MockMessage:
+                async def reply_html(self, text, reply_markup=None):
+                    await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+                async def reply_text(self, text, reply_markup=None): # на случай если usage_command использует reply_text
+                    await query.edit_message_text(text=text, reply_markup=reply_markup)
+
+
+            mock_update = Update(update.update_id, message=MockMessage(), effective_user=user, callback_query=query)
+            await usage_command(mock_update, context) # Вызываем как команду
+
+        elif action == "subscribe_info":
+            # Аналогично для информации о подписке
+            class MockMessageSub:
+                async def reply_html(self, text, reply_markup=None):
+                    # Если сообщение уже есть, редактируем. Если нет (редко для callback), отправляем новое.
+                    try:
+                        await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+                    except telegram.error.BadRequest as e:
+                        if "message is not modified" in str(e).lower():
+                            pass # Ничего страшного, сообщение не изменилось
+                        elif "message to edit not found" in str(e).lower() or query.message is None:
+                             if query.message: # Если есть исходное сообщение от кнопки
+                                await query.message.reply_html(text=text, reply_markup=reply_markup)
+                             else: # Если нет, отправляем новое в чат (маловероятно для callback)
+                                await context.bot.send_message(chat_id=user.id, text=text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+                        else:
+                            raise e # Другая ошибка BadRequest
+
+            mock_update_sub = Update(update.update_id, message=MockMessageSub(), effective_user=user, callback_query=query)
+            await subscribe_command(mock_update_sub, context)
+
+        elif action == "pay_subscription":
+            # Логика отправки инвойса
+            await send_payment_invoice(update, context)
+
+        # Добавьте другие обработчики действий по callback_data
+        else:
+            await query.edit_message_text(text=f"Действие '{action}' в разработке.")
+    else:
+        await query.edit_message_text(text="Неизвестное действие.")
+
+
+# --- ПЛАТЕЖИ ---
+async def send_payment_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет инвойс на оплату."""
+    chat_id = update.effective_chat.id if update.effective_chat else update.effective_user.id
     user_id = update.effective_user.id
-    payment_info_obj = update.message.successful_payment
-    logger.info(f"Successful payment from {user_id}. Payload: {payment_info_obj.invoice_payload}")
-    sub_days = 30 
-    bot_data_upd = await get_bot_data()
-    user_subs_upd = bot_data_upd.get('user_subscriptions',{})
-    current_sub = user_subs_upd.get(str(user_id),{})
-    now_utc_val = datetime.now(timezone.utc)
-    start_ext_date = now_utc_val
-    if is_user_profi_subscriber(current_sub):
-        try:
-            prev_valid = datetime.fromisoformat(current_sub['valid_until'])
-            if prev_valid.tzinfo is None: prev_valid = prev_valid.replace(tzinfo=timezone.utc)
-            if prev_valid > now_utc_val: start_ext_date = prev_valid
-        except ValueError: pass 
-    new_valid_date = start_ext_date + timedelta(days=sub_days)
-    user_subs_upd[str(user_id)] = {'level': CONFIG["PRO_SUBSCRIPTION_LEVEL_KEY"], 'valid_until': new_valid_date.isoformat(), 'last_payment_amount': payment_info_obj.total_amount, 'currency': payment_info_obj.currency, 'purchase_date': now_utc_val.isoformat()}
-    await set_bot_data({'user_subscriptions': user_subs_upd})
-    confirm_msg = f"🎉 Оплата успешна! Подписка <b>Профи</b> активна до <b>{new_valid_date.strftime('%d.%m.%Y')}</b>."
-    user_data_reply = await get_user_data(user_id)
-    await update.message.reply_text(confirm_msg, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_reply.get('current_menu','main_menu')))
-    if CONFIG["ADMIN_ID"]:
-        try: await context.bot.send_message(CONFIG["ADMIN_ID"], f"🔔 Новая оплата: User {user_id}, Sub до {new_valid_date.strftime('%d.%m.%Y')}")
-        except Exception: pass
 
+    title = CONFIG[CONFIG_PRICE_LABEL]
+    description = CONFIG[CONFIG_PRICE_DESCRIPTION]
+    payload = f"sub_{user_id}_{int(datetime.now().timestamp())}" # Уникальный payload
+    provider_token = CONFIG[CONFIG_PAYMENT_PROVIDER_TOKEN]
+    currency = CONFIG[CONFIG_CURRENCY]
+    price = CONFIG[CONFIG_PRICE_AMOUNT_RUB] # Цена в минимальных единицах валюты (копейки для RUB)
+
+    if not provider_token or "YOUR_" in provider_token:
+        logger.error("Токен провайдера платежей не настроен!")
+        # Сообщаем пользователю, если это callback от кнопки
+        if update.callback_query:
+            await update.callback_query.message.reply_text("К сожалению, оплата временно недоступна. Попробуйте позже.")
+        elif update.message: # Если это команда
+            await update.message.reply_text("К сожалению, оплата временно недоступна. Попробуйте позже.")
+        return
+
+    prices = [LabeledPrice(label=title, amount=price)]
+
+    try:
+        await context.bot.send_invoice(
+            chat_id, title, description, payload, provider_token, currency, prices,
+            # photo_url='URL_TO_YOUR_PRODUCT_IMAGE', # Опционально
+            # photo_size=128, # Опционально
+            # photo_width=128, # Опционально
+            # photo_height=128, # Опционально
+            # need_name=True, # Опционально, запрашивать ли имя
+            # need_phone_number=True, # Опционально
+            # need_email=True, # Опционально
+            # need_shipping_address=False, # Опционально
+            # send_phone_number_to_provider=True, # Опционально
+            # send_email_to_provider=True, # Опционально
+            # is_flexible=False # Опционально, для динамических цен доставки
+        )
+        logger.info(f"Инвойс отправлен пользователю {user_id} с payload: {payload}")
+    except telegram.error.TelegramError as e:
+        logger.error(f"Ошибка отправки инвойса пользователю {user_id}: {e}")
+        if update.callback_query:
+            await update.callback_query.message.reply_text("Не удалось создать счет на оплату. Пожалуйста, попробуйте позже.")
+        elif update.message:
+            await update.message.reply_text("Не удалось создать счет на оплату. Пожалуйста, попробуйте позже.")
+
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает pre-checkout запросы от Telegram после того, как пользователь ввел платежные данные."""
+    query = update.pre_checkout_query
+    if not query: return
+
+    # Здесь вы можете проверить payload, доступность товара и т.д.
+    # Например, query.invoice_payload
+    logger.info(f"PreCheckoutQuery от пользователя {query.from_user.id} с payload: {query.invoice_payload}")
+
+    # Если все в порядке, подтверждаем платеж
+    await query.answer(ok=True)
+    # Если есть проблема, отвечаем с ошибкой:
+    # await query.answer(ok=False, error_message="Извините, возникла проблема с обработкой вашего заказа.")
+
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает сообщение об успешном платеже."""
+    message = update.message
+    if not message or not message.successful_payment: return
+
+    user_id = message.from_user.id
+    payment_info = message.successful_payment
+    logger.info(
+        f"Успешный платеж от пользователя {user_id}: "
+        f"Сумма: {payment_info.total_amount / 100} {payment_info.currency}, "
+        f"Payload: {payment_info.invoice_payload}, "
+        f"Telegram Payment ID: {payment_info.telegram_payment_charge_id}, "
+        f"Provider Payment ID: {payment_info.provider_payment_charge_id}"
+    )
+
+    # Обновляем данные пользователя в Firestore
+    # Предположим, что подписка на 30 дней
+    subscription_end_date = datetime.now(timezone.utc) + timedelta(days=30)
+    user_update_data = {
+        "subscription_until": subscription_end_date,
+        "last_payment_date": firestore.SERVER_TIMESTAMP,
+        "last_payment_amount": payment_info.total_amount,
+        "last_payment_currency": payment_info.currency,
+        "requests_today": 0 # Сбрасываем дневной лимит
+    }
+    if await update_user_data(user_id, user_update_data):
+        logger.info(f"Подписка для пользователя {user_id} продлена до {subscription_end_date.isoformat()}")
+        await message.reply_text(
+            f"🎉 Спасибо за оплату! Ваша подписка активна до {subscription_end_date.strftime('%d.%m.%Y %H:%M')} UTC."
+        )
+    else:
+        logger.error(f"Не удалось обновить данные о подписке для пользователя {user_id} после оплаты.")
+        # Важно обработать этот случай: возможно, потребуется ручное вмешательство или повторная попытка
+        await message.reply_text(
+            "Спасибо за оплату! Возникла проблема с автоматической активацией подписки. "
+            "Пожалуйста, свяжитесь с администратором, если подписка не активируется в ближайшее время."
+        )
+
+    # Сохраняем информацию о платеже в отдельную коллекцию (опционально, для отчетности)
+    if db:
+        try:
+            payment_record = {
+                "user_id": user_id,
+                "telegram_user_id": message.from_user.id, # Для связки, если user_id не Telegram ID
+                "username": message.from_user.username or "",
+                "amount": payment_info.total_amount,
+                "currency": payment_info.currency,
+                "invoice_payload": payment_info.invoice_payload,
+                "telegram_payment_charge_id": payment_info.telegram_payment_charge_id,
+                "provider_payment_charge_id": payment_info.provider_payment_charge_id,
+                "payment_date": firestore.SERVER_TIMESTAMP,
+                "order_info": payment_info.order_info.to_dict() if payment_info.order_info else None
+            }
+            await asyncio.to_thread(
+                db.collection(FIRESTORE_PAYMENTS_COLLECTION).document(payment_info.telegram_payment_charge_id).set,
+                payment_record
+            )
+            logger.info(f"Запись о платеже {payment_info.telegram_payment_charge_id} сохранена в Firestore.")
+        except Exception as e:
+            logger.error(f"Ошибка сохранения записи о платеже в Firestore: {e}")
+
+
+# --- ОБРАБОТЧИК ОШИБОК ---
+# Принцип: Четкая обратная связь, Логирование
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
-    tb_str = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-    if isinstance(update, Update) and update.effective_chat:
-        user_data_err = await get_user_data(update.effective_user.id) if update.effective_user else {}
-        try: await context.bot.send_message(update.effective_chat.id, "Произошла ошибка. Попробуйте /start.", reply_markup=generate_menu_keyboard(user_data_err.get('current_menu','main_menu')))
-        except Exception: pass
-    if CONFIG["ADMIN_ID"] and isinstance(update, Update) and update.effective_user:
+    """Логирует ошибки и отправляет пользователю сообщение о проблеме."""
+    logger.error(msg="Исключение при обработке обновления:", exc_info=context.error)
+
+    # Собираем traceback для подробного логирования
+    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+    tb_string = "".join(tb_list)
+    logger.error(f"Traceback:\n{tb_string}")
+
+    # Формируем сообщение для пользователя (без технических деталей)
+    user_message = "😕 Ой, что-то пошло не так. Мы уже разбираемся в проблеме. Пожалуйста, попробуйте позже."
+
+    # Если ошибка связана с API Gemini, можно дать более конкретное сообщение
+    if isinstance(context.error, google.api_core.exceptions.GoogleAPIError):
+        user_message = "Возникла проблема при обращении к нейросети. Попробуйте изменить запрос или повторите попытку позже."
+    elif isinstance(context.error, telegram.error.NetworkError):
+         user_message = "Проблема с сетевым подключением. Пожалуйста, проверьте ваше интернет-соединение и попробуйте снова."
+    # Добавьте другие типы ошибок, если необходимо
+
+    # Отправляем сообщение пользователю, если это возможно
+    if isinstance(update, Update) and update.effective_message:
         try:
-            admin_err_text = f"🤖 Ошибка бота:\n{context.error.__class__.__name__}: {context.error}\nUser: {update.effective_user.id}\n```\n{tb_str[:3500]}\n```"
-            await context.bot.send_message(CONFIG["ADMIN_ID"], admin_err_text, parse_mode=ParseMode.MARKDOWN_V2)
-        except Exception: pass
+            await update.effective_message.reply_text(user_message)
+        except telegram.error.TelegramError as e:
+            logger.error(f"Не удалось отправить сообщение об ошибке пользователю: {e}")
+    elif isinstance(update, Update) and update.callback_query and update.callback_query.message:
+        try:
+            await update.callback_query.message.reply_text(user_message)
+        except telegram.error.TelegramError as e:
+            logger.error(f"Не удалось отправить сообщение об ошибке пользователю (callback): {e}")
 
-async def main():
-    app_build = Application.builder().token(CONFIG["TELEGRAM_TOKEN"])
-    app_build.read_timeout(30).connect_timeout(30)
-    app = app_build.build()
 
-    app.add_handler(CommandHandler("start", start), group=0)
-    app.add_handler(CommandHandler("menu", open_menu_command), group=0)
-    app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("subscribe", subscribe_info_command), group=0)
-    app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
-    app.add_handler(CommandHandler("help", help_command), group=0)
-    
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
-    
-    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    app.add_error_handler(error_handler)
+    # Уведомление администратора (опционально)
+    admin_user_id = CONFIG[CONFIG_ADMIN_USER_ID]
+    if admin_user_id and admin_user_id != 0: # Проверяем, что ID администратора задан
+        try:
+            # Собираем больше контекста для администратора
+            error_details_for_admin = f"Ошибка в боте:\n"
+            error_details_for_admin += f"Тип: {type(context.error).__name__}\n"
+            error_details_for_admin += f"Сообщение: {context.error}\n"
+            if isinstance(update, Update):
+                if update.effective_user:
+                    error_details_for_admin += f"Пользователь: {update.effective_user.id} (@{update.effective_user.username})\n"
+                if update.effective_message and update.effective_message.text:
+                     error_details_for_admin += f"Сообщение: {update.effective_message.text[:200]}\n" # Первые 200 символов
+                elif update.callback_query and update.callback_query.data:
+                     error_details_for_admin += f"Callback: {update.callback_query.data}\n"
 
-    bot_cmds = [BotCommand(c,d) for c,d in [
-        ("start","🚀 Перезапуск/Меню"), ("menu","📋 Открыть меню"), ("usage","📊 Мои лимиты"),
-        ("subscribe","💎 О подписке"), ("bonus","🎁 Бонус канала"), ("help","❓ Справка")]]
-    try: await app.bot.set_my_commands(bot_cmds); logger.info("Bot commands set.")
-    except Exception as e: logger.error(f"Failed to set bot commands: {e}")
+            # Ограничиваем длину сообщения для Telegram
+            max_len = 4000
+            if len(tb_string) + len(error_details_for_admin) > max_len:
+                available_space_for_tb = max_len - len(error_details_for_admin) - 20 # 20 для запаса
+                truncated_tb = tb_string[:available_space_for_tb] + "\n... (traceback truncated)"
+                admin_message_text = error_details_for_admin + "\n" + truncated_tb
+            else:
+                admin_message_text = error_details_for_admin + "\n" + tb_string
 
-    logger.info("Bot polling started...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+            await context.bot.send_message(chat_id=admin_user_id, text=admin_message_text[:4096]) # Telegram лимит
+        except Exception as e_admin:
+            logger.error(f"Не удалось отправить уведомление об ошибке администратору: {e_admin}")
+
+
+# --- ОСНОВНАЯ ФУНКЦИЯ ---
+async def main() -> None:
+    """Запускает бота."""
+    global db # Делаем db доступным для main
+
+    # 1. Инициализация Firebase
+    db = initialize_firebase_app()
+    if not db:
+        logger.critical("Не удалось инициализировать Firebase. Бот не может продолжить работу с базой данных.")
+        # Можно решить, останавливать ли бота полностью или работать без БД
+        # return # Раскомментируйте, если работа без БД невозможна
+
+    # 2. Конфигурация Gemini API
+    configure_gemini_api()
+
+    # 3. Создание экземпляра Application
+    # Принцип: Ясность
+    # Используем context_types для удобства работы с кастомным контекстом (если понадобится)
+    # persistence = PicklePersistence(filepath="bot_data_persistence") # Опционально для сохранения данных между перезапусками
+    application = (
+        Application.builder()
+        .token(CONFIG[CONFIG_TELEGRAM_TOKEN])
+        # .persistence(persistence) # Раскомментируйте, если используете persistence
+        .build()
+    )
+
+    # 4. Регистрация обработчиков
+    # Принцип: Модульность, SRP
+    # Каждый тип обновления обрабатывается своим хендлером.
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("menu", menu_command))
+    application.add_handler(CommandHandler("usage", usage_command))
+    application.add_handler(CommandHandler("subscribe", subscribe_command))
+    application.add_handler(CommandHandler("help", help_command))
+
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler_text))
+    application.add_handler(CallbackQueryHandler(button_callback_handler))
+
+    # Обработчики платежей
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+
+
+    # 5. Регистрация обработчика ошибок (должен быть последним)
+    application.add_error_handler(error_handler)
+
+    # 6. Установка команд бота
+    # Принцип: Удобство пользователя
+    bot_commands = [
+        BotCommand("start", "🚀 Перезапуск / Главное меню"),
+        BotCommand("menu", "📋 Открыть меню"),
+        BotCommand("usage", "📊 Мои лимиты"),
+        BotCommand("subscribe", "💎 Информация о подписке"),
+        BotCommand("help", "❓ Справка по боту"),
+    ]
+    try:
+        await application.bot.set_my_commands(bot_commands)
+        logger.info("Команды бота успешно установлены.")
+    except Exception as e:
+        logger.error(f"Не удалось установить команды бота: {e}")
+
+    # 7. Запуск бота
+    logger.info("Запуск бота в режиме опроса (polling)...")
+    # allowed_updates можно настроить для получения только нужных типов обновлений
+    await application.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
 
 if __name__ == '__main__':
-    if not CONFIG["GOOGLE_GEMINI_API_KEY"] or "YOUR_" in CONFIG["GOOGLE_GEMINI_API_KEY"] or not CONFIG["GOOGLE_GEMINI_API_KEY"].startswith("AIzaSy"): logger.warning("GOOGLE_GEMINI_API_KEY incorrect.")
-    else:
-        try: genai.configure(api_key=CONFIG["GOOGLE_GEMINI_API_KEY"]); logger.info("Google Gemini API configured.")
-        except Exception as e: logger.error(f"Google Gemini API config error: {e}")
-    for k_name in ["CUSTOM_GEMINI_PRO_API_KEY", "CUSTOM_GROK_3_API_KEY", "CUSTOM_GPT4O_MINI_API_KEY"]:
-        if not (val := CONFIG.get(k_name,"")) or "YOUR_" in val or not (val.startswith("sk-") or val.startswith("AIzaSy")): logger.warning(f"{k_name} incorrect.")
-    if not CONFIG["PAYMENT_PROVIDER_TOKEN"] or "YOUR_" in CONFIG["PAYMENT_PROVIDER_TOKEN"]: logger.warning("PAYMENT_PROVIDER_TOKEN incorrect.")
-    if not db: logger.critical("Firestore (db) NOT initialized! Limited functionality.")
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except ValueError as e: # Перехватываем ошибку валидации конфигурации
+        logger.critical(f"Ошибка запуска бота: {e}")
+    except KeyboardInterrupt:
+        logger.info("Бот остановлен вручную.")
+    except Exception as e:
+        logger.critical(f"Непредвиденная критическая ошибка при запуске бота: {e}")
+        logger.critical(traceback.format_exc())
