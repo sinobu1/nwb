@@ -85,10 +85,10 @@ def load_config() -> Dict[str, Any]:
     default_firebase_creds_path = os.path.join(os.path.dirname(__file__), CONFIG_FIREBASE_DEFAULT_FILENAME)
 
     config = {
-        CONFIG_TELEGRAM_TOKEN: os.getenv(CONFIG_TELEGRAM_TOKEN, "YOUR_TELEGRAM_TOKEN"),
-        CONFIG_GEMINI_API_KEY: os.getenv(CONFIG_GEMINI_API_KEY, "YOUR_GEMINI_API_KEY"),
-        CONFIG_GROK_API_KEY: os.getenv(CONFIG_GROK_API_KEY, "YOUR_GROK_API_KEY"),
-        CONFIG_GPT_API_KEY: os.getenv(CONFIG_GPT_API_KEY, "YOUR_GPT_API_KEY"),
+        CONFIG_TELEGRAM_TOKEN: os.getenv(CONFIG_TELEGRAM_TOKEN, "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0),
+        CONFIG_GEMINI_API_KEY: os.getenv(CONFIG_GEMINI_API_KEY, "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"),
+        CONFIG_GROK_API_KEY: os.getenv(CONFIG_GROK_API_KEY, "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P"),
+        CONFIG_GPT_API_KEY: os.getenv(CONFIG_GPT_API_KEY, "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P"),
 
         # Путь к файлу Firebase credentials. Сначала проверяем переменную окружения,
         # затем используем путь по умолчанию.
@@ -99,7 +99,7 @@ def load_config() -> Dict[str, Any]:
         CONFIG_FREE_DAILY_LIMIT: int(os.getenv(CONFIG_FREE_DAILY_LIMIT, 5)),
         CONFIG_BONUS_CHANNEL_ID: os.getenv(CONFIG_BONUS_CHANNEL_ID, ""),
         CONFIG_BONUS_CHANNEL_LINK: os.getenv(CONFIG_BONUS_CHANNEL_LINK, ""),
-        CONFIG_PAYMENT_PROVIDER_TOKEN: os.getenv(CONFIG_PAYMENT_PROVIDER_TOKEN, "YOUR_PAYMENT_PROVIDER_TOKEN"),
+        CONFIG_PAYMENT_PROVIDER_TOKEN: os.getenv(CONFIG_PAYMENT_PROVIDER_TOKEN, "390540012:LIVE:70602"),
         CONFIG_PRICE_AMOUNT_RUB: int(os.getenv(CONFIG_PRICE_AMOUNT_RUB, 10000)),
         CONFIG_PRICE_LABEL: os.getenv(CONFIG_PRICE_LABEL, "Подписка на бота"),
         CONFIG_PRICE_DESCRIPTION: os.getenv(CONFIG_PRICE_DESCRIPTION, "Доступ ко всем функциям на 30 дней"),
