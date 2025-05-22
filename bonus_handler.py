@@ -2,7 +2,16 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
-from .bot import get_user_data, set_user_data, NEWS_CHANNEL_USERNAME, NEWS_CHANNEL_LINK, NEWS_CHANNEL_BONUS_MODEL_KEY, NEWS_CHANNEL_BONUS_GENERATIONS, AVAILABLE_TEXT_MODELS, MENU_STRUCTURE
+# Corrected import from bot and added generate_menu_keyboard
+from bot import (
+    get_user_data, set_user_data,
+    NEWS_CHANNEL_USERNAME, NEWS_CHANNEL_LINK,
+    NEWS_CHANNEL_BONUS_MODEL_KEY, NEWS_CHANNEL_BONUS_GENERATIONS,
+    AVAILABLE_TEXT_MODELS, MENU_STRUCTURE, generate_menu_keyboard
+)
+# Added missing imports
+from datetime import datetime, timedelta
+from telegram.constants import ParseMode
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -20,7 +29,7 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
     if update.message:
         user_data['user_command_message'] = {
             'message_id': update.message.message_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat() # Uses datetime
         }
         await set_user_data(user_id, user_data)
         await try_delete_user_message(update, user_id)
@@ -34,8 +43,8 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
     if not NEWS_CHANNEL_USERNAME or NEWS_CHANNEL_USERNAME == "@YourNewsChannelHandle":
         await update.message.reply_text(
             "Функция бонуса за подписку на канал не настроена.",
-            reply_markup=generate_menu_keyboard(parent_menu_key),
-            parse_mode=None,
+            reply_markup=generate_menu_keyboard(parent_menu_key), # Uses generate_menu_keyboard
+            parse_mode=None, # Uses ParseMode implicitly if set, ensure consistency
             disable_web_page_preview=True
         )
         logger.info(f"Bonus feature not configured for user {user_id}.")
@@ -46,7 +55,7 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
     if not bonus_model_config:
         await update.message.reply_text(
             "Ошибка: Бонусная модель не найдена. Обратитесь к администратору.",
-            reply_markup=generate_menu_keyboard(parent_menu_key),
+            reply_markup=generate_menu_keyboard(parent_menu_key), # Uses generate_menu_keyboard
             parse_mode=None,
             disable_web_page_preview=True
         )
@@ -66,8 +75,8 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
         )
         await update.message.reply_text(
             reply_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=generate_menu_keyboard(parent_menu_key),
+            parse_mode=ParseMode.HTML, # Uses ParseMode
+            reply_markup=generate_menu_keyboard(parent_menu_key), # Uses generate_menu_keyboard
             disable_web_page_preview=True
         )
         logger.info(f"User {user_id} checked bonus status: {uses_left} uses left.")
@@ -85,15 +94,15 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
             await update.message.reply_text(
                 f"🎉 Спасибо за подписку на <a href='{NEWS_CHANNEL_LINK}'>канал {channel}</a>! "
                 f"Начислено <b>{NEWS_CHANNEL_BONUS_GENERATIONS}</b> бонусных генераций для модели {bonus_model_name}.",
-                parse_mode=ParseMode.HTML,
-                reply_markup=generate_menu_keyboard('main_menu'),
+                parse_mode=ParseMode.HTML, # Uses ParseMode
+                reply_markup=generate_menu_keyboard('main_menu'), # Uses generate_menu_keyboard
                 disable_web_page_preview=True
             )
             logger.info(f"User {user_id} claimed bonus for {bonus_model_name}.")
         else:
             await update.message.reply_text(
                 f"Подпишитесь на <a href='{NEWS_CHANNEL_LINK}'>канал {channel}</a> и нажмите «🎁 Получить» в меню «Бонус».",
-                parse_mode=ParseMode.HTML,
+                parse_mode=ParseMode.HTML, # Uses ParseMode
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton(f"📢 Перейти в канал {channel}", url=NEWS_CHANNEL_LINK)
                 ]]),
@@ -105,7 +114,7 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
         await update.message.reply_text(
             f"Не удалось проверить подписку на <a href='{NEWS_CHANNEL_LINK}'>канал {NEWS_CHANNEL_USERNAME}</a>. "
             f"Попробуйте позже.",
-            parse_mode=ParseMode.HTML,
+            parse_mode=ParseMode.HTML, # Uses ParseMode
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton(f"📢 Перейти в {NEWS_CHANNEL_USERNAME}", url=NEWS_CHANNEL_LINK)
             ]]),
@@ -115,7 +124,7 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
         logger.error(f"Unexpected error in bonus claim for user {user_id}: {e}", exc_info=True)
         await update.message.reply_text(
             "Ошибка при получении бонуса. Попробуйте позже.",
-            reply_markup=generate_menu_keyboard(parent_menu_key),
+            reply_markup=generate_menu_keyboard(parent_menu_key), # Uses generate_menu_keyboard
             parse_mode=None,
             disable_web_page_preview=True
         )
@@ -134,9 +143,9 @@ async def try_delete_user_message(update: Update, user_id: int):
         return
 
     try:
-        from datetime import datetime, timedelta
+        # from datetime import datetime, timedelta # Moved to top-level import
         msg_time = datetime.fromisoformat(timestamp)
-        if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48):
+        if datetime.now(msg_time.tzinfo) - msg_time > timedelta(hours=48): # Uses datetime, timedelta
             logger.info(f"Message {message_id} is too old, clearing record.")
             user_data.pop('user_command_message', None)
             await set_user_data(user_id, user_data)
