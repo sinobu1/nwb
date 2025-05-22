@@ -1,6 +1,7 @@
-import requests
 import logging
 import os
+import asyncio
+import requests
 from typing import Tuple
 
 # Настройка логирования
@@ -16,8 +17,8 @@ GROK_3_CONFIG = {
     "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
     "is_limited": True,
     "limit_type": "subscription_custom_pro",
-    "limit_if_no_subscription": 3,  # DEFAULT_FREE_REQUESTS_GROK_DAILY
-    "subscription_daily_limit": 25,  # DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY
+    "limit_if_no_subscription": 3,
+    "subscription_daily_limit": 25,
     "cost_category": "custom_api_grok_3_paid",
     "pricing_info": {}
 }
@@ -30,18 +31,17 @@ MAX_OUTPUT_TOKENS = 2048
 
 async def query_grok_3(system_prompt: str, user_message: str) -> Tuple[str, bool]:
     """
-    Отправляет запрос к модели Grok 3 через custom HTTP API.
-    
+    Отправка запроса к модели Grok 3 через HTTP API.
     Args:
-        system_prompt (str): Системный промпт для модели.
-        user_message (str): Сообщение пользователя.
-    
+        system_prompt: Системный промпт для модели.
+        user_message: Сообщение пользователя.
     Returns:
-        Tuple[str, bool]: Текст ответа и флаг, указывающий на успешность запроса.
+        Текст ответа и флаг успешности запроса.
     """
+    # Проверка валидности ключа API
     if not CUSTOM_GROK_3_API_KEY or "YOUR_CUSTOM_KEY" in CUSTOM_GROK_3_API_KEY or not CUSTOM_GROK_3_API_KEY.startswith("sk-"):
-        logger.error("Custom Grok 3 API key is missing, a placeholder, or incorrectly formatted.")
-        return "Ошибка конфигурации: Ключ API для модели Grok 3 не настроен корректно. Пожалуйста, сообщите администратору.", False
+        logger.error("Invalid Grok 3 API key.")
+        return "Ошибка: Ключ API для Grok 3 не настроен.", False
 
     headers = {
         "Authorization": f"Bearer {CUSTOM_GROK_3_API_KEY}",
@@ -49,6 +49,7 @@ async def query_grok_3(system_prompt: str, user_message: str) -> Tuple[str, bool
         "Accept": "application/json"
     }
 
+    # Формирование payloads
     payload = {
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -70,7 +71,6 @@ async def query_grok_3(system_prompt: str, user_message: str) -> Tuple[str, bool
         )
         response.raise_for_status()
         response_json = response.json()
-        logger.debug(f"Raw JSON response from Grok 3: {response_json}")
 
         # Извлечение текста ответа
         extracted_text = None
@@ -83,17 +83,17 @@ async def query_grok_3(system_prompt: str, user_message: str) -> Tuple[str, bool
 
         if not extracted_text:
             logger.warning(f"No text content in Grok 3 response: {response_json}")
-            return "Ответ от API не содержит текстовых данных или не удалось его извлечь.", False
+            return "Ответ от API пуст или не удалось извлечь текст.", False
 
         logger.info(f"Grok 3 response received. Length: {len(extracted_text)}")
         return extracted_text, True
 
     except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTPError for Grok 3 API: {e}. Response: {e.response.text if e.response else 'No response'}", exc_info=True)
-        return f"Ошибка сети при обращении к API Grok 3 ({e.response.status_code}). Попробуйте позже.", False
+        logger.error(f"HTTPError for Grok 3 API: {e}. Response: {e.response.text if e.response else 'No response'}")
+        return f"Ошибка сети ({e.response.status_code}). Попробуйте позже.", False
     except requests.exceptions.RequestException as e:
-        logger.error(f"RequestException for Grok 3 API: {e}", exc_info=True)
-        return f"Сетевая ошибка при обращении к API Grok 3: {type(e).__name__}. Проверьте соединение или попробуйте позже.", False
+        logger.error(f"RequestException for Grok 3 API: {e}")
+        return f"Сетевая ошибка: {type(e).__name__}. Проверьте соединение.", False
     except Exception as e:
-        logger.error(f"Unexpected error with Grok 3 API: {e}", exc_info=True)
-        return f"Неожиданная ошибка при работе с API Grok 3: {type(e).__name__}.", False
+        logger.error(f"Unexpected error with Grok 3 API: {e}")
+        return f"Неожиданная ошибка: {type(e).__name__}.", False
