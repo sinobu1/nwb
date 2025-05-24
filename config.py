@@ -49,16 +49,24 @@ class AppConfig:
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
 
-    DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72
-    DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 48
+    DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY = 65
+    DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50
+    DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 1
+    DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1 # Также модель для бонуса с канала
+    DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY = 10
+    
     DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY = 75
-    DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY = 0
     DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY = 25
     PRO_SUBSCRIPTION_LEVEL_KEY = "profi_access_v1"
-    DEFAULT_FREE_REQUESTS_GROK_DAILY = 3
     DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY = 25
-    DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY = 3
     DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY = 25
+
+    GEMS_FOR_NEW_USER = 0 # Сколько гемов давать новому пользователю
+    # Здесь можно определить пакеты гемов для покупки, например:
+    # GEM_PACKAGES = {
+    #     "pack1": {"gems": 100, "price_rub": 100}, # цена в копейках для Telegram Payments
+    #     "pack2": {"gems": 550, "price_rub": 450},
+    # }
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
@@ -114,6 +122,20 @@ AI_MODES = {
             "Используй ясное форматирование для списков и абзацев, если это необходимо."
         ),
         "welcome": "Универсальный агент к вашим услугам. Какой у вас вопрос?"
+    },
+    "professional_dietitian": {
+        "name": "Диетолог-профессионал",
+        "prompt": (
+            "Ты — Диетолог-профессионал, эксперт по здоровому питанию и образу жизни. "
+            "Твоя задача — предоставлять научно обоснованные рекомендации по питанию, "
+            "составлять индивидуальные планы питания, анализировать рационы, давать "
+            "советы по контролю веса и улучшению самочувствия через питание. "
+            "Всегда основывай свои ответы на актуальных знаниях в области диетологии "
+            "и нутрициологии. Будь внимателен к деталям запроса пользователя, "
+            "уточняй информацию при необходимости. Используй четкую структуру, "
+            "списки и таблицы для планов и рекомендаций."
+        ),
+        "welcome": "Здравствуйте! Я ваш профессиональный диетолог. Чем могу помочь сегодня? Расскажите о ваших целях или вопросах по питанию."
     },
     "idea_generator": {
         "name": "Генератор идей",
@@ -191,39 +213,36 @@ AI_MODES = {
 AVAILABLE_TEXT_MODELS = {
     "google_gemini_2_0_flash": {
         "name": "Gemini 2.0", "id": "gemini-2.0-flash", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
-        "is_limited": True, "limit_type": "daily_free", "limit": CONFIG.DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY,
-        "cost_category": "google_flash_free"
+        "is_limited": True, 
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY, # 65
+        "gem_cost": 0 # Бесплатная в рамках лимита
     },
     "google_gemini_2_5_flash_preview": {
         "name": "Gemini 2.5", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
-        "is_limited": True, "limit_type": "subscription_or_daily_free",
-        "limit_if_no_subscription": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY,
-        "subscription_daily_limit": CONFIG.DEFAULT_SUBSCRIPTION_REQUESTS_GOOGLE_FLASH_PREVIEW_DAILY,
-        "cost_category": "google_flash_preview_flex"
+        "is_limited": True,
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY, # 50
+        "gem_cost": 0 # Бесплатная в рамках лимита
     },
-    "custom_api_gemini_2_5_pro": {
+    "custom_api_gemini_2_5_pro": { # Это также NEWS_CHANNEL_BONUS_MODEL_KEY
         "name": "Gemini Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_PRO_DAILY,
-        "subscription_daily_limit": CONFIG.DEFAULT_SUBSCRIPTION_REQUESTS_CUSTOM_PRO_DAILY,
-        "cost_category": "custom_api_pro_paid", "pricing_info": {}
+        "is_limited": True, 
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY, # 1
+        "gem_cost": 2.5
     },
     "custom_api_grok_3": {
         "name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG.DEFAULT_FREE_REQUESTS_GROK_DAILY,
-        "subscription_daily_limit": CONFIG.DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY,
-        "cost_category": "custom_api_grok_3_paid", "pricing_info": {}
+        "is_limited": True, 
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY, # 1
+        "gem_cost": 2.5
     },
     "custom_api_gpt_4o_mini": {
         "name": "GPT-4o mini", "id": "gpt-4o-mini", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
-        "is_limited": True, "limit_type": "subscription_custom_pro",
-        "limit_if_no_subscription": CONFIG.DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY,
-        "subscription_daily_limit": CONFIG.DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY,
-        "cost_category": "custom_api_gpt4o_mini_paid", "pricing_info": {}
+        "is_limited": True, 
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY, # 10
+        "gem_cost": 0.5
     }
 }
 DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]["id"]
@@ -462,6 +481,137 @@ class CustomHttpAIService(BaseAIService):
             logger.error(f"Unexpected Custom API error for {self.model_id} ({endpoint}): {e}", exc_info=True)
             return f"Неожиданная ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
 
+# --- НОВЫЕ УТИЛИТЫ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ СИСТЕМЫ ГЕМОВ ---
+
+async def get_user_gem_balance(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> float:
+    """Получает текущий баланс гемов пользователя."""
+    if user_data is None:
+        user_data = await firestore_service.get_user_data(user_id)
+    return float(user_data.get('gem_balance', 0.0))
+
+async def update_user_gem_balance(user_id: int, new_balance: float) -> None:
+    """Обновляет баланс гемов пользователя в Firestore."""
+    await firestore_service.set_user_data(user_id, {'gem_balance': new_balance})
+    logger.info(f"User {user_id} gem balance updated to: {new_balance}")
+
+async def get_daily_usage_for_model(user_id: int, model_key: str, bot_data_cache: Optional[Dict[str, Any]] = None) -> int:
+    """Получает количество сегодняшних БЕСПЛАТНЫХ использований модели."""
+    if bot_data_cache is None:
+        bot_data_cache = await firestore_service.get_bot_data()
+    
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    all_user_daily_counts = bot_data_cache.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+    user_counts_today = all_user_daily_counts.get(str(user_id), {})
+    model_usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
+
+    return model_usage_info['count'] if model_usage_info.get('date') == today_str else 0
+
+async def check_and_log_request_attempt(user_id: int, model_key: str, user_data: Optional[Dict[str, Any]] = None, bot_data_cache: Optional[Dict[str, Any]] = None) -> Tuple[bool, str, str, Optional[float]]:
+    """
+    Проверяет, может ли пользователь сделать запрос.
+    Возвращает: (can_proceed, message, usage_type ["free", "bonus", "gem"], gem_cost_if_any)
+    """
+    model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
+    if not model_cfg:
+        return False, "Ошибка: Конфигурация модели не найдена.", "error", None
+
+    if user_data is None:
+        user_data = await firestore_service.get_user_data(user_id)
+    if bot_data_cache is None:
+        bot_data_cache = await firestore_service.get_bot_data()
+
+    # 1. Проверка бонуса с новостного канала (если применимо)
+    # Бонусные попытки расходуются в первую очередь
+    if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and \
+       user_data.get('claimed_news_bonus', False) and \
+       user_data.get('news_bonus_uses_left', 0) > 0:
+        logger.info(f"User {user_id} can use model {model_key} via news channel bonus.")
+        return True, "Используется бонусная генерация.", "bonus", 0.0
+
+    # 2. Проверка бесплатных дневных лимитов
+    free_daily_limit = model_cfg.get('free_daily_limit', 0)
+    current_free_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
+
+    if current_free_usage < free_daily_limit:
+        logger.info(f"User {user_id} can use model {model_key} via free daily limit ({current_free_usage}/{free_daily_limit}).")
+        return True, f"Используется бесплатная попытка ({current_free_usage + 1}/{free_daily_limit}).", "free", 0.0
+
+    # 3. Если бесплатные лимиты исчерпаны, проверяем гемы
+    gem_cost = model_cfg.get('gem_cost', 0.0)
+    if gem_cost > 0:
+        user_gem_balance = await get_user_gem_balance(user_id, user_data)
+        if user_gem_balance >= gem_cost:
+            logger.info(f"User {user_id} can use model {model_key} for {gem_cost} gems (balance: {user_gem_balance}).")
+            return True, f"Будет списано {gem_cost} гемов.", "gem", gem_cost
+        else:
+            # Недостаточно гемов
+            # TODO: Предложить купить гемы
+            msg = (f"Недостаточно гемов для модели «{model_cfg['name']}».\n"
+                   f"Нужно: {gem_cost} гемов, у вас: {user_gem_balance}.\n"
+                   f"Пополните баланс через меню «💎 Гемы».")
+            logger.warning(f"User {user_id} insufficient gems for {model_key}. Needed: {gem_cost}, Has: {user_gem_balance}")
+            return False, msg, "no_gems", gem_cost
+    
+    # 4. Если модель не имеет стоимости в гемах (gem_cost == 0) и бесплатные лимиты исчерпаны
+    if gem_cost == 0 and current_free_usage >= free_daily_limit:
+        msg = (f"Дневной бесплатный лимит для модели «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. "
+               f"Эта модель не доступна за гемы. Попробуйте завтра или выберите другую модель.")
+        logger.warning(f"User {user_id} free daily limit exhausted for {model_key} (no gem cost).")
+        return False, msg, "limit_exhausted_no_gems", None
+
+    # Сюда не должны доходить, но на всякий случай
+    logger.error(f"User {user_id} check_and_log_request_attempt reached unexpected state for model {model_key}.")
+    return False, "Не удалось определить возможность использования модели. Обратитесь в поддержку.", "error", None
+
+
+async def increment_request_count(user_id: int, model_key: str, usage_type: str, gem_cost_val: Optional[float] = None):
+    """
+    Инкрементирует счетчики или списывает гемы в зависимости от типа использования.
+    usage_type: "free", "bonus", "gem"
+    """
+    if usage_type == "bonus":
+        user_data = await firestore_service.get_user_data(user_id)
+        bonus_left = user_data.get('news_bonus_uses_left', 0)
+        if bonus_left > 0:
+            await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
+            logger.info(f"User {user_id} consumed a news channel bonus for {model_key}. Left: {bonus_left - 1}")
+        else:
+            logger.warning(f"User {user_id} attempted to use bonus for {model_key}, but no bonus uses left (should have been caught by check).")
+    
+    elif usage_type == "free":
+        bot_data = await firestore_service.get_bot_data()
+        all_user_daily_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+        user_daily_counts = all_user_daily_counts.get(str(user_id), {})
+        
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        model_usage_info = user_daily_counts.get(model_key, {'date': today_str, 'count': 0})
+        
+        if model_usage_info.get('date') != today_str: # Сброс счетчика, если новый день
+            model_usage_info = {'date': today_str, 'count': 0}
+        
+        model_usage_info['count'] += 1
+        user_daily_counts[model_key] = model_usage_info
+        all_user_daily_counts[str(user_id)] = user_daily_counts
+        
+        await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_user_daily_counts})
+        logger.info(f"Incremented FREE daily count for user {user_id}, model {model_key} to {model_usage_info['count']}.")
+
+    elif usage_type == "gem":
+        if gem_cost_val is None or gem_cost_val <= 0:
+            logger.error(f"User {user_id} gem usage for {model_key} but gem_cost_val is invalid: {gem_cost_val}")
+            return # Ошибка, не должны были дойти сюда без стоимости
+
+        current_balance = await get_user_gem_balance(user_id)
+        new_balance = current_balance - gem_cost_val
+        if new_balance < 0:
+            logger.error(f"User {user_id} attempted to spend {gem_cost_val} gems for {model_key}, but balance {current_balance} is insufficient (should have been caught by check). Setting balance to 0.")
+            new_balance = 0 # Предохранитель
+        
+        await update_user_gem_balance(user_id, new_balance)
+        logger.info(f"User {user_id} spent {gem_cost_val} gems for model {model_key}. New balance: {new_balance}")
+    
+    else:
+        logger.error(f"Unknown usage_type '{usage_type}' for user {user_id}, model {model_key}")
 # --- УТИЛИТЫ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
