@@ -284,42 +284,39 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     action_type = action_item_found["action"]
     action_target = action_item_found["target"]
 
-    if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
+     if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
+        # Код для этого условия с правильным отступом
         await show_menu(update, user_id, action_target)
-    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
+    
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT: # <--- Убедитесь, что эта строка на одном уровне с if выше
+        # Весь код ниже должен быть с ОДИНАКОВЫМ отступом (на 4 пробела больше, чем elif)
         await firestore_service.set_user_data(user_id, {'current_ai_mode': action_target})
         agent_name = AI_MODES.get(action_target, {}).get('name', 'N/A')
         response_text = f"🤖 Агент ИИ изменен на: <b>{agent_name}</b>."
-        # Определяем, из какого меню пришло действие, чтобы вернуться в него (родительское меню выбора агентов)
-        # action_origin_menu_key был определен ранее при поиске action_item_found
-        # Если мы хотим вернуться в меню, ИЗ КОТОРОГО ВЫБИРАЛИ агента, то это current_menu_key на момент нажатия кнопки
-        # Но правильнее будет использовать родителя того меню, где была кнопка, если это было под-подменю
-        # В нашем случае, это будет current_menu_key, где current_menu_key = BotConstants.MENU_AI_MODES_SUBMENU
         
-        # Если мы хотим вернуться в МЕНЮ ВЫБОРА АГЕНТОВ (MENU_AI_MODES_SUBMENU)
-        # Это меню, где отображался список агентов
-        reply_menu_after_set_agent = current_menu_key # current_menu_key должен быть MENU_AI_MODES_SUBMENU
+        # user_data_loc уже был получен выше в menu_button_handler
+        # current_menu_key также уже был получен выше
+        reply_menu_after_set_agent = current_menu_key 
         
         await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_set_agent))
-        # current_menu уже должен быть MENU_AI_MODES_SUBMENU, так что его можно не обновлять,
-        # но для надежности, если мы хотим быть уверены, что находимся в меню агентов:
         await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_set_agent})
-    elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL:
+
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL: # <--- Эта строка на том же уровне, что и elif выше
+        # Код для этого условия с правильным отступом (на 4 пробела больше, чем этот elif)
         model_info = AVAILABLE_TEXT_MODELS.get(action_target, {})
         update_payload = {
             'selected_model_id': model_info.get("id"), 
             'selected_api_type': model_info.get("api_type")
         }
-        # Сброс агента, если выбранная модель несовместима с текущим "Продвинутым" агентом
-    if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and \
+        # user_data_loc уже был получен выше
+        if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and \
            user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
             update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
             logger.info(f"User {user_id} selected model {action_target}, AI mode reset from gemini_pro_custom_mode to default.")
         
         await firestore_service.set_user_data(user_id, update_payload)
-        user_data_loc.update(update_payload) # Обновляем локальную копию для лимитов
+        user_data_loc.update(update_payload) 
         
-        # Получаем актуальные лимиты для выбранной модели
         bot_data_cache = await firestore_service.get_bot_data()
         today_string_val = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         user_model_counts = bot_data_cache.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {}).get(str(user_id), {})
@@ -332,11 +329,12 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         response_text = (f"⚙️ Модель ИИ изменена на: <b>{model_info.get('name', 'N/A')}</b>.\n"
                          f"Дневной лимит: {current_usage_string} / {limit_display_string}.")
         
-        # Возвращаемся в МЕНЮ ВЫБОРА МОДЕЛЕЙ (MENU_MODELS_SUBMENU)
-        reply_menu_after_set_model = current_menu_key # current_menu_key должен быть MENU_MODELS_SUBMENU
+        # current_menu_key также уже был получен выше
+        reply_menu_after_set_model = current_menu_key
 
         await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_set_model))
         await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_set_model})
+
     elif action_type == BotConstants.CALLBACK_ACTION_SHOW_LIMITS:
         await show_limits(update, user_id)
     elif action_type == BotConstants.CALLBACK_ACTION_CHECK_BONUS:
