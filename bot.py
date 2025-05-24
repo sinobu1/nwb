@@ -1188,7 +1188,7 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(ok=True)
         logger.info(f"PreCheckoutQuery OK for payload: {query.invoice_payload}")
     else:
-               await query.answer(ok=False, error_message="Недопустимый запрос на оплату.")
+        await query.answer(ok=False, error_message="Недопустимый запрос на оплату.")
         logger.warning(f"PreCheckoutQuery failed for payload: {query.invoice_payload}")
     except Exception as e:
         logger.error(f"Error in precheckout_callback for user {query.from_user.id}: {e}", exc_info=True)
