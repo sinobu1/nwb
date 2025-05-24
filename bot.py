@@ -32,16 +32,16 @@ logger = logging.getLogger(__name__)
 
 # --- КОНФИГУРАЦИЯ ---
 class AppConfig:
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
-    GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
-    CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
+    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0") # Ваш токен
+    GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "ВАШ_GOOGLE_API_KEY") # Замените, если используете
+    CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "ВАШ_GEN-API_КЛЮЧ") # Ключ от gen-api.ru
     CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
-    CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602")
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152"))
+    CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "ВАШ_GEN-API_КЛЮЧ") # Ключ от gen-api.ru
+    CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "ВАШ_GEN-API_КЛЮЧ") # Ключ от gen-api.ru
+    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "ВАШ_PAYMENT_TOKEN") # Токен провайдера платежей
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "ВАШ_ADMIN_ID")) # ID админа
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
-    FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
+    FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json" # Путь к файлу Firebase
 
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
@@ -50,20 +50,22 @@ class AppConfig:
     DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72
     DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 48
 
-    NEWS_CHANNEL_USERNAME = "@timextech"
-    NEWS_CHANNEL_LINK = "https://t.me/timextech"
-    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
-    NEWS_CHANNEL_BONUS_GENERATIONS = 1
+    NEWS_CHANNEL_USERNAME = "@timextech" # Замените на ваш канал
+    NEWS_CHANNEL_LINK = "https://t.me/timextech" # Замените на ссылку на ваш канал
+    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro" # Модель для бонуса
+    NEWS_CHANNEL_BONUS_GENERATIONS = 1 # Количество бонусных генераций
 
     DEFAULT_AI_MODE_KEY = "universal_ai_basic"
     DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
 
 CONFIG = AppConfig()
 
+# Убедитесь, что используете один и тот же ключ для всех моделей gen-api.ru, если он у вас один
+# Если ключи разные, оставьте как есть
 _API_KEYS_PROVIDER = {
     "CUSTOM_GEMINI_PRO_API_KEY": CONFIG.CUSTOM_GEMINI_PRO_API_KEY,
-    "CUSTOM_GROK_3_API_KEY": CONFIG.CUSTOM_GROK_3_API_KEY,
-    "CUSTOM_GPT4O_MINI_API_KEY": CONFIG.CUSTOM_GPT4O_MINI_API_KEY,
+    "CUSTOM_GROK_3_API_KEY": CONFIG.CUSTOM_GROK_3_API_KEY, # Может быть CONFIG.CUSTOM_GEMINI_PRO_API_KEY, если ключ общий
+    "CUSTOM_GPT4O_MINI_API_KEY": CONFIG.CUSTOM_GPT4O_MINI_API_KEY, # Может быть CONFIG.CUSTOM_GEMINI_PRO_API_KEY, если ключ общий
 }
 
 # --- КОНСТАНТЫ ПРИЛОЖЕНИЯ ---
@@ -95,16 +97,16 @@ class BotConstants:
 # --- ОПРЕДЕЛЕНИЯ РЕЖИМОВ И МОДЕЛЕЙ ---
 AI_MODES = {
     "universal_ai_basic": {
-        "name": "Универсальный", "prompt": ("Ты — Gemini..."), "welcome": "..."
+        "name": "Универсальный", "prompt": ("Ты — Gemini, продвинутый ИИ-ассистент..."), "welcome": "..."
     },
     "gemini_pro_custom_mode": {
-        "name": "Продвинутый", "prompt": ("Ты — Gemini 2.5 Pro..."), "welcome": "..."
+        "name": "Продвинутый", "prompt": ("Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент..."), "welcome": "..."
     },
     "creative_helper": {
-        "name": "Творческий", "prompt": ("Ты — Gemini, креативный..."), "welcome": "..."
+        "name": "Творческий", "prompt": ("Ты — Gemini, креативный ИИ-партнёр и писатель..."), "welcome": "..."
     },
     "analyst": {
-        "name": "Аналитик", "prompt": ("Ты — ИИ-аналитик..."), "welcome": "..."
+        "name": "Аналитик", "prompt": ("Ты — ИИ-аналитик на базе Gemini..."), "welcome": "..."
     },
     "joker": {
         "name": "Шутник", "prompt": ("Ты — ИИ с чувством юмора..."), "welcome": "..."
@@ -250,15 +252,17 @@ class CustomHttpAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
-        if not actual_key or "YOUR_" in actual_key:
+        if not actual_key or "YOUR_" in actual_key: # Простая проверка, что ключ не дефолтный
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
+        
         headers = {"Authorization": f"Bearer {actual_key}", "Content-Type": "application/json", "Accept": "application/json"}
         messages_payload = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
         payload = {"messages": messages_payload, "model": self.model_id, "is_sync": True, "max_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB}
         endpoint = self.model_config["endpoint"]
+
         try:
             response = await asyncio.to_thread(requests.post, endpoint, headers=headers, json=payload, timeout=45)
-            response.raise_for_status()
+            response.raise_for_status() # Проверка на HTTP ошибки (4xx, 5xx)
             
             try:
                 json_resp = response.json()
@@ -267,46 +271,74 @@ class CustomHttpAIService(BaseAIService):
                 return f"Ошибка API: не удалось обработать ответ от сервера (не является JSON). Текст ответа: {response.text[:200]}"
             
             extracted_text = None
-            if self.model_id == "grok-3-beta":
+
+            # --- ИСПРАВЛЕННЫЙ ПАРСИНГ ДЛЯ GPT-4O-MINI ---
+            if self.model_id == "gpt-4o-mini":
+                try:
+                    if isinstance(json_resp.get("response"), list) and json_resp["response"]:
+                        message_obj = json_resp["response"][0].get("message", {})
+                        extracted_text = message_obj.get("content", "").strip()
+                    
+                    if not extracted_text: # Если текст не найден по основному пути
+                        # Проверяем, есть ли 'status' и он не 'success', или если просто нет текста
+                        # Это для отладки, если API вдруг вернет другую структуру ошибки
+                        if ("status" in json_resp and json_resp.get("status") != "success") or not extracted_text:
+                             logger.warning(
+                                f"API for gpt-4o-mini returned an unexpected structure or non-success status. "
+                                f"Status: '{json_resp.get('status', 'N/A')}'. "
+                                f"Full JSON: {json.dumps(json_resp, ensure_ascii=False, indent=2)}"
+                            )
+                             error_msg = json_resp.get("error_message", "Ответ не содержит текста или статус ошибки.")
+                             extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
+                except (TypeError, IndexError, AttributeError) as e_parse:
+                    logger.error(
+                        f"Error parsing gpt-4o-mini response structure for {self.model_id}. Error: {e_parse}. "
+                        f"Full JSON: {json.dumps(json_resp, ensure_ascii=False, indent=2)}",
+                        exc_info=True
+                    )
+                    extracted_text = f"Ошибка обработки ответа от {self.model_config['name']} (структура)."
+
+            elif self.model_id == "grok-3-beta": # Парсинг для Grok
                 if "response" in json_resp and isinstance(json_resp.get("response"), list) and json_resp["response"]:
                     extracted_text = json_resp["response"][0].get("choices", [{}])[0].get("message", {}).get("content", "").strip()
             
-            elif self.model_id in ["gemini-2.5-pro-preview-03-25", "gpt-4o-mini"]:
+            elif self.model_id == "gemini-2.5-pro-preview-03-25": # Парсинг для Gemini Pro через gen-api.ru
                  output_val = json_resp.get("output")
                  if isinstance(output_val, str): extracted_text = output_val.strip()
                  elif isinstance(output_val, dict): extracted_text = output_val.get("text", output_val.get("content", "")).strip()
                  if not extracted_text: extracted_text = json_resp.get("text", "").strip()
                  
                  if json_resp.get("status") != "success" and not extracted_text:
-                     # --- ИЗМЕНЕНИЕ: Добавлено логирование проблемного JSON ---
                      logger.warning(
                          f"API for {self.model_id} returned status '{json_resp.get('status')}' "
-                         f"with no parsable text and no 'error_message'. Full JSON response: {json.dumps(json_resp, ensure_ascii=False)}"
+                         f"with no parsable text and no 'error_message'. Full JSON response: {json.dumps(json_resp, ensure_ascii=False, indent=2)}"
                      )
-                     # --- КОНЕЦ ИЗМЕНЕНИЯ ---
                      error_msg = json_resp.get("error_message", "Неизвестная ошибка API")
                      extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
             
-            if extracted_text is None: # Общий случай, если специфичный парсинг не сработал
-                for key in ["text", "content", "message", "output", "response"]:
-                    if isinstance(json_resp.get(key), str) and (val := json_resp[key].strip()):
-                        extracted_text = val
+            # Общий fallback, если ничего не найдено и текст все еще пуст
+            if not extracted_text:
+                for key_check in ["text", "content", "output"]: # Проверяем самые частые поля
+                    if isinstance(json_resp.get(key_check), str) and (check_val := json_resp[key_check].strip()):
+                        extracted_text = check_val
+                        logger.info(f"Used fallback text extraction on key '{key_check}' for model {self.model_id}")
                         break
             
-            return extracted_text if extracted_text else f"Ответ API {self.model_config['name']} не содержит текста."
+            return extracted_text if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста."
+
         except requests.exceptions.HTTPError as e:
             logger.error(f"Custom API HTTPError for {self.model_id}: {e.response.status_code} - {e.response.text}")
             try:
-                error_json = e.response.json()
+                error_json = e.response.json() # Попытка получить JSON из тела ошибки
                 error_message = error_json.get("error", e.response.text)
                 return f"Ошибка API ({e.response.status_code}) для {self.model_config['name']}: {error_message}"
-            except json.JSONDecodeError:
-                return f"Ошибка сети API ({e.response.status_code}) для {self.model_config['name']}."
+            except json.JSONDecodeError: # Если тело ошибки не JSON
+                return f"Ошибка сети API ({e.response.status_code}) для {self.model_config['name']}: {e.response.text[:100]}"
         except Exception as e:
             logger.error(f"Unexpected Custom API error for {self.model_id}: {e}", exc_info=True)
             return f"Неожиданная ошибка API ({type(e).__name__}) для {self.model_config['name']}."
 
-# ... (остальной код остается без изменений, как в v4) ...
+# ... (остальной код остается без изменений, как в v5) ...
 def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_cfg: return None
@@ -320,7 +352,13 @@ async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]
     selected_id = user_data_loc.get('selected_model_id', DEFAULT_MODEL_ID)
     for key, info in AVAILABLE_TEXT_MODELS.items():
         if info["id"] == selected_id: return key
-    return CONFIG.DEFAULT_MODEL_KEY
+    # Если модель не найдена, возвращаем и устанавливаем дефолтную
+    logger.warning(f"Selected model_id '{selected_id}' for user {user_id} not found. Reverting to default.")
+    default_key = CONFIG.DEFAULT_MODEL_KEY
+    default_cfg = AVAILABLE_TEXT_MODELS[default_key]
+    await firestore_service.set_user_data(user_id, {'selected_model_id': default_cfg["id"]})
+    return default_key
+
 
 async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     user_data_loc = user_data if user_data is not None else await firestore_service.get_user_data(user_id)
@@ -332,10 +370,9 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
     if not isinstance(text, str) or len(text) <= max_length: return str(text), False
     suffix = "\n\n(...ответ был сокращен)"
-    # Ensure adjusted_max_length is not negative if suffix is too long
     adjusted_max_length = max(0, max_length - len(suffix))
     
-    if adjusted_max_length == 0: # If only suffix can fit, or less
+    if adjusted_max_length == 0:
         return text[:max_length - 3] + "..." if max_length > 3 else text[:max_length], True
 
     truncated_text = text[:adjusted_max_length]
@@ -383,7 +420,7 @@ async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[b
         cost = model_cfg.get("gem_cost", 0.0)
         balance = user_data.get("gem_balance", 0.0)
         if balance < cost:
-            return False, f"Бесплатные попытки для «{model_cfg['name']}» закончились. Требуется: {cost}💎, у вас: {balance:.1f}💎."
+            return False, f"Бесплатные попытки для «{model_cfg['name']}» закончились ({current_usage}/{model_cfg.get('limit', 0)}). Требуется: {cost}💎, у вас: {balance:.1f}💎."
         return True, "use_gems"
         
     return True, ""
@@ -527,7 +564,7 @@ async def send_gems_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     title = f"Покупка {amount} 💎"
     description = f"Пакет из {amount} гемов для использования в боте."
-    payload = f"buy_gems_{amount}_user_{user_id}"
+    payload = f"buy_gems_{amount}_user_{user_id}" # Убедитесь, что amount здесь - количество гемов
     
     await context.bot.send_invoice(
         chat_id=user_id, title=title, description=description, payload=payload,
@@ -653,8 +690,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     is_successful_response = not (
         ai_response.startswith("Ошибка") or
-        "не содержит текста" in ai_response or
-        "Ответ Google GenAI пуст" in ai_response
+        "не содержит текста" in ai_response or # Covers "Ответ API ... не содержит ожидаемого текста."
+        "Ответ Google GenAI пуст" in ai_response or
+        "не удалось обработать ответ от сервера" in ai_response # Covers the JSONDecodeError message
     )
 
     final_reply, _ = smart_truncate(ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
@@ -672,10 +710,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
-    if query.invoice_payload.startswith("buy_gems_"):
+    # Example payload: buy_gems_100_user_12345
+    if query.invoice_payload.startswith("buy_gems_") and query.invoice_payload.count('_') == 3:
         await query.answer(ok=True)
     else:
-        await query.answer(ok=False, error_message="Ошибка запроса на оплату.")
+        logger.warning(f"Invalid precheckout payload: {query.invoice_payload}")
+        await query.answer(ok=False, error_message="Ошибка запроса на оплату. Пожалуйста, попробуйте снова.")
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -686,6 +726,13 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         try:
             parts = payload.split('_') # e.g., "buy_gems_100_user_12345"
             gems_to_add = int(parts[1]) # gems_amount is at index 1
+            # payload_user_id = int(parts[3]) # user_id from payload for verification
+
+            # if user_id != payload_user_id:
+            #     logger.error(f"User ID mismatch in payment! update.effective_user.id={user_id}, payload_user_id={payload_user_id}")
+            #     await update.message.reply_text("Произошла ошибка при проверке платежа. Свяжитесь с поддержкой.")
+            #     return
+
             user_data = await firestore_service.get_user_data(user_id)
             new_balance = user_data.get('gem_balance', 0.0) + gems_to_add
             await firestore_service.set_user_data(user_id, {'gem_balance': new_balance})
@@ -695,11 +742,13 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
                 parse_mode=ParseMode.HTML
             )
             if CONFIG.ADMIN_ID:
-                admin_msg = f"🔔 Новая покупка: {gems_to_add}💎 от user {user_id} ({update.effective_user.full_name}). Сумма: {payment.total_amount / 100} {payment.currency}."
+                admin_msg = f"🔔 Новая покупка: {gems_to_add}💎 от user {user_id} (@{update.effective_user.username or 'N/A'}). Сумма: {payment.total_amount / 100} {payment.currency}."
                 await context.bot.send_message(CONFIG.ADMIN_ID, admin_msg)
-        except (IndexError, ValueError) as e: # Added IndexError for safety
+        except (IndexError, ValueError) as e:
             logger.error(f"Failed to parse gem payment payload '{payload}': {e}")
             await update.message.reply_text("Произошла ошибка при обработке вашего платежа. Пожалуйста, свяжитесь с поддержкой.")
+    else:
+        logger.warning(f"Received successful payment with unknown payload: {payload} from user {user_id}")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -709,14 +758,46 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         try: await context.bot.send_message(chat_id=update.effective_chat.id, text="Произошла внутренняя ошибка. Попробуйте /start.")
         except Exception: pass
     if CONFIG.ADMIN_ID:
-        error_details = f"🤖 Ошибка в боте:\n{context.error.__class__.__name__}: {context.error}\n\nTraceback:\n{tb_string[:3500]}"
-        try: await context.bot.send_message(CONFIG.ADMIN_ID, error_details)
-        except Exception: pass
+        user_info = "N/A"
+        if isinstance(update, Update) and update.effective_user:
+            user_info = f"ID: {update.effective_user.id} (@{update.effective_user.username or 'N/A'})"
+        
+        message_text = "N/A"
+        if isinstance(update, Update) and update.message and hasattr(update.message, 'text'):
+             message_text = update.message.text
+
+        error_details = (
+            f"🤖 Обнаружена ошибка в боте:\n"
+            f"User: {user_info}\n"
+            f"Message: {message_text}\n"
+            f"Error Type: {context.error.__class__.__name__}\n"
+            f"Error: {context.error}\n\n"
+            f"Traceback (first 3500 chars):\n```\n{tb_string[:3500]}\n```"
+        )
+        try:
+            # MarkdownV2 requires escaping special characters
+            escaped_error_details = error_details.replace("`", "\\`").replace("_", "\\_").replace("*", "\\*").replace("[", "\\[").replace("]", "\\]").replace("(", "\\(").replace(")", "\\)").replace("~", "\\~").replace(">", "\\>").replace("#", "\\#").replace("+", "\\+").replace("-", "\\-").replace("=", "\\=").replace("|", "\\|").replace("{", "\\{").replace("}", "\\}").replace(".", "\\.").replace("!", "\\!")
+            await context.bot.send_message(CONFIG.ADMIN_ID, escaped_error_details[:4096], parse_mode=ParseMode.MARKDOWN_V2)
+        except Exception as e_md:
+            logger.error(f"Failed to send detailed error report to admin via MarkdownV2: {e_md}. Trying plain text.")
+            try:
+                 await context.bot.send_message(CONFIG.ADMIN_ID, error_details[:4096]) # Send raw if markdown fails
+            except Exception as e_plain:
+                 logger.error(f"Failed to send plain text detailed error report to admin: {e_plain}")
+
 
 async def main():
     if CONFIG.GOOGLE_GEMINI_API_KEY and CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"):
         genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY)
-    
+        logger.info("Google Gemini API configured.")
+    else:
+        logger.warning("Google Gemini API key not configured or invalid. Google models may not work.")
+
+    # Placeholder values check
+    if "ВАШ_" in CONFIG.TELEGRAM_TOKEN: logger.error("TELEGRAM_TOKEN is a placeholder!")
+    if "ВАШ_" in CONFIG.PAYMENT_PROVIDER_TOKEN: logger.warning("PAYMENT_PROVIDER_TOKEN is a placeholder. Payments will fail.")
+    if CONFIG.ADMIN_ID == 0: logger.warning("ADMIN_ID is not set or is 0.")
+
     if not firestore_service._db:
         logger.critical("Firestore не инициализирован! Бот не может работать.")
         return
