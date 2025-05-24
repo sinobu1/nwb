@@ -12,7 +12,7 @@ from config import CONFIG, logger, firestore_service, genai
 # Импортируем все наши обработчики из handlers.py
 from handlers import (
     start, open_menu_command, usage_command,
-    subscribe_info_command, get_news_bonus_info_command, help_command,
+    gems_info_command, get_news_bonus_info_command, help_command, # <--- ИСПРАВЛЕНО
     menu_button_handler, handle_text, precheckout_callback,
     successful_payment_callback, error_handler
 )
@@ -55,7 +55,7 @@ async def main():
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("subscribe", subscribe_info_command), group=0)
+    app.add_handler(CommandHandler("gems", gems_info_command), group=0) # <--- ДОБАВЛЯЕМ ЭТУ СТРОКУ
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
