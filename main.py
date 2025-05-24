@@ -21,7 +21,7 @@ from handlers import (
 async def main():
     """Основная функция для запуска бота."""
     
-    # Конфигурация Google Gemini API (используется для Vision агента)
+    # Конфигурация Google Gemini API (используется для Vision агента Диетолога)
     if CONFIG.GOOGLE_GEMINI_API_KEY and \
        "YOUR_" not in CONFIG.GOOGLE_GEMINI_API_KEY and \
        CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"): # Проверка ключа
@@ -31,34 +31,44 @@ async def main():
         except Exception as e:
             logger.error(f"Failed to configure Google Gemini API (for Vision): {e}", exc_info=True)
     else:
-        logger.warning("Google Gemini API key (for Vision) is not configured or is missing. Photo dietitian may not work.")
+        logger.warning("Google Gemini API key (for Vision) is not configured or is missing. Photo dietitian may not work as intended.")
 
-    # ... (остальные проверки API ключей и Firestore как были) ...
-    if not firestore_service._db:
+    # Проверка Firestore
+    if not firestore_service._db: # Используем _db для проверки инициализации
         logger.critical("Firestore (db) was NOT initialized successfully! Bot will not work correctly.")
         return
 
+    # Сборка приложения
     app_builder = Application.builder().token(CONFIG.TELEGRAM_TOKEN)
-    app_builder.read_timeout(30).connect_timeout(30)
+    app_builder.read_timeout(30).connect_timeout(30) # Настройка таймаутов
     app = app_builder.build()
 
-    # Регистрация обработчиков
+    # Регистрация обработчиков с группами для правильного порядка срабатывания
+    # Группа 0: Команды
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("gems", gems_info_command), group=0) # Изменено с subscribe на gems
+    app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) # Обработчик фото
+    # Группа 1: Обработчики фото и кнопок меню (фото должно иметь приоритет или быть специфичным)
+    # Photo handler должен идти перед menu_button_handler, если кнопки - это текст, который может быть частью фото-диалога
+    # Но т.к. фото - это отдельный тип, порядок здесь не так критичен, как для текстовых.
+    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
+    
+    # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
     
+    # Обработчики платежей
     app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     
+    # Глобальный обработчик ошибок
     app.add_error_handler(error_handler)
 
+    # Установка команд бота
     bot_commands = [
         BotCommand("menu", "📋 Открыть главное меню"),
         BotCommand("usage", "📊 Лимиты и баланс гемов"),
