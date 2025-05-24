@@ -449,43 +449,54 @@ def get_ai_service(model_key: str) -> Optional[BaseAIService]:
 
 # --- UTILITIES ---
 async def _store_and_try_delete_message(update: Update, user_id: int, is_command_to_keep: bool = False):
-    if not update.message:
+    if not update.message or not update.effective_chat:
+        logger.debug(f"No message or chat info for user {user_id}. Skipping deletion.")
         return
     message_id_to_process = update.message.message_id
-    timestamp_now_iso = datetime.now(timezone.utc).isoformat()
     chat_id = update.effective_chat.id
+    timestamp_now_iso = datetime.now(timezone.utc).isoformat()
     user_data = await firestore_service.get_user_data(user_id)
     prev_command_info = user_data.pop('user_command_to_delete', None)
-    
-    # Skip deletion if no previous message or invalid message ID
-    if prev_command_info and prev_command_info.get('message_id'):
-        try:
-            prev_msg_time = datetime.fromisoformat(prev_command_info['timestamp'])
-            if prev_msg_time.tzinfo is None:
-                prev_msg_time = prev_msg_time.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
-                await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
-                logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-            else:
-                logger.debug(f"Skipped deletion of previous message {prev_command_info['message_id']} (older than 48 hours)")
-        except telegram.error.BadRequest as e:
-            logger.debug(f"Failed to delete previous user message {prev_command_info['message_id']}: {e}")
-        except ValueError as e:
-            logger.warning(f"Invalid timestamp format for previous message {prev_command_info['message_id']}: {e}")
 
+    # Delete previous message if valid
+    if prev_command_info and prev_command_info.get('message_id') and prev_command_info.get('chat_id'):
+        prev_message_id = prev_command_info['message_id']
+        prev_chat_id = prev_command_info.get('chat_id')
+        if prev_chat_id != chat_id:
+            logger.debug(f"Previous message {prev_message_id} chat_id {prev_chat_id} differs from current {chat_id}. Skipping deletion.")
+        else:
+            try:
+                prev_msg_time = datetime.fromisoformat(prev_command_info['timestamp'])
+                if prev_msg_time.tzinfo is None:
+                    prev_msg_time = prev_msg_time.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) - prev_msg_time > timedelta(hours=48):
+                    logger.debug(f"Previous message {prev_message_id} is older than 48 hours. Skipping deletion.")
+                else:
+                    await update.get_bot().delete_message(chat_id=prev_chat_id, message_id=prev_message_id)
+                    logger.info(f"Successfully deleted previous user message {prev_message_id} from chat {prev_chat_id}.")
+            except telegram.error.BadRequest as e:
+                logger.debug(f"Failed to delete previous user message {prev_message_id} from chat {prev_chat_id}: {e}")
+            except ValueError as e:
+                logger.warning(f"Invalid timestamp format for previous message {prev_message_id}: {e}")
+
+    # Handle current message
     if not is_command_to_keep:
         user_data['user_command_to_delete'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
+            'message_id': message_id_to_process,
+            'chat_id': chat_id,
+            'timestamp': timestamp_now_iso
         }
         try:
             await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
-            logger.info(f"Successfully deleted current user message {message_id_to_process} (not kept).")
+            logger.info(f"Successfully deleted current user message {message_id_to_process} from chat {chat_id} (not kept).")
             user_data.pop('user_command_to_delete', None)
         except telegram.error.BadRequest as e:
-            logger.debug(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
+            logger.debug(f"Failed to delete current user message {message_id_to_process} from chat {chat_id}: {e}. Stored for next attempt.")
     else:
         user_data['user_command_message_to_keep'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
+            'message_id': message_id_to_process,
+            'chat_id': chat_id,
+            'timestamp': timestamp_now_iso
         }
     await firestore_service.set_user_data(user_id, user_data)
 
