@@ -5,15 +5,18 @@ import telegram
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import ContextTypes
-
+from telegram import LabeledPrice
 # Импортируем всё необходимое из общего файла config.py
 from config import (
     firestore_service, CONFIG, BotConstants, AVAILABLE_TEXT_MODELS,
     AI_MODES, MENU_STRUCTURE, auto_delete_message_decorator,
-    get_current_model_key, get_current_mode_details, get_user_actual_limit_for_model,
+    get_current_model_key, get_current_mode_details, # УДАЛИТЕ get_user_actual_limit_for_model если он тут был
     is_menu_button_text, generate_menu_keyboard, _store_and_try_delete_message,
     check_and_log_request_attempt, get_ai_service, smart_truncate,
-    increment_request_count, is_user_profi_subscriber, logger, show_menu
+    increment_request_count, # УДАЛИТЕ is_user_profi_subscriber если он тут был
+    logger, show_menu,
+    # НОВЫЕ функции для гемов, которые мы определили в config.py
+    get_user_gem_balance, update_user_gem_balance, get_daily_usage_for_model
 )
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
@@ -76,8 +79,9 @@ async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_limits(update, update.effective_user.id)
 
 @auto_delete_message_decorator()
-async def subscribe_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_subscription(update, update.effective_user.id)
+async def gems_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE): # Было subscribe_info_command
+    """Отображает меню покупки гемов."""
+    await show_menu(update, update.effective_user.id, BotConstants.MENU_GEMS_SUBMENU)
 
 @auto_delete_message_decorator()
 async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,6 +231,54 @@ async def show_help(update: Update, user_id: int):
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_MAIN)
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_for_reply), disable_web_page_preview=True)
 
+# --- >>> НОВАЯ ФУНКЦИЯ для отправки счета за гемы <<< ---
+async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, package_key: str):
+    user_id = update.effective_user.id
+    package_info = CONFIG.GEM_PACKAGES.get(package_key)
+
+    if not package_info:
+        logger.error(f"User {user_id} tried to buy non-existent gem package: {package_key}")
+        await update.message.reply_text("Ошибка: Выбранный пакет гемов не найден. Пожалуйста, попробуйте еще раз.",
+                                        reply_markup=generate_menu_keyboard(BotConstants.MENU_GEMS_SUBMENU))
+        return
+
+    title = package_info["title"]
+    description = package_info["description"]
+    # Уникальный payload для этого счета
+    payload = f"gems_{package_key}_user_{user_id}_{int(datetime.now().timestamp())}"
+    currency = package_info["currency"]
+    price_units = package_info["price_units"] # Цена в минимальных единицах валюты
+
+    prices = [LabeledPrice(label=f"{package_info['gems']} Гемов", amount=price_units)]
+
+    if not CONFIG.PAYMENT_PROVIDER_TOKEN or "YOUR_" in CONFIG.PAYMENT_PROVIDER_TOKEN:
+        logger.error("Payment provider token is not configured for sending invoice.")
+        await update.message.reply_text(
+            "К сожалению, система оплаты временно недоступна. Попробуйте позже.",
+            reply_markup=generate_menu_keyboard(BotConstants.MENU_GEMS_SUBMENU)
+        )
+        return
+        
+    try:
+        await context.bot.send_invoice(
+            chat_id=user_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN,
+            currency=currency,
+            prices=prices,
+            # можно добавить start_parameter, need_name, need_phone_number и т.д. по необходимости
+        )
+        logger.info(f"Invoice for package '{package_key}' sent to user {user_id}.")
+        # После отправки счета, можно вернуть пользователя в меню гемов или оставить как есть
+        # await show_menu(update, user_id, BotConstants.MENU_GEMS_SUBMENU) # Опционально
+    except Exception as e:
+        logger.error(f"Failed to send invoice to user {user_id} for package {package_key}: {e}", exc_info=True)
+        await update.message.reply_text(
+            "Произошла ошибка при формировании счета. Пожалуйста, попробуйте позже.",
+            reply_markup=generate_menu_keyboard(BotConstants.MENU_GEMS_SUBMENU)
+
 # --- ОБРАБОТЧИК КНОПОК МЕНЮ ---
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -323,10 +375,13 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await show_limits(update, user_id)
     elif action_type == BotConstants.CALLBACK_ACTION_CHECK_BONUS:
         await claim_news_bonus_logic(update, user_id)
-    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_SUBSCRIPTION:
-        await show_subscription(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_GEMS_STORE: # Если вы сделали кнопку для перехода в магазин гемов
+        await show_menu(update, user_id, BotConstants.MENU_GEMS_SUBMENU)
     elif action_type == BotConstants.CALLBACK_ACTION_SHOW_HELP:
         await show_help(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE:
+        package_key_to_buy = action_target # target здесь будет ключом пакета, например "pack_10_gems"
+        await send_gem_purchase_invoice(update, context, package_key_to_buy)
     else:
         logger.warning(f"Unknown action type '{action_type}' for button '{button_text}'")
         await show_menu(update, user_id, BotConstants.MENU_MAIN)
@@ -406,64 +461,108 @@ if usage_type == "gem" and gem_cost_for_request:
     current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
     await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu), disable_web_page_preview=True)
 
-# --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ ---
+# --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ (изменяем) ---
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
-    expected_payload_part = f"subscription_{CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY}"
-    if query.invoice_payload and expected_payload_part in query.invoice_payload:
-        await query.answer(ok=True)
-        logger.info(f"PreCheckoutQuery OK for payload: {query.invoice_payload}")
-    else:
-        await query.answer(ok=False, error_message="Неверный или устаревший запрос на оплату.")
-        logger.warning(f"PreCheckoutQuery FAILED for payload: {query.invoice_payload}")
+    # --- >>> ИЗМЕНЯЕМ ПРОВЕРКУ PAYLOAD <<< ---
+    # Раньше было: expected_payload_part = f"subscription_{CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY}"
+    # Теперь: Проверяем, что payload начинается с "gems_"
+    if query.invoice_payload and query.invoice_payload.startswith("gems_"):
+        # Здесь можно добавить дополнительную валидацию payload, если нужно
+        # Например, проверить, что user_id в payload совпадает с query.from_user.id
+        # и что пакет гемов существует.
+        payload_parts = query.invoice_payload.split('_')
+        if len(payload_parts) >= 3 and payload_parts[0] == "gems":
+            package_key = f"{payload_parts[1]}_{payload_parts[2]}" # например, "pack_10_gems"
+            if package_key in CONFIG.GEM_PACKAGES:
+                await query.answer(ok=True)
+                logger.info(f"PreCheckoutQuery OK for gems payload: {query.invoice_payload}")
+                return
+            else:
+                logger.warning(f"PreCheckoutQuery FAILED. Unknown gem package in payload: {query.invoice_payload}")
+                await query.answer(ok=False, error_message="Выбранный пакет гемов больше не доступен.")    
+                return
+        
+    logger.warning(f"PreCheckoutQuery FAILED. Invalid payload format: {query.invoice_payload}")
+    await query.answer(ok=False, error_message="Неверный или устаревший запрос на оплату.")
+
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = update.effective_user.id # Это user_id того, кто совершил платеж
     payment_info = update.message.successful_payment
-    logger.info(f"Successful payment from {user_id}. Payload: {payment_info.invoice_payload}")
+    invoice_payload = payment_info.invoice_payload
 
-    subscription_days = 30
-    bot_data = await firestore_service.get_bot_data()
-    user_subscriptions_map = bot_data.get(BotConstants.FS_USER_SUBSCRIPTIONS_KEY, {})
-    current_user_subscription = user_subscriptions_map.get(str(user_id), {})
-    
-    now_utc = datetime.now(timezone.utc)
-    subscription_start_date = now_utc
+    logger.info(f"Successful payment received from user {user_id}. Amount: {payment_info.total_amount} {payment_info.currency}. Payload: {invoice_payload}")
 
-    if is_user_profi_subscriber(current_user_subscription):
+    # --- >>> ИЗМЕНЯЕМ ЛОГИКУ: Начисляем гемы вместо подписки <<< ---
+    if invoice_payload and invoice_payload.startswith("gems_"):
         try:
-            previous_valid_until = datetime.fromisoformat(current_user_subscription['valid_until'])
-            if previous_valid_until.tzinfo is None: # Добавим проверку и установку tzinfo если отсутствует
-                previous_valid_until = previous_valid_until.replace(tzinfo=timezone.utc)
+            payload_parts = invoice_payload.split('_')
+            # Ожидаемый формат: "gems_{pack_key_part1}_{pack_key_part2}_user_{user_id_from_payload}_{timestamp}"
+            # Например: "gems_pack_10_gems_user_12345_1678886400"
+            # Собираем package_key (может состоять из нескольких частей)
+            
+            # Найдем "_user_"
+            user_part_index = -1
+            for i, part in enumerate(payload_parts):
+                if part == "user":
+                    user_part_index = i
+                    break
+            
+            if user_part_index == -1 or user_part_index == 1: # Не нашли "_user_" или пакет пустой
+                raise ValueError("Invalid payload structure: missing user or package info")
 
-            if previous_valid_until > now_utc:
-                subscription_start_date = previous_valid_until
-        except (ValueError, KeyError):
-            logger.warning(f"Could not parse previous 'valid_until' for user {user_id}.")
+            package_key = "_".join(payload_parts[1:user_part_index]) # Собираем ключ пакета
+            user_id_from_payload = int(payload_parts[user_part_index + 1])
 
-    new_valid_until_date = subscription_start_date + timedelta(days=subscription_days)
+            if user_id != user_id_from_payload: # Дополнительная проверка безопасности
+                logger.error(f"Security alert: Payload user ID {user_id_from_payload} does not match message user ID {user_id} for invoice {invoice_payload}")
+                # Не начисляем гемы, но нужно уведомить администратора
+                await update.message.reply_text("Произошла ошибка при обработке вашего платежа. Свяжитесь с поддержкой.")
+                if CONFIG.ADMIN_ID:
+                    await context.bot.send_message(CONFIG.ADMIN_ID, f"⚠️ Ошибка несоответствия User ID в платеже! Payload: {invoice_payload}, User: {user_id}")
+                return
 
-    user_subscriptions_map[str(user_id)] = {
-        'level': CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY,
-        'valid_until': new_valid_until_date.isoformat(),
-        'last_payment_amount': payment_info.total_amount,
-        'currency': payment_info.currency,
-        'purchase_date': now_utc.isoformat(),
-        'telegram_payment_charge_id': payment_info.telegram_payment_charge_id,
-        'provider_payment_charge_id': payment_info.provider_payment_charge_id
-    }
-    
-    await firestore_service.set_bot_data({BotConstants.FS_USER_SUBSCRIPTIONS_KEY: user_subscriptions_map})
+            package_info = CONFIG.GEM_PACKAGES.get(package_key)
+            if not package_info:
+                logger.error(f"Successful payment for UNKNOWN gem package '{package_key}' from payload '{invoice_payload}' by user {user_id}")
+                await update.message.reply_text("Ошибка: купленный пакет гемов не найден. Свяжитесь с поддержкой.")
+                return
 
-    confirmation_message = (
-        f"🎉 Оплата прошла успешно! Ваша подписка <b>Profi</b> активна до <b>{new_valid_until_date.strftime('%d.%m.%Y')}</b>."
-    )
-    
-    user_data = await firestore_service.get_user_data(user_id)
-    await update.message.reply_text(
-        confirmation_message, parse_mode=ParseMode.HTML, 
-        reply_markup=generate_menu_keyboard(user_data.get('current_menu', BotConstants.MENU_MAIN))
-    )
+            gems_to_add = package_info["gems"]
+            current_gem_balance = await get_user_gem_balance(user_id) # user_id из update.effective_user
+            new_gem_balance = current_gem_balance + gems_to_add
+            await update_user_gem_balance(user_id, new_gem_balance)
+
+            confirmation_message = (
+                f"🎉 Оплата прошла успешно! Вам начислено <b>{gems_to_add} гемов</b>.\n"
+                f"Ваш новый баланс: <b>{new_gem_balance:.1f} гемов</b>.\n\n"
+                "Спасибо за покупку!"
+            )
+            user_data_for_reply_menu = await firestore_service.get_user_data(user_id)
+            await update.message.reply_text(
+                confirmation_message, 
+                parse_mode=ParseMode.HTML, 
+                reply_markup=generate_menu_keyboard(user_data_for_reply_menu.get('current_menu', BotConstants.MENU_GEMS_SUBMENU)) # Возвращаем в меню гемов
+            )
+
+            # Уведомление администратору
+            if CONFIG.ADMIN_ID:
+                admin_message = (
+                    f"💎 Новая покупка гемов!\n"
+                    f"Пользователь: {user_id} ({update.effective_user.full_name if update.effective_user else 'N/A'})\n"
+                    f"Пакет: {package_info['title']} ({gems_to_add} гемов)\n"
+                    f"Сумма: {payment_info.total_amount / 100} {payment_info.currency}\n"
+                    f"Новый баланс: {new_gem_balance:.1f} гемов\n"
+                    f"Payload: {invoice_payload}"
+                )
+                await context.bot.send_message(CONFIG.ADMIN_ID, admin_message)
+
+        except Exception as e:
+            logger.error(f"Error processing successful gem payment for user {user_id}, payload {invoice_payload}: {e}", exc_info=True)
+            await update.message.reply_text("Произошла ошибка при начислении гемов. Пожалуйста, свяжитесь с поддержкой, указав детали вашего платежа.")
+    else:
+        logger.warning(f"Successful payment received with unknown payload type from user {user_id}: {invoice_payload}")
 
 # --- ОБРАБОТЧИК ОШИБОК ---
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
