@@ -40,24 +40,22 @@ class AppConfig:
     CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
     CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
     CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602") # Ваш реальный токен провайдера платежей
+    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602")
     ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152"))
-    FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS") # Будет использоваться, если переменная окружения установлена
-    FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json" # Путь к файлу ключа, если FIREBASE_CREDENTIALS не установлена
+    FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
+    FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
 
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
 
-    # Новые дневные БЕСПЛАТНЫЕ лимиты
     DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY = 65
     DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50
     DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 1
     DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1
     DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY = 10
     
-    GEMS_FOR_NEW_USER = 0  # Начальное количество гемов для нового пользователя
-
+    GEMS_FOR_NEW_USER = 0
     GEM_PACKAGES = {
         "pack_10_gems": {"gems": 10, "price_units": 10000, "currency": "RUB", "title": "✨ 10 Гемов", "description": "Небольшой пакет для старта"},
         "pack_50_gems": {"gems": 50, "price_units": 45000, "currency": "RUB", "title": "🌟 50 Гемов", "description": "Средний пакет по выгодной цене"},
@@ -84,14 +82,14 @@ class BotConstants:
     FS_USERS_COLLECTION = "users"
     FS_BOT_DATA_COLLECTION = "bot_data"
     FS_BOT_DATA_DOCUMENT = "data"
-    FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts" # Для учета бесплатных дневных попыток
+    FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"
 
     MENU_MAIN = "main_menu"
     MENU_AI_MODES_SUBMENU = "ai_modes_submenu"
     MENU_MODELS_SUBMENU = "models_submenu"
     MENU_LIMITS_SUBMENU = "limits_submenu"
     MENU_BONUS_SUBMENU = "bonus_submenu"
-    MENU_GEMS_SUBMENU = "gems_submenu" 
+    MENU_GEMS_SUBMENU = "gems_submenu"
     MENU_HELP_SUBMENU = "help_submenu"
 
     CALLBACK_ACTION_SUBMENU = "submenu"
@@ -99,7 +97,7 @@ class BotConstants:
     CALLBACK_ACTION_SET_MODEL = "set_model"
     CALLBACK_ACTION_SHOW_LIMITS = "show_limits"
     CALLBACK_ACTION_CHECK_BONUS = "check_bonus"
-    CALLBACK_ACTION_SHOW_GEMS_STORE = "show_gems_store" 
+    CALLBACK_ACTION_SHOW_GEMS_STORE = "show_gems_store"
     CALLBACK_ACTION_BUY_GEM_PACKAGE = "buy_gem_package"
     CALLBACK_ACTION_SHOW_HELP = "show_help"
 
@@ -137,31 +135,18 @@ AI_MODES = {
         "prompt": ("Ты — Литературный Редактор, ИИ-помощник для писателей. Твоя задача — помогать пользователям писать лучше, предоставляя четкие и конструктивные отзывы по их текстам. Анализируй стиль, грамматику, структуру, логику изложения. Предлагай улучшения, помогай с выбором слов и выражений. Будь тактичным и объективным в своих рекомендациях."),
         "welcome": "Готов помочь улучшить ваш текст! Пожалуйста, предоставьте текст для редактуры."
     },
+    "professional_dietitian": { # Текстовый диетолог
+        "name": "Диетолог-профессионал (Текст)",
+        "prompt": ("Ты — Диетолог-профессионал, эксперт по здоровому питанию и образу жизни. Твоя задача — предоставлять научно обоснованные рекомендации по питанию, составлять индивидуальные планы питания, анализировать рационы, давать советы по контролю веса и улучшению самочувствия через питание. Всегда основывай свои ответы на актуальных знаниях в области диетологии и нутрициологии. Будь внимателен к деталям запроса пользователя, уточняй информацию при необходимости. Используй четкую структуру, списки и таблицы для планов и рекомендаций."),
+        "welcome": "Здравствуйте! Я ваш профессиональный диетолог. Чем могу помочь сегодня? Расскажите о ваших целях или вопросах по питанию."
+    },
     "photo_dietitian_analyzer": { # Новый агент для анализа фото
         "name": "🥑 Диетолог (анализ фото)",
-        "prompt": (
-            "Ты — Диетолог-Профессионал, работающий с продвинутой мультимодальной ИИ-моделью Gemini 2.5 Pro, способной анализировать изображения. "
-            "Твоя главная задача — детальный анализ ФОТОГРАФИЙ еды, присланных пользователем. "
-            "Твой рабочий процесс СТРОГО следующий:\n"
-            "1. Пользователь присылает ФОТО блюда.\n"
-            "2. Ты получаешь это фото и текстовый запрос от пользователя с просьбой указать вес блюда. Твоя задача на этом этапе: ТОЛЬКО попросить пользователя указать ВЕС блюда в граммах. Не делай никаких предположений о калорийности или составе до получения веса! Пример твоего ответа: 'Отличное фото! Чтобы я мог точно рассчитать КБЖУ, пожалуйста, укажите примерный вес этой порции в граммах.'\n"
-            "3. Пользователь присылает ВЕС порции текстом.\n"
-            "4. Теперь, имея ФОТО и ВЕС, ты должен:\n"
-            "   а) Максимально точно определить все ингредиенты блюда по фото.\n"
-            "   б) Учитывая указанный вес, рассчитать калорийность (Ккал), содержание белков (Б), жиров (Ж) и углеводов (У) для всей порции.\n"
-            "   в) Представить результат в четком, структурированном виде. Например:\n"
-            "      'Анализ вашего блюда (примерный вес: [вес] г):\n"
-            "      - Блюдо: [Название блюда/Основные ингредиенты]\n"
-            "      - Калорийность: [X] Ккал\n"
-            "      - Белки: [Y] г\n"
-            "      - Жиры: [Z] г\n"
-            "      - Углеводы: [W] г\n"
-            "      [Краткие комментарии или советы по блюду, если уместно]'\n"
-            "Если пользователь вместо фото или веса задает ОБЩИЙ текстовый вопрос по диетологии (например, 'польза авокадо'), отвечай на него как эксперт-диетолог, основываясь на своих знаниях, без упоминания анализа фото."
-        ),
+        "prompt": ("Ты — Диетолог-Профессионал с возможностью анализа изображений еды. Твоя задача — по ФОТО и указанному ВЕСУ порции определить блюдо/продукты, рассчитать их примерную калорийность, содержание белков, жиров и углеводов (КБЖУ). Если пользователь прислал фото, но еще не указал вес, твой ответ должен быть ТОЛЬКО запросом веса. Пример: 'Отличное фото! Пожалуйста, укажите примерный вес этой порции в граммах.' После получения веса, предоставь результат в четком, структурированном виде. Если пользователь просто задает текстовый вопрос о диетологии без фото, отвечай как эксперт-диетолог."),
         "welcome": "Загрузите фото блюда, и я помогу с анализом КБЖУ! Если у вас общий вопрос по диетологии, просто напишите его.",
-        "multimodal_capable": True, # Флаг для нашей логики
-        "forced_model_key": "custom_api_gemini_2_5_pro" # Модель, которую будет использовать этот агент
+        "multimodal_capable": True,
+        "forced_model_key": "custom_api_gemini_2_5_pro", 
+        "native_vision_model_id": "gemini-1.5-flash-latest" 
     },
     "gemini_pro_custom_mode": {
         "name": "Продвинутый (Gemini Pro)",
@@ -314,13 +299,25 @@ class BaseAIService(ABC):
         self.model_id = model_config["id"]
 
     @abstractmethod
-    async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str: # Добавил image_data
         pass
 
 class GoogleGenAIService(BaseAIService):
-    async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
+    # Эта функция теперь тоже должна принимать image_data, если мы хотим единообразия
+    # Но стандартный genai.GenerativeModel(model_id).generate_content() для текстовых моделей не примет image_data
+    # Если же model_id здесь будет Vision моделью, то логика должна быть другой.
+    # Пока оставляем для текстовых моделей Google.
+    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
+        if image_data:
+            logger.warning(f"GoogleGenAIService for model {self.model_id} received image_data, but it's a text-only service. Image will be ignored.")
+        
         full_prompt = f"{system_prompt}\n\n**Запрос:**\n{user_prompt}"
         try:
+            # Убедимся, что genai сконфигурирован
+            if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
+                 return "API ключ для Google Gemini не настроен."
+            # genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY) # Уже должно быть сделано в main.py
+
             model_genai = genai.GenerativeModel(
                 self.model_id,
                 generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB}
@@ -339,7 +336,7 @@ class CustomHttpAIService(BaseAIService):
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
-        if not actual_key or "YOUR_" in actual_key or not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")):
+        if not actual_key or "YOUR_" in actual_key or not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")): # Обновил проверку ключа
             logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
 
@@ -349,102 +346,75 @@ class CustomHttpAIService(BaseAIService):
             "Accept": "application/json"
         }
         
-        is_gen_api_format = self.model_config.get("endpoint", "").startswith("https://api.gen-api.ru")
+        endpoint_url = self.model_config.get("endpoint", "")
+        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
+        always_array_content_models_gen_api = ["gpt-4o-mini"]
 
         messages_payload = []
         if system_prompt:
-            # Системный промпт всегда текстовый
-            messages_payload.append({
-                "role": "system", 
-                "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
-            })
+            if is_gen_api_endpoint and self.model_id not in always_array_content_models_gen_api:
+                 messages_payload.append({"role": "system", "content": system_prompt})
+            else:
+                 messages_payload.append({"role": "system", "content": [{"type": "text", "text": system_prompt}]})
 
-        # Формирование контента для user message (может быть мультимодальным)
         user_content_list = []
-        if is_gen_api_format:
-            if image_data:
-                # ПРЕДПОЛАГАЕМЫЙ ФОРМАТ для gen-api.ru, если они следуют общепринятым практикам
-                # Вам нужно будет уточнить этот формат в их документации или поддержке!
-                if image_data.get("type") == "url" and image_data.get("value"):
-                    user_content_list.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
-                elif image_data.get("type") == "base64" and image_data.get("value"):
-                    # Пример: {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data['value']}"}}
-                    # Или может быть другой формат для base64, например, отдельное поле.
-                    # Этот вариант требует точного знания формата gen-api.ru для base64.
-                    # Пока оставим image_url как основной способ.
-                    logger.warning("Base64 image sending for gen-api.ru is not fully specified, trying common URL format assumption.")
-                    # Если у вас есть URL после загрузки base64 куда-то, используйте его.
-                    # Если нужно передавать base64 напрямую, формат JSON должен это поддерживать.
-                    # Для примера, если бы gen-api.ru поддерживал base64 напрямую в content:
-                    # user_content_list.append({
-                    #     "type": "image_base64", # или как они это называют
-                    #     "source": {
-                    #         "type": "base64",
-                    #         "media_type": image_data.get("mime_type", "image/jpeg"),
-                    #         "data": image_data["value"]
-                    #     }
-                    # })
-                    # Поскольку точный формат неизвестен, эта часть ЗАКОММЕНТИРОВАНА.
-                    # Сосредоточимся на image_url.
-                    pass # Пропускаем base64, если не знаем точного формата для gen-api
-
+        if image_data and image_data.get("type") == "url" and image_data.get("value"):
+            user_content_list.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
+            logger.info(f"Image URL added to payload for {self.model_id}: {image_data['value']}")
+        
+        # Добавляем текстовую часть
+        if is_gen_api_endpoint and not image_data and self.model_id not in always_array_content_models_gen_api:
+            messages_payload.append({"role": "user", "content": user_prompt})
+        else:
             user_content_list.append({"type": "text", "text": user_prompt})
             messages_payload.append({"role": "user", "content": user_content_list})
-        else: # Для других API (не gen-api.ru)
-            if image_data:
-                logger.warning(f"Image data provided for non-gen-api endpoint {self.model_config['endpoint']}, but multimodal handling is not defined for it.")
-            messages_payload.append({"role": "user", "content": user_prompt})
-
 
         payload = {
             "messages": messages_payload,
-            "is_sync": True, # gen-api.ru использует is_sync [cite: 1]
+            "is_sync": True,
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
         
-        # Параметр 'model' не нужен в теле запроса для gen-api.ru, если модель указана в URL
-        # Но документация для gemini-2.5-pro на gen-api.ru указывает 'model' как параметр (хотя и с default value) [cite: 1]
-        # Попробуем его добавить, так как для gpt-4o-mini мы его убирали.
-        if is_gen_api_format and self.model_id:
-             payload['model'] = self.model_id # Например, "gemini-2.5-pro-preview-03-25" [cite: 1]
+        if is_gen_api_endpoint and self.model_id:
+             payload['model'] = self.model_id 
 
         if self.model_config.get("parameters"):
             payload.update(self.model_config["parameters"])
         
-        endpoint = self.model_config["endpoint"]
-        logger.debug(f"Sending payload to {endpoint}: {json.dumps(payload, ensure_ascii=False)}")
+        endpoint = self.model_config["endpoint"] # Уже определен как endpoint_url
+        logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=60) # Увеличил таймаут
+                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=90)
             )
             response.raise_for_status()
             json_resp = response.json()
-            logger.debug(f"Received response from {endpoint}: {json.dumps(json_resp, ensure_ascii=False)}")
+            logger.debug(f"Получен ответ от {endpoint}: {json.dumps(json_resp, ensure_ascii=False, indent=2)}")
             
             extracted_text = None
 
-            if is_gen_api_format:
-                # gen-api.ru для gemini-2.5-pro может возвращать ответ как в gpt-4o-mini (поле "response")
-                # или текст напрямую в поле "text" (как для их gemini-pro модели ранее)
-                if "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
+            if is_gen_api_endpoint:
+                if json_resp.get("status") == "success" and "output" in json_resp:
+                    extracted_text = json_resp["output"]
+                elif "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
                     first_response_item = json_resp["response"][0]
                     if "message" in first_response_item and "content" in first_response_item["message"]:
                         extracted_text = first_response_item["message"]["content"]
-                elif "text" in json_resp: # Прямой текстовый ответ (как было для старой gemini-pro)
+                elif "text" in json_resp: 
                     extracted_text = json_resp.get("text")
 
-                if not extracted_text and json_resp.get("status") != "success":
+                if not extracted_text and json_resp.get("status") not in ["success", "starting", "processing"]:
                     status_from_api = json_resp.get('status','N/A')
-                    error_msg_from_api = json_resp.get('error_message', '')
+                    error_msg_from_api = json_resp.get('error_message', json_resp.get('result'))
+                    if isinstance(error_msg_from_api, list): error_msg_from_api = " ".join(error_msg_from_api)
                     input_details_on_error = json_resp.get('input', {})
                     if not error_msg_from_api and isinstance(input_details_on_error, dict):
                         error_msg_from_api = input_details_on_error.get('error', '')
-                    
-                    logger.error(f"API Error for {self.model_config['name']}. Status: {status_from_api}. Full response: {json_resp}")
+                    logger.error(f"Ошибка API для {self.model_config['name']}. Статус: {status_from_api}. Полный ответ: {json_resp}")
                     final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
-                    if not error_msg_from_api.strip() and str(error_msg_from_api) != '0':
+                    if not str(error_msg_from_api).strip() and str(error_msg_from_api) != '0':
                         final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
                     return final_error_message
             else: 
@@ -453,8 +423,6 @@ class CustomHttpAIService(BaseAIService):
                         extracted_text = check_val; break
             
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
-
-        # ... (обработка HTTPError, RequestException, Exception как и раньше) ...
         except requests.exceptions.HTTPError as e:
             error_body = e.response.text if e.response else "No response body"
             status_code = e.response.status_code if e.response else "N/A"
@@ -466,7 +434,6 @@ class CustomHttpAIService(BaseAIService):
         except Exception as e:
             logger.error(f"Unexpected Custom API error for {self.model_id} ({endpoint}): {e}", exc_info=True)
             return f"Неожиданная ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
-
 
 async def get_user_gem_balance(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> float:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
@@ -589,21 +556,23 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
             if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
                 await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-        except (telegram.error.BadRequest, ValueError) as e:
+        except (telegram.error.BadRequest, ValueError) as e: # BadRequest может быть, если сообщение уже удалено или слишком старое
             logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
     
-    if not is_command_to_keep:
+    if not is_command_to_keep: # Если это не команда /start или другая "важная" команда
         user_data_for_msg_handling['user_command_to_delete'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
         }
-        try:
+        try: # Пытаемся удалить текущее (не "важное") сообщение сразу
             await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
             logger.info(f"Successfully deleted current user message {message_id_to_process} (not kept).")
-            user_data_for_msg_handling.pop('user_command_to_delete', None)
+            user_data_for_msg_handling.pop('user_command_to_delete', None) # Удаляем из user_data, т.к. успешно удалили
         except telegram.error.BadRequest as e:
+            # Если не удалось удалить сразу (например, нет прав или сообщение слишком старое), информация останется в user_data
+            # для попытки удаления при следующем сообщении (если это не команда /start)
             logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
-    else:
-         user_data_for_msg_handling['user_command_message_to_keep'] = {
+    else: # Если это "важная" команда (is_command_to_keep=True), ее не пытаемся удалить сразу
+         user_data_for_msg_handling['user_command_message_to_keep'] = { # Просто сохраняем информацию о ней
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
         }
     await firestore_service.set_user_data(user_id, user_data_for_msg_handling)
@@ -611,7 +580,7 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
 def auto_delete_message_decorator(is_command_to_keep: bool = False):
     def decorator(func):
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if update.effective_user and update.message:
+            if update.effective_user and update.message: # Убедимся, что есть сообщение для обработки
                  await _store_and_try_delete_message(update, update.effective_user.id, is_command_to_keep)
             return await func(update, context)
         return wrapper
@@ -629,7 +598,7 @@ async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]
     
     for key, info in AVAILABLE_TEXT_MODELS.items():
         if info["id"] == selected_id:
-            if user_data.get('selected_api_type') != info.get("api_type"): # Обновляем, если тип устарел или отсутствует
+            if user_data.get('selected_api_type') != info.get("api_type"):
                 await firestore_service.set_user_data(user_id, {'selected_api_type': info.get("api_type")})
             return key
             
@@ -646,41 +615,48 @@ async def get_selected_model_details(user_id: int, user_data: Optional[Dict[str,
 
 async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
-    current_model_k_loc = await get_current_model_key(user_id, user_data)
-    mode_k_loc = user_data.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
-
-    if mode_k_loc not in AI_MODES:
-        mode_k_loc = CONFIG.DEFAULT_AI_MODE_KEY
-        await firestore_service.set_user_data(user_id, {'current_ai_mode': mode_k_loc})
     
-    if current_model_k_loc == "custom_api_gemini_2_5_pro" and mode_k_loc != "gemini_pro_custom_mode":
-        # Если выбрана модель Gemini Pro, но агент не специальный для нее,
-        # можно автоматически переключить на специальный агент или оставить как есть,
-        # в зависимости от желаемого поведения. Текущая логика позволяет использовать Gemini Pro с любым агентом.
-        # Если нужно принудительно, то:
-        # return AI_MODES.get("gemini_pro_custom_mode", AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY])
-        pass # Оставляем выбор агента пользователю
+    active_agent_key = user_data.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
+    agent_config = AI_MODES.get(active_agent_key)
+
+    if not agent_config: # Если сохраненный агент невалиден
+        active_agent_key = CONFIG.DEFAULT_AI_MODE_KEY
+        await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key})
+        agent_config = AI_MODES[active_agent_key]
+    
+    # Если агент имеет принудительную модель и эта модель "gemini_pro_custom_mode" 
+    # (которая является ключом для специального агента "Продвинутый (Gemini Pro)"),
+    # то используем промпт этого специального агента.
+    forced_model_key_for_agent = agent_config.get("forced_model_key")
+    if forced_model_key_for_agent == "custom_api_gemini_2_5_pro": # Предполагая, что это модель для "gemini_pro_custom_mode"
+         # И если текущий агент не сам "gemini_pro_custom_mode" (чтобы избежать рекурсии, если он сам себя форсит)
+        if active_agent_key != "gemini_pro_custom_mode":
+            return AI_MODES.get("gemini_pro_custom_mode", agent_config) # Возвращаем спец.агента или текущего, если спец. нет
+
+    # Также, если глобально выбрана модель "custom_api_gemini_2_5_pro",
+    # и текущий агент НЕ "photo_dietitian_analyzer" (у которого своя логика forced_model),
+    # то используем специальный агент "gemini_pro_custom_mode".
+    globally_selected_model_key = await get_current_model_key(user_id, user_data)
+    if globally_selected_model_key == "custom_api_gemini_2_5_pro" and \
+       active_agent_key != "photo_dietitian_analyzer" and \
+       active_agent_key != "gemini_pro_custom_mode": # чтобы не перезаписывать если уже он
+        return AI_MODES.get("gemini_pro_custom_mode", agent_config)
         
-    return AI_MODES.get(mode_k_loc, AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY])
+    return agent_config
 
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
-    if not isinstance(text, str): text = str(text) # На случай если пришел не текст
+    if not isinstance(text, str): text = str(text)
     if len(text) <= max_length: return text, False
-
     suffix = "\n\n(...ответ был сокращен)"
     adjusted_max_length = max_length - len(suffix)
-
     if adjusted_max_length <= 0: return text[:max_length - len("...")] + "...", True 
-        
     truncated_text = text[:adjusted_max_length]
-    
     for separator in ['\n\n', '. ', '! ', '? ', '\n', ' ']: 
         position = truncated_text.rfind(separator)
         if position != -1:
             actual_cut_position = position + (len(separator) if separator != ' ' else 0)
             if actual_cut_position > 0 and actual_cut_position > adjusted_max_length * 0.3:
                  return text[:actual_cut_position].strip() + suffix, True
-                 
     return text[:adjusted_max_length].strip() + suffix, True
 
 def is_menu_button_text(text: str) -> bool:
@@ -694,19 +670,21 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     keyboard_rows: List[List[KeyboardButton]] = []
     items = menu_config["items"]
-
-    # Группировка по две кнопки для основного меню, меню моделей и меню гемов
-    if menu_key in [BotConstants.MENU_MAIN, BotConstants.MENU_MODELS_SUBMENU, BotConstants.MENU_GEMS_SUBMENU]:
+    group_by_two_keys = [
+        BotConstants.MENU_MAIN, 
+        BotConstants.MENU_MODELS_SUBMENU, 
+        BotConstants.MENU_GEMS_SUBMENU,
+        BotConstants.MENU_AI_MODES_SUBMENU # Агентов тоже лучше группировать
+    ]
+    if menu_key in group_by_two_keys:
         for i in range(0, len(items), 2):
             keyboard_rows.append([KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))])
-    else: # Остальные меню - по одной кнопке в ряду
+    else:
         for item in items: keyboard_rows.append([KeyboardButton(item["text"])])
-            
     if menu_config.get("is_submenu", False):
         navigation_row = [KeyboardButton("🏠 Главное меню")]
         if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
         keyboard_rows.append(navigation_row)
-        
     return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
 
 async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None):
@@ -717,7 +695,6 @@ async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param
             reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
         await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
         return
-
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
     await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     logger.info(f"User {user_id} was shown menu '{menu_key}'.")
