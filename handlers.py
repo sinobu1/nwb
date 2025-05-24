@@ -20,15 +20,15 @@ from config import (
 )
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
-
 @auto_delete_message_decorator(is_command_to_keep=True)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_first_name = update.effective_user.first_name
     
     user_data_loc = await firestore_service.get_user_data(user_id)
-    updates_to_user_data = {}
+    updates_to_user_data = {} # Инициализируем пустой словарь для обновлений
 
+    # Проверка и добавление стандартных полей, если их нет
     if 'current_ai_mode' not in user_data_loc:
         updates_to_user_data['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
     if 'current_menu' not in user_data_loc:
@@ -40,13 +40,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if 'selected_api_type' not in user_data_loc:
         updates_to_user_data['selected_api_type'] = default_model_config.get("api_type")
 
+    # --- >>> ИСПРАВЛЕННАЯ ЛОГИКА ИНИЦИАЛИЗАЦИИ ГЕМОВ <<< ---
+    if 'gem_balance' not in user_data_loc: # Инициализация баланса гемов
+        updates_to_user_data['gem_balance'] = CONFIG.GEMS_FOR_NEW_USER 
+    # --- >>> КОНЕЦ ИСПРАВЛЕНИЯ <<< ---
+
+    # Если были какие-либо обновления, сохраняем их все разом
     if updates_to_user_data:
         await firestore_service.set_user_data(user_id, updates_to_user_data)
-        user_data_loc.update(updates_to_user_data)
-        
-    if 'gem_balance' not in user_data_loc: # Инициализация баланса гемов
-    updates_to_user_data['gem_balance'] = CONFIG.GEMS_FOR_NEW_USER # Например, 0 или приветственный бонус
+        user_data_loc.update(updates_to_user_data) # Обновляем локальную копию user_data_loc
 
+    # Получаем актуальные данные после возможного обновления
     current_model_key_val = await get_current_model_key(user_id, user_data_loc)
     mode_details_res = await get_current_mode_details(user_id, user_data_loc)
     model_details_res = AVAILABLE_TEXT_MODELS.get(current_model_key_val)
@@ -67,8 +71,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN),
         disable_web_page_preview=True
     )
-    await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
-    logger.info(f"User {user_id} ({user_first_name}) started the bot.")
+    # Устанавливаем current_menu в MENU_MAIN после отправки приветствия,
+    # если он не был установлен ранее или если это перезапуск.
+    if user_data_loc.get('current_menu') != BotConstants.MENU_MAIN:
+         await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
+    
+    logger.info(f"User {user_id} ({user_first_name}) started or restarted the bot.")
 
 @auto_delete_message_decorator()
 async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
