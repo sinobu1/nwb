@@ -2,6 +2,7 @@
 import traceback
 import asyncio # Добавлен для прямого вызова Google AI SDK
 import io # Для работы с байтами изображения
+import mimetypes
 from datetime import datetime, timezone, timedelta
 import telegram
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
@@ -406,7 +407,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
        'dietitian_pending_photo_id' in context.user_data:
 
         photo_file_id = context.user_data['dietitian_pending_photo_id']
-        billing_model_key = active_agent_config.get("forced_model_key") # Для списания гемов/лимитов
+        billing_model_key = active_agent_config.get("forced_model_key")
         native_vision_model_id = active_agent_config.get("native_vision_model_id", "gemini-1.5-flash-latest")
 
         if not billing_model_key or billing_model_key not in AVAILABLE_TEXT_MODELS:
@@ -429,24 +430,31 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         ai_response_text = "Ошибка при обработке изображения."
         try:
-            if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY: # Проверка ключа Google
+            if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
                 raise ValueError("API ключ для Google Gemini (Vision) не настроен в конфигурации бота.")
 
             actual_photo_file = await context.bot.get_file(photo_file_id)
             file_bytes = await actual_photo_file.download_as_bytearray()
             
-            image_part = {"mime_type": actual_photo_file.mime_type or "image/jpeg", "data": bytes(file_bytes)}
+            # --- >>> ИСПРАВЛЕННОЕ ОПРЕДЕЛЕНИЕ MIME-ТИПА <<< ---
+            mime_type = None
+            if actual_photo_file.file_path: # file_path может быть None в редких случаях
+                mime_type, _ = mimetypes.guess_type(actual_photo_file.file_path)
             
-            # Промпт для Vision модели (может отличаться от основного промпта агента)
-            # Основной промпт агента содержит инструкции по диалогу, которые здесь не нужны
+            if not mime_type: 
+                mime_type = "image/jpeg" # Значение по умолчанию, если не удалось определить
+            
+            image_part = {"mime_type": mime_type, "data": bytes(file_bytes)}
+            logger.info(f"Preparing image for Vision API. Determined/guessed MIME type: {mime_type}")
+            # --- >>> КОНЕЦ ИСПРАВЛЕНИЯ <<< ---
+            
             vision_system_prompt = (
-                "Проанализируй изображение еды и текст с указанием веса. "
+                "Ты — эксперт-диетолог. Проанализируй изображение еды и текст с указанием веса. "
                 "Определи блюдо/продукты. Рассчитай примерные КБЖУ (калории, белки, жиры, углеводы) для указанного веса. "
                 "Представь результат в структурированном виде, начиная с названия блюда, затем вес, затем КБЖУ."
             )
             text_prompt_with_weight = f"Вес этой порции: {user_message_text}. {vision_system_prompt}"
             
-            # Используем genai, импортированный из config, где он уже должен быть сконфигурирован
             model_vision = genai.GenerativeModel(native_vision_model_id)
             logger.debug(f"Sending to Google Vision API. Model: {native_vision_model_id}. Text prompt part: {text_prompt_with_weight[:100]}")
             response_vision = await asyncio.get_event_loop().run_in_executor(
@@ -457,7 +465,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"Successfully received response from Google Vision API for user {user_id}")
 
         except ValueError as ve:
-            logger.error(f"Configuration error for Google Gemini Vision: {ve}")
+            logger.error(f"Configuration error for Google Gemini Vision for user {user_id}: {ve}")
             ai_response_text = str(ve)
         except Exception as e:
             logger.error(f"Error with Google Gemini Vision API for user {user_id}: {e}", exc_info=True)
@@ -475,11 +483,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # --- Обычная обработка текста ---
     final_model_key_for_request = ""
-    # Если текущий агент "photo_dietitian_analyzer", но он не ждет вес (т.е. это обычный текстовый запрос к нему)
-    if active_agent_config and active_agent_config.get("multimodal_capable") and not context.user_data.get('dietitian_state') == 'awaiting_weight':
-        final_model_key_for_request = active_agent_config.get("forced_model_key")
-        logger.info(f"Agent '{current_ai_mode_key}' (multimodal in text mode) forcing model to '{final_model_key_for_request}'.")
-    elif active_agent_config and active_agent_config.get("forced_model_key") and not active_agent_config.get("multimodal_capable"):
+    if active_agent_config and active_agent_config.get("forced_model_key") and \
+       (not active_agent_config.get("multimodal_capable") or (active_agent_config.get("multimodal_capable") and not context.user_data.get('dietitian_state') == 'awaiting_weight')):
         final_model_key_for_request = active_agent_config.get("forced_model_key")
         logger.info(f"Agent '{current_ai_mode_key}' forcing model to '{final_model_key_for_request}' for text request.")
     else:
@@ -516,8 +521,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
     try:
-        # Для текстовых запросов image_data не передается (или None)
-        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text) 
+        # Для текстовых запросов image_data = None
+        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text, image_data=None) 
     except Exception as e:
         model_name_for_error = AVAILABLE_TEXT_MODELS.get(final_model_key_for_request, {}).get('name', final_model_key_for_request)
         logger.error(f"Unhandled exception in AI service for model {model_name_for_error}: {e}", exc_info=True)
