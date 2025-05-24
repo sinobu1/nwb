@@ -237,7 +237,6 @@ class BaseAIService(ABC):
 
 class GoogleGenAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
-        # ... (Код без изменений)
         full_prompt = f"{system_prompt}\n\n**Запрос:**\n{user_prompt}"
         try:
             model_genai = genai.GenerativeModel(self.model_id, generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB})
@@ -261,13 +260,11 @@ class CustomHttpAIService(BaseAIService):
             response = await asyncio.to_thread(requests.post, endpoint, headers=headers, json=payload, timeout=45)
             response.raise_for_status()
             
-            # --- УЛУЧШЕННАЯ ОБРАБОТКА ---
             try:
                 json_resp = response.json()
             except json.JSONDecodeError:
                 logger.error(f"Failed to decode JSON from API for {self.model_id}. Status: {response.status_code}. Response text: {response.text[:500]}")
                 return f"Ошибка API: не удалось обработать ответ от сервера (не является JSON). Текст ответа: {response.text[:200]}"
-            # --- КОНЕЦ УЛУЧШЕНИЯ ---
             
             extracted_text = None
             if self.model_id == "grok-3-beta":
@@ -281,10 +278,16 @@ class CustomHttpAIService(BaseAIService):
                  if not extracted_text: extracted_text = json_resp.get("text", "").strip()
                  
                  if json_resp.get("status") != "success" and not extracted_text:
+                     # --- ИЗМЕНЕНИЕ: Добавлено логирование проблемного JSON ---
+                     logger.warning(
+                         f"API for {self.model_id} returned status '{json_resp.get('status')}' "
+                         f"with no parsable text and no 'error_message'. Full JSON response: {json.dumps(json_resp, ensure_ascii=False)}"
+                     )
+                     # --- КОНЕЦ ИЗМЕНЕНИЯ ---
                      error_msg = json_resp.get("error_message", "Неизвестная ошибка API")
                      extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
             
-            if extracted_text is None:
+            if extracted_text is None: # Общий случай, если специфичный парсинг не сработал
                 for key in ["text", "content", "message", "output", "response"]:
                     if isinstance(json_resp.get(key), str) and (val := json_resp[key].strip()):
                         extracted_text = val
@@ -303,8 +306,7 @@ class CustomHttpAIService(BaseAIService):
             logger.error(f"Unexpected Custom API error for {self.model_id}: {e}", exc_info=True)
             return f"Неожиданная ошибка API ({type(e).__name__}) для {self.model_config['name']}."
 
-# ... (остальной код остается без изменений) ...
-
+# ... (остальной код остается без изменений, как в v4) ...
 def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_cfg: return None
@@ -330,12 +332,22 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
     if not isinstance(text, str) or len(text) <= max_length: return str(text), False
     suffix = "\n\n(...ответ был сокращен)"
-    truncated_text = text[:max_length - len(suffix)]
-    last_p = truncated_text.rfind('\n\n')
-    if last_p > len(truncated_text) * 0.5: return text[:last_p].strip() + suffix, True
-    last_s = truncated_text.rfind('. ')
-    if last_s > len(truncated_text) * 0.5: return text[:last_s+1].strip() + suffix, True
-    return truncated_text.strip() + suffix, True
+    # Ensure adjusted_max_length is not negative if suffix is too long
+    adjusted_max_length = max(0, max_length - len(suffix))
+    
+    if adjusted_max_length == 0: # If only suffix can fit, or less
+        return text[:max_length - 3] + "..." if max_length > 3 else text[:max_length], True
+
+    truncated_text = text[:adjusted_max_length]
+    
+    for separator in ['\n\n', '. ', '! ', '? ', '\n', ' ']: 
+        position = truncated_text.rfind(separator)
+        if position != -1:
+            actual_cut_position = position + (len(separator) if separator != ' ' else 0) 
+            if actual_cut_position > 0 and actual_cut_position > adjusted_max_length * 0.3:
+                 return text[:actual_cut_position].strip() + suffix, True
+                 
+    return text[:adjusted_max_length].strip() + suffix, True
 
 async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[bool, str]:
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -525,7 +537,15 @@ async def send_gems_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 async def show_help(update: Update, user_id: int):
     help_text = (
-        "<b>❓ Справка ... </b>" # Сокращено
+        "<b>❓ Справка по использованию бота</b>\n\n"
+        "1.  <b>Запросы к ИИ</b>: Просто напишите ваш вопрос в чат.\n"
+        "2.  <b>Меню</b>: Используйте кнопки для навигации:\n"
+        "    ▫️ «<b>🤖 Агенты ИИ</b>»: Выберите роль (стиль) для ответов.\n"
+        "    ▫️ «<b>⚙️ Модели ИИ</b>»: Переключайтесь между нейросетями.\n"
+        "    ▫️ «<b>📊 Лимиты</b>»: Проверьте баланс гемов и дневные лимиты.\n"
+        "    ▫️ «<b>🎁 Бонус</b>»: Получите бонус за подписку на канал.\n"
+        "    ▫️ «<b>💎 Гемы</b>»: Пополните ваш баланс гемов.\n"
+        "3.  <b>Команды</b>: /start, /menu, /help, /bonus, /usage."
     )
     await update.effective_message.reply_text(help_text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
@@ -664,8 +684,8 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 
     if payload.startswith("buy_gems_"):
         try:
-            parts = payload.split('_')
-            gems_to_add = int(parts[1])
+            parts = payload.split('_') # e.g., "buy_gems_100_user_12345"
+            gems_to_add = int(parts[1]) # gems_amount is at index 1
             user_data = await firestore_service.get_user_data(user_id)
             new_balance = user_data.get('gem_balance', 0.0) + gems_to_add
             await firestore_service.set_user_data(user_id, {'gem_balance': new_balance})
@@ -677,8 +697,10 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             if CONFIG.ADMIN_ID:
                 admin_msg = f"🔔 Новая покупка: {gems_to_add}💎 от user {user_id} ({update.effective_user.full_name}). Сумма: {payment.total_amount / 100} {payment.currency}."
                 await context.bot.send_message(CONFIG.ADMIN_ID, admin_msg)
-        except Exception as e:
-            logger.error(f"Failed to process gem payment payload '{payload}': {e}")
+        except (IndexError, ValueError) as e: # Added IndexError for safety
+            logger.error(f"Failed to parse gem payment payload '{payload}': {e}")
+            await update.message.reply_text("Произошла ошибка при обработке вашего платежа. Пожалуйста, свяжитесь с поддержкой.")
+
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
