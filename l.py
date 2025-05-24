@@ -1,3 +1,31 @@
+import telegram
+from telegram import (
+    ReplyKeyboardMarkup, KeyboardButton, Update,
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+)
+from telegram.constants import ParseMode, ChatAction
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, filters,
+    ContextTypes, PreCheckoutQueryHandler
+)
+import google.generativeai as genai
+import google.api_core.exceptions
+import requests
+import logging
+import traceback
+import os
+import asyncio
+import nest_asyncio
+import json
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Any, Tuple, Union, List # Добавил List
+import uuid # Не используется явно, но оставлен на случай скрытой зависимости
+import firebase_admin
+from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin.exceptions import FirebaseError
+from google.cloud.firestore_v1.client import Client as FirestoreClient
+from abc import ABC, abstractmethod # Для абстрактных классов
+
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
 
 @auto_delete_message_decorator(is_command_to_keep=True) # Сохраняем сообщение /start
