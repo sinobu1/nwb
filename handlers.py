@@ -331,8 +331,11 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         if update.message: await update.message.reply_text("Для анализа фото еды, выберите агента '🥑 Диетолог (анализ фото)'.")
 
+# В файле handlers.py
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text or is_menu_button_text(update.message.text.strip()): return
+    if not update.message or not update.message.text or is_menu_button_text(update.message.text.strip()):
+        return
         
     user_id = update.effective_user.id
     user_message_text = update.message.text.strip()
@@ -340,94 +343,177 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_ai_mode_key = user_data_cache.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     active_agent_config = AI_MODES.get(current_ai_mode_key)
 
-    if active_agent_config and active_agent_config.get("multimodal_capable") and \
-       context.user_data.get('dietitian_state') == 'awaiting_weight' and \
-       'dietitian_pending_photo_id' in context.user_data:
+    # --- Логика для агента "Диетолог (анализ фото)" ---
+    if active_agent_config and active_agent_config.get("multimodal_capable"): # Проверяем, что это наш фото-диетолог
+        current_dietitian_state = context.user_data.get('dietitian_state')
 
-        photo_file_id = context.user_data['dietitian_pending_photo_id']
-        billing_model_key = active_agent_config.get("forced_model_key")
-        native_vision_model_id = active_agent_config.get("native_vision_model_id")
-
-        if not (billing_model_key and billing_model_key in AVAILABLE_TEXT_MODELS and native_vision_model_id):
-            logger.error(f"Photo Dietitian config error for agent '{current_ai_mode_key}'. Billing: {billing_model_key}, Vision: {native_vision_model_id}")
-            await update.message.reply_text("Ошибка конфигурации Диетолога. Сообщите администратору.")
-            context.user_data.pop('dietitian_state', None); context.user_data.pop('dietitian_pending_photo_id', None)
-            return
-
-        bot_data_cache = await firestore_service.get_bot_data()
-        can_proceed, limit_msg, usage_type, gem_cost = await check_and_log_request_attempt(
-            user_id, billing_model_key, user_data_cache, bot_data_cache, current_ai_mode_key)
-        if not can_proceed: await update.message.reply_text(limit_msg, parse_mode=ParseMode.HTML); return
-        
-        logger.info(f"User {user_id} (agent {current_ai_mode_key}) weight: '{user_message_text}' for photo {photo_file_id}. BillAs: {billing_model_key}, Use: {usage_type}, Vision: {native_vision_model_id}")
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-        
-        ai_response_text = "Ошибка анализа изображения."
-        try:
-            if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
-                raise ValueError("API ключ Google Gemini (Vision) не настроен.")
-
-            actual_photo_file = await context.bot.get_file(photo_file_id)
-            file_bytes = await actual_photo_file.download_as_bytearray()
-            mime_type, _ = mimetypes.guess_type(actual_photo_file.file_path or "image.jpg")
-            image_part = {"mime_type": mime_type or "image/jpeg", "data": bytes(file_bytes)}
-            logger.info(f"Vision API: MIME type: {mime_type or 'image/jpeg'}")
+        # 1. Обработка ответа пользователя ПОСЛЕ анализа КБЖУ
+        if current_dietitian_state == 'analysis_complete_awaiting_feedback':
+            logger.info(f"User {user_id} (photo_dietitian_analyzer) sent follow-up: '{user_message_text}'")
             
-            vision_prompt_text = f"Вес этой порции: {user_message_text}. {active_agent_config['prompt']}" # Используем основной промпт агента
+            positive_feedback_keywords = ["да", "спасибо", "хорошо", "понял", "все так", "отлично", "супер", "именно", "верно"]
+            is_simple_ack = any(keyword in user_message_text.lower() for keyword in positive_feedback_keywords) and len(user_message_text.split()) <= 5
+
+            if is_simple_ack:
+                await update.message.reply_text(
+                    "Отлично! Рад был помочь. Если у вас есть еще блюда для анализа или вопросы по питанию, пожалуйста, обращайтесь. 🥗",
+                    reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU)) # Возврат в меню агентов
+                )
+            else:
+                # Если это не простое подтверждение, считаем это новым текстовым запросом к диетологу
+                logger.info(f"Treating dietitian follow-up '{user_message_text}' as a new text query to the same agent.")
+                # Удаляем состояние, чтобы запрос обработался как обычный текстовый ниже
+                context.user_data.pop('dietitian_state', None) 
+                # Передаем управление дальше в общую логику обработки текста,
+                # которая использует forced_model_key диетолога для текстовых запросов
+                # (это произойдет ниже, после этого блока if/elif)
             
-            model_vision = genai.GenerativeModel(native_vision_model_id)
-            response_vision = await asyncio.get_event_loop().run_in_executor(None, lambda: model_vision.generate_content([image_part, vision_prompt_text]))
-            ai_response_text = response_vision.text
-            logger.info(f"Google Vision API response OK for user {user_id}")
-        except ValueError as ve: logger.error(f"Google Vision Config error for {user_id}: {ve}"); ai_response_text = str(ve)
-        except Exception as e: logger.error(f"Google Vision API error for {user_id}: {e}", exc_info=True); ai_response_text = "Не удалось проанализировать фото."
-        
-        await increment_request_count(user_id, billing_model_key, usage_type, current_ai_mode_key, gem_cost)
-        final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-        current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU) 
-        await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu_reply))
-        context.user_data.pop('dietitian_state', None); context.user_data.pop('dietitian_pending_photo_id', None)
-        return 
+            if is_simple_ack: # Если это было простое подтверждение, завершаем обработку здесь
+                 context.user_data.pop('dietitian_state', None)
+                 return
+
+        # 2. Обработка ввода веса ПОСЛЕ отправки фото
+        elif current_dietitian_state == 'awaiting_weight' and 'dietitian_pending_photo_id' in context.user_data:
+            photo_file_id = context.user_data['dietitian_pending_photo_id']
+            billing_model_key = active_agent_config.get("forced_model_key")
+            native_vision_model_id = active_agent_config.get("native_vision_model_id")
+
+            if not (billing_model_key and billing_model_key in AVAILABLE_TEXT_MODELS and native_vision_model_id):
+                logger.error(f"Photo Dietitian config error for agent '{current_ai_mode_key}'. Billing: {billing_model_key}, Vision: {native_vision_model_id}")
+                await update.message.reply_text("Ошибка конфигурации Диетолога. Сообщите администратору.")
+                context.user_data.pop('dietitian_state', None); context.user_data.pop('dietitian_pending_photo_id', None)
+                return
+
+            bot_data_cache = await firestore_service.get_bot_data()
+            can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
+                user_id, billing_model_key, user_data_cache, bot_data_cache, current_ai_mode_key
+            )
+
+            if not can_proceed:
+                await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML)
+                return
+            
+            logger.info(f"User {user_id} (agent {current_ai_mode_key}) provided weight: '{user_message_text}' for photo {photo_file_id}. Billing Model: {billing_model_key}. Usage: {usage_type}. Vision Model: {native_vision_model_id}")
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+            
+            ai_response_text = "Ошибка при обработке изображения."
+            try:
+                if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
+                    raise ValueError("API ключ для Google Gemini (Vision) не настроен в конфигурации бота.")
+
+                actual_photo_file = await context.bot.get_file(photo_file_id)
+                file_bytes = await actual_photo_file.download_as_bytearray()
+                
+                mime_type, _ = mimetypes.guess_type(actual_photo_file.file_path or "image.jpg")
+                if not mime_type: mime_type = "image/jpeg"
+                
+                image_part = {"mime_type": mime_type, "data": bytes(file_bytes)}
+                logger.info(f"Preparing image for Vision API. Determined/guessed MIME type: {mime_type}")
+                
+                # Используем основной системный промпт агента, он содержит инструкции по всему процессу
+                vision_system_instruction = active_agent_config["prompt"] 
+                # Текстовая часть для Vision API должна явно указывать на использование фото и предоставленный вес
+                text_prompt_with_weight = f"Проанализируй предоставленное ФОТО. Пользователь указал вес порции: {user_message_text}."
+                
+                model_vision = genai.GenerativeModel(native_vision_model_id)
+                logger.debug(f"Sending to Google Vision API. Model: {native_vision_model_id}. System context (part): {vision_system_instruction[:150]} User text: {text_prompt_with_weight}")
+                
+                # Модель Vision должна получить и системный промпт, и изображение, и текстовый запрос с весом.
+                # Порядок может иметь значение. Обычно [system_prompt, image, user_prompt_with_weight]
+                # или [image, combined_text_prompt_including_system_instructions_and_weight]
+                # Промпт агента уже содержит инструкцию про "ФОТО и ВЕС", попробуем так:
+                response_vision = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: model_vision.generate_content([vision_system_instruction, image_part, text_prompt_with_weight]) 
+                )
+                ai_response_text = response_vision.text
+                logger.info(f"Successfully received response from Google Vision API for user {user_id}")
+
+            except ValueError as ve:
+                logger.error(f"Configuration error for Google Gemini Vision for user {user_id}: {ve}")
+                ai_response_text = str(ve)
+            except Exception as e:
+                logger.error(f"Error with Google Gemini Vision API for user {user_id}: {e}", exc_info=True)
+                ai_response_text = "К сожалению, не удалось проанализировать изображение. Попробуйте позже."
+            
+            await increment_request_count(user_id, billing_model_key, usage_type, current_ai_mode_key, gem_cost_for_request)
+            
+            final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+            current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU) 
+            await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu_reply))
+            
+            # Устанавливаем новое состояние после анализа
+            context.user_data['dietitian_state'] = 'analysis_complete_awaiting_feedback'
+            context.user_data.pop('dietitian_pending_photo_id', None)
+            return 
+
+    # --- Обычная обработка текста (включая текстовые запросы к диетологу) ---
     
-    # Обычная обработка текста
-    final_model_key = ""
-    if active_agent_config and active_agent_config.get("forced_model_key") and \
-       not (active_agent_config.get("multimodal_capable") and context.user_data.get('dietitian_state') == 'awaiting_weight'):
-        final_model_key = active_agent_config.get("forced_model_key")
-    else: final_model_key = await get_current_model_key(user_id, user_data_cache)
+    # Определяем, какую модель использовать
+    final_model_key_for_request = ""
+    if active_agent_config and active_agent_config.get("forced_model_key"):
+        # Это сработает для текстовых запросов к 'photo_dietitian_analyzer' (когда он не в состоянии 'awaiting_weight' или 'analysis_complete_awaiting_feedback')
+        # или для других агентов с forced_model_key
+        final_model_key_for_request = active_agent_config.get("forced_model_key")
+        logger.info(f"Agent '{current_ai_mode_key}' forcing model to '{final_model_key_for_request}' for this text request.")
+    else:
+        final_model_key_for_request = await get_current_model_key(user_id, user_data_cache)
 
-    bot_data_cache = await firestore_service.get_bot_data()
-    can_proceed, limit_msg, usage_type, gem_cost = await check_and_log_request_attempt(
-        user_id, final_model_key, user_data_cache, bot_data_cache, current_ai_mode_key)
+    # Проверка лимитов/гемов
+    bot_data_cache_for_check = await firestore_service.get_bot_data()
+    can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
+        user_id, final_model_key_for_request, user_data_cache, bot_data_cache_for_check, current_ai_mode_key
+    )
+        
     if not can_proceed:
-        await update.message.reply_text(limit_msg, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), disable_web_page_preview=True)
+        await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML, 
+                                        reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), 
+                                        disable_web_page_preview=True)
         return
 
+    # Проверка длины запроса
     if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
-        await update.message.reply_text("Ваш запрос слишком короткий.", reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)))
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text("Ваш запрос слишком короткий.", reply_markup=generate_menu_keyboard(current_menu))
         return
 
-    logger.info(f"User {user_id} (agent: {current_ai_mode_key}, model: {final_model_key}) AI request: '{user_message_text[:100]}...'")
-    ai_service = get_ai_service(final_model_key)
+    logger.info(f"User {user_id} (agent: {current_ai_mode_key}, model: {final_model_key_for_request}) sent AI request: '{user_message_text[:100]}...'")
+
+    ai_service = get_ai_service(final_model_key_for_request)
     if not ai_service:
-        logger.critical(f"Could not get AI service for model key '{final_model_key}'.")
-        await update.message.reply_text("Критическая ошибка при выборе AI модели.", reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)))
+        logger.critical(f"Could not get AI service for model key '{final_model_key_for_request}'.")
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text("Критическая ошибка при выборе AI модели.", reply_markup=generate_menu_keyboard(current_menu))
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    system_prompt = active_agent_config["prompt"] if active_agent_config else AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"]
+    
+    # Используем промпт активного агента
+    system_prompt_to_use = active_agent_config["prompt"] if active_agent_config else AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"]
+    
     ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
     try:
-        ai_response_text = await ai_service.generate_response(system_prompt, user_message_text) 
+        # Для текстовых запросов image_data не передается (или None)
+        # generate_response должен уметь обрабатывать image_data=None
+        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text, image_data=None) 
     except Exception as e:
-        model_name = AVAILABLE_TEXT_MODELS.get(final_model_key, {}).get('name', final_model_key)
-        logger.error(f"AI service error for model {model_name}: {e}", exc_info=True)
-        ai_response_text = f"Ошибка при обработке запроса моделью {model_name}."
+        model_name_for_error = AVAILABLE_TEXT_MODELS.get(final_model_key_for_request, {}).get('name', final_model_key_for_request)
+        logger.error(f"Unhandled exception in AI service for model {model_name_for_error}: {e}", exc_info=True)
+        ai_response_text = f"Произошла внутренняя ошибка при обработке вашего запроса моделью {model_name_for_error}."
     
-    await increment_request_count(user_id, final_model_key, usage_type, current_ai_mode_key, gem_cost)
-    final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-    await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), disable_web_page_preview=True)
-    logger.info(f"Sent AI response (model: {final_model_key}, usage: {usage_type}) to user {user_id}.")
+    await increment_request_count(user_id, final_model_key_for_request, usage_type, current_ai_mode_key, gem_cost_for_request)
+
+    final_reply_text, was_truncated = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+    if was_truncated:
+        logger.info(f"AI response for user {user_id} was truncated.")
+    
+    current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN) # Для клавиатуры после ответа
+    await update.message.reply_text(
+        final_reply_text, 
+        reply_markup=generate_menu_keyboard(current_menu), 
+        disable_web_page_preview=True
+    )
+    logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
 
 # --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ ---
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
