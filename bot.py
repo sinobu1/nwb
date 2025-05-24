@@ -137,7 +137,7 @@ AVAILABLE_TEXT_MODELS = {
     },
     "custom_api_gemini_2_5_pro": {
         "name": "Gemini Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
-        "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True, "free_daily_limit": 0, "gem_cost": 2.5
     },
     "custom_api_grok_3": {
