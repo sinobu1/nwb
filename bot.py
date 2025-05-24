@@ -28,6 +28,7 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
 from pydantic import BaseModel, Field
+from google.cloud.firestore_v1.client import Client as FirestoreClient
 
 # --- Настройка логирования ---
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
