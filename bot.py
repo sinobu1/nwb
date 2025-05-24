@@ -19,6 +19,11 @@ import nest_asyncio
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple, List
+import firebase_admin
+from firebase_admin import credentials, firestore, initialize_app # <-- ИСПРАВЛЕНА ЭТА СТРОКА
+from firebase_admin.exceptions import FirebaseError
+from google.cloud.firestore_v1.client import Client as FirestoreClient
+from abc import ABC, abstractmethod # Для абстрактных классов
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
