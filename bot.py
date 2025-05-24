@@ -25,6 +25,12 @@ from firebase_admin import credentials, firestore, initialize_app
 from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1.client import Client as FirestoreClient
 from abc import ABC, abstractmethod # Для абстрактных классов
+from handlers import (
+    start, open_menu_command, usage_command, 
+    subscribe_info_command, get_news_bonus_info_command, help_command,
+    menu_button_handler, handle_text, precheckout_callback, 
+    successful_payment_callback, error_handler
+)
 
 nest_asyncio.apply()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
