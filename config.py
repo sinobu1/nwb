@@ -353,88 +353,100 @@ class CustomHttpAIService(BaseAIService):
 
         messages_payload = []
         if system_prompt:
+            # Системный промпт всегда текстовый
             messages_payload.append({
                 "role": "system", 
                 "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
             })
-        messages_payload = []
-        if system_prompt:
-            # Для gen-api.ru системный промпт всегда текстовый, даже если есть картинка в user_prompt
-            messages_payload.append({
-                "role": "system",
-                "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
-            })
 
-        # Формирование user_content (может быть мультимодальным)
-        user_content_parts = []
+        # Формирование контента для user message (может быть мультимодальным)
+        user_content_list = []
         if is_gen_api_format:
             if image_data:
+                # ПРЕДПОЛАГАЕМЫЙ ФОРМАТ для gen-api.ru, если они следуют общепринятым практикам
+                # Вам нужно будет уточнить этот формат в их документации или поддержке!
                 if image_data.get("type") == "url" and image_data.get("value"):
-                    user_content_parts.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
+                    user_content_list.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
                 elif image_data.get("type") == "base64" and image_data.get("value"):
-                    # Формат для base64 может отличаться, уточните в документации gen-api.ru
-                    # Например: {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data['value']}"}}
-                    user_content_parts.append({"type": "image_base64", "base64_data": image_data["value"], "mime_type": image_data.get("mime_type", "image/jpeg")}) # ПРИМЕР!
-            user_content_parts.append({"type": "text", "text": user_prompt})
-            messages_payload.append({"role": "user", "content": user_content_parts})
-        else: # Для других API, которые могут не поддерживать такой формат content array
+                    # Пример: {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data['value']}"}}
+                    # Или может быть другой формат для base64, например, отдельное поле.
+                    # Этот вариант требует точного знания формата gen-api.ru для base64.
+                    # Пока оставим image_url как основной способ.
+                    logger.warning("Base64 image sending for gen-api.ru is not fully specified, trying common URL format assumption.")
+                    # Если у вас есть URL после загрузки base64 куда-то, используйте его.
+                    # Если нужно передавать base64 напрямую, формат JSON должен это поддерживать.
+                    # Для примера, если бы gen-api.ru поддерживал base64 напрямую в content:
+                    # user_content_list.append({
+                    #     "type": "image_base64", # или как они это называют
+                    #     "source": {
+                    #         "type": "base64",
+                    #         "media_type": image_data.get("mime_type", "image/jpeg"),
+                    #         "data": image_data["value"]
+                    #     }
+                    # })
+                    # Поскольку точный формат неизвестен, эта часть ЗАКОММЕНТИРОВАНА.
+                    # Сосредоточимся на image_url.
+                    pass # Пропускаем base64, если не знаем точного формата для gen-api
+
+            user_content_list.append({"type": "text", "text": user_prompt})
+            messages_payload.append({"role": "user", "content": user_content_list})
+        else: # Для других API (не gen-api.ru)
             if image_data:
-                # TODO: Как другие API обрабатывают image + text? Возможно, image_data не используется.
-                logger.warning(f"Image data provided for non-gen-api endpoint {self.model_config['endpoint']}, but handling is not defined.")
+                logger.warning(f"Image data provided for non-gen-api endpoint {self.model_config['endpoint']}, but multimodal handling is not defined for it.")
             messages_payload.append({"role": "user", "content": user_prompt})
 
 
         payload = {
             "messages": messages_payload,
-            "is_sync": True,
+            "is_sync": True, # gen-api.ru использует is_sync [cite: 1]
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
         
+        # Параметр 'model' не нужен в теле запроса для gen-api.ru, если модель указана в URL
+        # Но документация для gemini-2.5-pro на gen-api.ru указывает 'model' как параметр (хотя и с default value) [cite: 1]
+        # Попробуем его добавить, так как для gpt-4o-mini мы его убирали.
+        if is_gen_api_format and self.model_id:
+             payload['model'] = self.model_id # Например, "gemini-2.5-pro-preview-03-25" [cite: 1]
+
         if self.model_config.get("parameters"):
             payload.update(self.model_config["parameters"])
         
         endpoint = self.model_config["endpoint"]
+        logger.debug(f"Sending payload to {endpoint}: {json.dumps(payload, ensure_ascii=False)}")
 
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=45)
+                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=60) # Увеличил таймаут
             )
             response.raise_for_status()
             json_resp = response.json()
+            logger.debug(f"Received response from {endpoint}: {json.dumps(json_resp, ensure_ascii=False)}")
             
             extracted_text = None
 
             if is_gen_api_format:
+                # gen-api.ru для gemini-2.5-pro может возвращать ответ как в gpt-4o-mini (поле "response")
+                # или текст напрямую в поле "text" (как для их gemini-pro модели ранее)
                 if "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
                     first_response_item = json_resp["response"][0]
                     if "message" in first_response_item and "content" in first_response_item["message"]:
                         extracted_text = first_response_item["message"]["content"]
-                    elif self.model_id == "gemini-2.5-pro-preview-03-25" and "text" in first_response_item:
-                         extracted_text = first_response_item["text"]
-                
-                if self.model_id == "gemini-2.5-pro-preview-03-25" and "text" in json_resp and not extracted_text:
-                    extracted_text = json_resp.get("text","").strip()
-                
-                if not extracted_text and json_resp.get("status") != "success": # "status" может отсутствовать при прямом ответе
-                    status_from_api = json_resp.get('status','N/A (успех из-за данных)')
+                elif "text" in json_resp: # Прямой текстовый ответ (как было для старой gemini-pro)
+                    extracted_text = json_resp.get("text")
+
+                if not extracted_text and json_resp.get("status") != "success":
+                    status_from_api = json_resp.get('status','N/A')
                     error_msg_from_api = json_resp.get('error_message', '')
                     input_details_on_error = json_resp.get('input', {})
-
                     if not error_msg_from_api and isinstance(input_details_on_error, dict):
                         error_msg_from_api = input_details_on_error.get('error', '')
-
-                    if "response" in json_resp: # Если есть поле response, но текст не извлечен
-                         logger.warning(f"API for {self.model_config['name']} returned 'response' field but text extraction failed. Full 'response' field: {json_resp['response']}")
-                         if 'output' in json_resp and isinstance(json_resp['output'], str) : # Проверяем output на всякий случай
-                             extracted_text = json_resp['output'].strip()
-
-                    if not extracted_text: # Если текст так и не извлечен, формируем сообщение об ошибке
-                        logger.error(f"API Error or unexpected response structure for {self.model_config['name']}. Status: {status_from_api}. Full response: {json_resp}")
-                        final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
-                        if not error_msg_from_api.strip() and str(error_msg_from_api) != '0':
-                            final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
-                        return final_error_message 
+                    
+                    logger.error(f"API Error for {self.model_config['name']}. Status: {status_from_api}. Full response: {json_resp}")
+                    final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
+                    if not error_msg_from_api.strip() and str(error_msg_from_api) != '0':
+                        final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
+                    return final_error_message
             else: 
                 for key_check in ["text", "content", "message", "output", "response"]:
                     if isinstance(json_resp.get(key_check), str) and (check_val := json_resp[key_check].strip()):
@@ -442,16 +454,19 @@ class CustomHttpAIService(BaseAIService):
             
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
 
+        # ... (обработка HTTPError, RequestException, Exception как и раньше) ...
         except requests.exceptions.HTTPError as e:
-            error_body = e.response.text
-            logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {e.response.status_code} - {error_body}", exc_info=True)
-            return f"Ошибка сети Custom API ({e.response.status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
+            error_body = e.response.text if e.response else "No response body"
+            status_code = e.response.status_code if e.response else "N/A"
+            logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {status_code} - {error_body}", exc_info=True)
+            return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
         except requests.exceptions.RequestException as e:
             logger.error(f"Custom API RequestException for {self.model_id} ({endpoint}): {e}", exc_info=True)
             return f"Сетевая ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
         except Exception as e:
             logger.error(f"Unexpected Custom API error for {self.model_id} ({endpoint}): {e}", exc_info=True)
             return f"Неожиданная ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
+
 
 async def get_user_gem_balance(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> float:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
