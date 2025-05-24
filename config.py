@@ -61,12 +61,7 @@ class AppConfig:
     DEFAULT_SUBSCRIPTION_REQUESTS_GROK_DAILY = 25
     DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY = 25
 
-    GEMS_FOR_NEW_USER = 0 # Сколько гемов давать новому пользователю
-    # Здесь можно определить пакеты гемов для покупки, например:
-    # GEM_PACKAGES = {
-    #     "pack1": {"gems": 100, "price_rub": 100}, # цена в копейках для Telegram Payments
-    #     "pack2": {"gems": 550, "price_rub": 450},
-    # }
+    GEMS_FOR_NEW_USER = 0
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
