@@ -1,2 +1,2 @@
-web: python config.py
+web: python main.py
 
