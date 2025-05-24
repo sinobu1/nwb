@@ -1,30 +1,35 @@
+# В начало файла handlers.py
 import telegram
-from telegram import (
-    ReplyKeyboardMarkup, KeyboardButton, Update,
-    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode, ChatAction
+from telegram.ext import ContextTypes
+from datetime import datetime, timezone
+
+# Импортируем всё необходимое из главного файла
+from main import (
+    firestore_service,
+    CONFIG,
+    BotConstants,
+    AVAILABLE_TEXT_MODELS,
+    AI_MODES,
+    MENU_STRUCTURE,
+    auto_delete_message_decorator,
+    get_current_model_key,
+    get_current_mode_details,
+    get_user_actual_limit_for_model,
+    show_limits,
+    claim_news_bonus_logic,
+    show_subscription,
+    show_help,
+    is_menu_button_text,
+    generate_menu_keyboard,
+    _store_and_try_delete_message, # Если используется напрямую, хотя он внутри декоратора
+    check_and_log_request_attempt,
+    get_ai_service,
+    smart_truncate,
+    increment_request_count,
+    is_user_profi_subscriber,
+    logger # Важно импортировать логгер
 )
-from telegram.constants import ParseMode, ChatAction
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
-)
-import google.generativeai as genai
-import google.api_core.exceptions
-import requests
-import logging
-import traceback
-import os
-import asyncio
-import nest_asyncio
-import json
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, Tuple, Union, List # Добавил List
-import uuid # Не используется явно, но оставлен на случай скрытой зависимости
-import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
-from firebase_admin.exceptions import FirebaseError
-from google.cloud.firestore_v1.client import Client as FirestoreClient
-from abc import ABC, abstractmethod # Для абстрактных классов
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
 
