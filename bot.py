@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from google.cloud import firestore
+from google.cloud.firestore_v1.client import Client as FirestoreClient
 
 # Настройка логирования
 logging.basicConfig(
@@ -26,6 +26,70 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class FirestoreService:
+    def __init__(self, cert_path: str = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json", creds_json_str: Optional[str] = None):
+        self._db: Optional[FirestoreClient] = None
+        try:
+            cred_obj = None
+            if creds_json_str:
+                try:
+                    cred_obj = credentials.Certificate(json.loads(creds_json_str))
+                    logger.info("Firebase credentials loaded from JSON string.")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing FIREBASE_CREDENTIALS_JSON_STR: {e}. Check JSON env var.")
+                    raise
+            elif os.path.exists(cert_path):
+                cred_obj = credentials.Certificate(cert_path)
+                logger.info(f"Firebase credentials loaded from file: {cert_path}.")
+            else:
+                raise FileNotFoundError("Firebase credentials not configured (JSON string or cert file).")
+
+            if not firebase_admin._apps:  # pylint: disable=protected-access
+                firebase_admin.initialize_app(cred_obj)
+                logger.info("Firebase app successfully initialized.")
+            else:
+                logger.info("Firebase app already initialized.")
+            self._db = firestore.client()
+            logger.info("Firestore client successfully initialized.")
+        except Exception as e:
+            logger.error(f"Critical error during Firebase/Firestore initialization: {e}", exc_info=True)
+            self._db = None
+
+    async def _execute_firestore_op(self, func, *args, **kwargs):
+        if not self._db:
+            logger.warning(f"Firestore (db) is not initialized. Operation '{func.__name__}' skipped.")
+            return None
+        # Firestore sync operations need to run in an executor for async context
+        return await asyncio.get_event_loop().run_in_executor(None, lambda: func(*args, **kwargs))
+
+    async def get_user_data(self, user_id: int) -> Dict[str, Any]:
+        if not self._db:
+            return {}
+        doc_ref = self._db.collection("users").document(str(user_id))
+        doc = await self._execute_firestore_op(doc_ref.get)
+        return doc.to_dict() if doc and doc.exists else {}
+
+    async def set_user_data(self, user_id: int, data: Dict[str, Any]) -> None:
+        if not self._db:
+            return
+        doc_ref = self._db.collection("users").document(str(user_id))
+        await self._execute_firestore_op(doc_ref.set, data, merge=True)
+        logger.debug(f"User data for {user_id} updated with keys: {list(data.keys())}")
+
+    async def get_bot_data(self) -> Dict[str, Any]:
+        if not self._db:
+            return {}
+        doc_ref = self._db.collection("bot_data").document("data")
+        doc = await self._execute_firestore_op(doc_ref.get)
+        return doc.to_dict() if doc and doc.exists else {}
+
+    async def set_bot_data(self, data: Dict[str, Any]) -> None:
+        if not self._db:
+            return
+        doc_ref = self._db.collection("bot_data").document("data")
+        await self._execute_firestore_op(doc_ref.set, data, merge=True)
+        logger.debug(f"Bot data updated with keys: {list(data.keys())}")
+        
 # Конфигурация бота
 class AppConfig:
     BOT_TOKEN = os.getenv("BOT_TOKEN")
