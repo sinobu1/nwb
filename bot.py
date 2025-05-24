@@ -456,6 +456,8 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
     chat_id = update.effective_chat.id
     user_data = await firestore_service.get_user_data(user_id)
     prev_command_info = user_data.pop('user_command_to_delete', None)
+    
+    # Skip deletion if no previous message or invalid message ID
     if prev_command_info and prev_command_info.get('message_id'):
         try:
             prev_msg_time = datetime.fromisoformat(prev_command_info['timestamp'])
@@ -464,8 +466,13 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
             if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
                 await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-        except (telegram.error.BadRequest, ValueError) as e:
-            logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
+            else:
+                logger.debug(f"Skipped deletion of previous message {prev_command_info['message_id']} (older than 48 hours)")
+        except telegram.error.BadRequest as e:
+            logger.debug(f"Failed to delete previous user message {prev_command_info['message_id']}: {e}")
+        except ValueError as e:
+            logger.warning(f"Invalid timestamp format for previous message {prev_command_info['message_id']}: {e}")
+
     if not is_command_to_keep:
         user_data['user_command_to_delete'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
@@ -475,7 +482,7 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
             logger.info(f"Successfully deleted current user message {message_id_to_process} (not kept).")
             user_data.pop('user_command_to_delete', None)
         except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
+            logger.debug(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
     else:
         user_data['user_command_message_to_keep'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
@@ -507,7 +514,7 @@ async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]
     default_cfg = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]
     await firestore_service.set_user_data(user_id, {
         'selected_model_id': default_cfg["id"],
-        'selected_api_type': default_cfg["api_type"]
+        'selected_api_type': default_cfg.get("api_type")
     })
     return CONFIG.DEFAULT_MODEL_KEY
 
@@ -1176,21 +1183,32 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         final_reply_text,
         reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)),
+        parse_mode=ParseMode.HTML,
         disable_web_page_preview=True
     )
-    logger.info(f"Successfully sent AI response (model: {current_model_key_val}) to user {user_id}.")
+    logger.info(f"User {user_id} received AI response for model {current_model_key_val} (first 50 chars): '{final_reply_text[:50]}...'")
 
 # --- PAYMENT HANDLERS ---
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     query = update.pre_checkout_query
-    expected_payload_part = f"subscription_{CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY}"
-    if query.invoice_payload and expected_payload_part in query.invoice_payload:
+    try:
+        if not query:
+            logger.warning(f"Empty PreCheckoutQuery received for user {user_id}.")
+            await query.answer(ok=False, error_message="Платежный запрос пуст.")
+            return
+        payload = query.invoice_payload
+        expected_payload_part = f"subscription_{CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY}"
+        if expected_payload_part not in payload:
+            logger.warning(f"Invalid invoice payload for user {user_id}: {payload}")
+            await query.answer(ok=False, error_message="Недопустимый запрос на оплату.")
+            return
         await query.answer(ok=True)
-        logger.info(f"PreCheckoutQuery OK for payload: {query.invoice_payload}")
-    else:
-        await query.answer(ok=False, error_message="Недопустимый запрос на оплату.")
-        logger.warning(f"PreCheckoutQuery failed for payload: {query.invoice_payload}")
-        
+        logger.info(f"PreCheckoutQuery approved for user {user_id} with payload: {payload}")
+    except Exception as e:
+        logger.error(f"Error in precheckout_callback for user {user_id}: {e}", exc_info=True)
+        await query.answer(ok=False, error_message="Произошла ошибка при обработке платежа.")
+        logger.warning(f"PreCheckoutQuery failed due to exception for user {user_id}.")
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1241,7 +1259,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # --- BOT INITIALIZATION ---
-def main():
+async def main():
     try:
         if not CONFIG.TELEGRAM_TOKEN or "YOUR_" in CONFIG.TELEGRAM_TOKEN:
             logger.critical("Invalid or missing TELEGRAM_TOKEN. Please set it in environment variables.")
@@ -1276,12 +1294,13 @@ def main():
             BotCommand("bonus", "Получить бонус за подписку на канал"),
             BotCommand("help", "Показать справку")
         ]
-        application.bot.set_my_commands(bot_commands)
+        await application.bot.set_my_commands(bot_commands)
+        logger.info("Bot commands menu set successfully.")
 
         logger.info("Starting bot polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+        await application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         logger.critical(f"Critical error during bot initialization: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
