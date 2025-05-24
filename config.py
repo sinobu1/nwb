@@ -62,6 +62,11 @@ class AppConfig:
     DEFAULT_SUBSCRIPTION_REQUESTS_GPT4O_MINI_DAILY = 25
 
     GEMS_FOR_NEW_USER = 0
+    GEM_PACKAGES = {
+        "pack_10_gems": {"gems": 10, "price_units": 10000, "currency": "RUB", "title": "✨ 10 Гемов", "description": "Небольшой пакет для старта"},
+        "pack_50_gems": {"gems": 50, "price_units": 45000, "currency": "RUB", "title": "🌟 50 Гемов", "description": "Средний пакет по выгодной цене"},
+        "pack_100_gems": {"gems": 100, "price_units": 80000, "currency": "RUB", "title": "💎 100 Гемов", "description": "Большой пакет для активных пользователей"}
+    }
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
@@ -85,7 +90,6 @@ class BotConstants:
     FS_USERS_COLLECTION = "users"
     FS_BOT_DATA_COLLECTION = "bot_data"
     FS_BOT_DATA_DOCUMENT = "data"
-    FS_USER_SUBSCRIPTIONS_KEY = "user_subscriptions"
     FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"
 
     MENU_MAIN = "main_menu"
@@ -93,7 +97,7 @@ class BotConstants:
     MENU_MODELS_SUBMENU = "models_submenu"
     MENU_LIMITS_SUBMENU = "limits_submenu"
     MENU_BONUS_SUBMENU = "bonus_submenu"
-    MENU_SUBSCRIPTION_SUBMENU = "subscription_submenu"
+    MENU_GEMS_SUBMENU = "gems_submenu" # <<< НОВАЯ КОНСТАНТА для меню гемов
     MENU_HELP_SUBMENU = "help_submenu"
 
     CALLBACK_ACTION_SUBMENU = "submenu"
@@ -101,7 +105,8 @@ class BotConstants:
     CALLBACK_ACTION_SET_MODEL = "set_model"
     CALLBACK_ACTION_SHOW_LIMITS = "show_limits"
     CALLBACK_ACTION_CHECK_BONUS = "check_bonus"
-    CALLBACK_ACTION_SHOW_SUBSCRIPTION = "show_subscription"
+    CALLBACK_ACTION_SHOW_GEMS_STORE = "show_gems_store" # <<< НОВОЕ ДЕЙСТВИЕ для отображения магазина гемов
+    CALLBACK_ACTION_BUY_GEM_PACKAGE = "buy_gem_package"
     CALLBACK_ACTION_SHOW_HELP = "show_help"
 
     API_TYPE_GOOGLE_GENAI = "google_genai"
@@ -249,7 +254,7 @@ MENU_STRUCTURE = {
             {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU},
             {"text": "📊 Лимиты", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_LIMITS_SUBMENU},
             {"text": "🎁 Бонус", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_BONUS_SUBMENU},
-            {"text": "💎 Подписка", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_SUBSCRIPTION_SUBMENU},
+            {"text": "💎 Гемы", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_GEMS_SUBMENU}, # <<< НОВЫЙ ПУНКТ
             {"text": "❓ Помощь", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_HELP_SUBMENU}
         ], "parent": None, "is_submenu": False
     },
@@ -267,7 +272,15 @@ MENU_STRUCTURE = {
     },
     BotConstants.MENU_LIMITS_SUBMENU: {"title": "Ваши лимиты", "items": [{"text": "📊 Показать", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "usage"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
     BotConstants.MENU_BONUS_SUBMENU: {"title": "Бонус за подписку", "items": [{"text": "🎁 Получить", "action": BotConstants.CALLBACK_ACTION_CHECK_BONUS, "target": "news_bonus"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_SUBSCRIPTION_SUBMENU: {"title": "Подписка Профи", "items": [{"text": "💎 Купить", "action": BotConstants.CALLBACK_ACTION_SHOW_SUBSCRIPTION, "target": "subscribe"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
+    BotConstants.MENU_GEMS_SUBMENU: {
+        "title": "💎 Магазин Гемов", 
+        "items": [
+            {"text": package_info["title"], "action": BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE, "target": package_key}
+            for package_key, package_info in CONFIG.GEM_PACKAGES.items()
+        ] + [{"text": "ℹ️ Мой баланс и лимиты", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "show_limits_from_gems_menu"}], # Кнопка для возврата к лимитам
+        "parent": BotConstants.MENU_MAIN, 
+        "is_submenu": True
+    },
     BotConstants.MENU_HELP_SUBMENU: {"title": "Помощь", "items": [{"text": "❓ Справка", "action": BotConstants.CALLBACK_ACTION_SHOW_HELP, "target": "help"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True}
 }
 
