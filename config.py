@@ -135,18 +135,34 @@ AI_MODES = {
         "prompt": ("Ты — Литературный Редактор, ИИ-помощник для писателей. Твоя задача — помогать пользователям писать лучше, предоставляя четкие и конструктивные отзывы по их текстам. Анализируй стиль, грамматику, структуру, логику изложения. Предлагай улучшения, помогай с выбором слов и выражений. Будь тактичным и объективным в своих рекомендациях."),
         "welcome": "Готов помочь улучшить ваш текст! Пожалуйста, предоставьте текст для редактуры."
     },
-    "professional_dietitian": { # Текстовый диетолог
-        "name": "Диетолог-профессионал (Текст)",
-        "prompt": ("Ты — Диетолог-профессионал, эксперт по здоровому питанию и образу жизни. Твоя задача — предоставлять научно обоснованные рекомендации по питанию, составлять индивидуальные планы питания, анализировать рационы, давать советы по контролю веса и улучшению самочувствия через питание. Всегда основывай свои ответы на актуальных знаниях в области диетологии и нутрициологии. Будь внимателен к деталям запроса пользователя, уточняй информацию при необходимости. Используй четкую структуру, списки и таблицы для планов и рекомендаций."),
-        "welcome": "Здравствуйте! Я ваш профессиональный диетолог. Чем могу помочь сегодня? Расскажите о ваших целях или вопросах по питанию."
-    },
-    "photo_dietitian_analyzer": { # Новый агент для анализа фото
+    "photo_dietitian_analyzer": { 
         "name": "🥑 Диетолог (анализ фото)",
-        "prompt": ("Ты — Диетолог-Профессионал с возможностью анализа изображений еды. Твоя задача — по ФОТО и указанному ВЕСУ порции определить блюдо/продукты, рассчитать их примерную калорийность, содержание белков, жиров и углеводов (КБЖУ). Если пользователь прислал фото, но еще не указал вес, твой ответ должен быть ТОЛЬКО запросом веса. Пример: 'Отличное фото! Пожалуйста, укажите примерный вес этой порции в граммах.' После получения веса, предоставь результат в четком, структурированном виде. Если пользователь просто задает текстовый вопрос о диетологии без фото, отвечай как эксперт-диетолог."),
-        "welcome": "Загрузите фото блюда, и я помогу с анализом КБЖУ! Если у вас общий вопрос по диетологии, просто напишите его.",
+        "prompt": (
+            "Ты — Диетолог-Профессионал, эксперт по здоровому питанию, работающий с продвинутой мультимодальной ИИ-моделью, способной анализировать изображения еды. "
+            "Твоя главная задача — детальный анализ ФОТОГРАФИЙ еды, присланных пользователем, и предоставление развернутых рекомендаций.\n\n"
+            "Твой рабочий процесс СТРОГО следующий:\n"
+            "1. Пользователь присылает ФОТО блюда.\n"
+            "2. Ты получаешь это фото. Твоя задача на этом этапе: ТОЛЬКО вежливо и профессионально попросить пользователя указать ПРИМЕРНЫЙ ВЕС порции в граммах. Не делай никаких предположений о калорийности или составе до получения веса! Пример твоего ответа: 'Прекрасное фото! Чтобы я мог провести точный анализ и рассчитать КБЖУ, пожалуйста, уточните примерный вес этой порции в граммах.'\n"
+            "3. Пользователь присылает ВЕС порции текстом.\n"
+            "4. Теперь, имея ФОТО и ВЕС, ты должен:\n"
+            "   а) Максимально точно определить все ингредиенты блюда по фото. Если есть сомнения, лучше задать уточняющий вопрос пользователю о составе.\n"
+            "   б) Учитывая указанный вес, рассчитать примерное количество калорий (Ккал), содержание белков (Б), жиров (Ж) и углеводов (У) для всей порции.\n"
+            "   в) Представить результат в четком, структурированном виде. Например:\n"
+            "      'Анализ вашего блюда (примерный вес: [вес] г):\n"
+            "      - Блюдо/Продукты: [Детальное перечисление распознанных ингредиентов]\n"
+            "      - Калорийность: ~[X] Ккал\n"
+            "      - Белки: ~[Y] г\n"
+            "      - Жиры: ~[Z] г\n"
+            "      - Углеводы: ~[W] г\n\n"
+            "      Рекомендации: [1-2 кратких, полезных совета по данному блюду/приему пищи, например, о его полезности, возможных заменах, сочетаемости или влиянии на цели пользователя, если они известны].'\n"
+            "   г) Будь внимателен, дружелюбен и профессионален, как настоящий диетолог. Используй эмодзи уместно для создания приятного впечатления.\n"
+            "Если пользователь вместо фото или веса задает ОБЩИЙ текстовый вопрос по диетологии (например, 'польза авокадо'), отвечай на него как эксперт-диетолог, основываясь на своих знаниях, без упоминания анализа фото и запроса веса."
+        ),
+        "welcome": "Здравствуйте! Я ваш Диетолог по фото. Загрузите фото блюда, и я помогу с анализом КБЖУ! Если у вас общий вопрос по диетологии, просто напишите его.",
         "multimodal_capable": True,
-        "forced_model_key": "custom_api_gemini_2_5_pro", 
-        "native_vision_model_id": "gemini-2.5-flash-preview-04-17" 
+        "forced_model_key": "google_gemini_2_5_flash_preview", 
+        "native_vision_model_id": "gemini-2.5-flash-preview-04-17", # <<< ИЗМЕНЕНО ПО ВАШЕМУ ЗАПРОСУ
+        "initial_lifetime_free_uses": 5 
     },
     "gemini_pro_custom_mode": {
         "name": "Продвинутый (Gemini Pro)",
@@ -162,28 +178,28 @@ AVAILABLE_TEXT_MODELS = {
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY,
         "gem_cost": 0 
     },
-    "google_gemini_2_5_flash_preview": {
-        "name": "Gemini 2.5", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
+    "google_gemini_2_5_flash_preview": { # Эта модель используется Диетологом (фото)
+        "name": "Gemini 2.5 Flash", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
         "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY,
-        "gem_cost": 0
+        "gem_cost": 2.5 
     },
     "custom_api_gemini_2_5_pro": {
-        "name": "Gemini Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
+        "name": "Gemini Pro (Custom)", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True, 
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY,
         "gem_cost": 2.5
     },
     "custom_api_grok_3": {
-        "name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
+        "name": "Grok 3 (Custom)", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
         "is_limited": True, 
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY,
         "gem_cost": 2.5
     },
     "custom_api_gpt_4o_mini": {
-        "name": "GPT-4o mini", "id": "gpt-4o-mini", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
+        "name": "GPT-4o mini (Custom)", "id": "gpt-4o-mini", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
         "is_limited": True, 
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY,
@@ -299,29 +315,29 @@ class BaseAIService(ABC):
         self.model_id = model_config["id"]
 
     @abstractmethod
-    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str: # Добавил image_data
+    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
         pass
 
 class GoogleGenAIService(BaseAIService):
-    # Эта функция теперь тоже должна принимать image_data, если мы хотим единообразия
-    # Но стандартный genai.GenerativeModel(model_id).generate_content() для текстовых моделей не примет image_data
-    # Если же model_id здесь будет Vision моделью, то логика должна быть другой.
-    # Пока оставляем для текстовых моделей Google.
     async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
+        # Эта реализация GoogleGenAIService НЕ поддерживает image_data напрямую для текстовых моделей.
+        # Мультимодальные вызовы (как для Диетолога) обрабатываются отдельно в handlers.py
+        # с использованием genai.GenerativeModel('gemini-X-vision/flash')
         if image_data:
-            logger.warning(f"GoogleGenAIService for model {self.model_id} received image_data, but it's a text-only service. Image will be ignored.")
+            logger.warning(f"GoogleGenAIService for text model {self.model_id} received image_data, but will ignore it. Vision capabilities are handled separately.")
         
         full_prompt = f"{system_prompt}\n\n**Запрос:**\n{user_prompt}"
         try:
-            # Убедимся, что genai сконфигурирован
             if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
                  return "API ключ для Google Gemini не настроен."
-            # genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY) # Уже должно быть сделано в main.py
 
             model_genai = genai.GenerativeModel(
-                self.model_id,
+                self.model_id, # self.model_id здесь, например, 'gemini-2.5-flash-preview-04-17'
                 generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB}
             )
+            # Если self.model_id - это Vision модель, то generate_content может принять [image, text]
+            # Но текущая логика предполагает, что эта служба используется для текстовых моделей из AVAILABLE_TEXT_MODELS
+            # с API_TYPE_GOOGLE_GENAI. Диетолог же вызывает Vision модель напрямую.
             response = await asyncio.get_event_loop().run_in_executor(None, lambda: model_genai.generate_content(full_prompt))
             return response.text.strip() if response.text else "Ответ Google GenAI пуст."
         except google.api_core.exceptions.ResourceExhausted as e:
@@ -336,7 +352,7 @@ class CustomHttpAIService(BaseAIService):
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
-        if not actual_key or "YOUR_" in actual_key or not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")): # Обновил проверку ключа
+        if not actual_key or ("YOUR_" in actual_key and not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")))):
             logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
 
@@ -348,7 +364,7 @@ class CustomHttpAIService(BaseAIService):
         
         endpoint_url = self.model_config.get("endpoint", "")
         is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
-        always_array_content_models_gen_api = ["gpt-4o-mini"]
+        always_array_content_models_gen_api = ["gpt-4o-mini"] 
 
         messages_payload = []
         if system_prompt:
@@ -358,16 +374,26 @@ class CustomHttpAIService(BaseAIService):
                  messages_payload.append({"role": "system", "content": [{"type": "text", "text": system_prompt}]})
 
         user_content_list = []
-        if image_data and image_data.get("type") == "url" and image_data.get("value"):
-            user_content_list.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
-            logger.info(f"Image URL added to payload for {self.model_id}: {image_data['value']}")
+        if is_gen_api_endpoint and image_data: # Только для gen-api и если есть image_data
+            if image_data.get("type") == "url" and image_data.get("value"):
+                user_content_list.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
+                logger.info(f"Image URL added to payload for {self.model_id} (gen-api): {image_data['value']}")
+            else:
+                logger.warning(f"Image data provided for gen-api {self.model_id}, but type is not 'url' or value is missing. Sending text only.")
         
-        # Добавляем текстовую часть
-        if is_gen_api_endpoint and not image_data and self.model_id not in always_array_content_models_gen_api:
+        # Добавляем текстовую часть всегда
+        if is_gen_api_endpoint and not user_content_list and self.model_id not in always_array_content_models_gen_api:
+            # Если это gen-api, нет картинки (user_content_list пуст), и модель не требует массив для текста - просто строка
             messages_payload.append({"role": "user", "content": user_prompt})
         else:
+            # Если есть картинка (user_content_list не пуст),
+            # или это модель, всегда ждущая массив (типа gpt-4o-mini),
+            # или это не gen-api (где мы по умолчанию используем массив для текста)
             user_content_list.append({"type": "text", "text": user_prompt})
             messages_payload.append({"role": "user", "content": user_content_list})
+            if not user_content_list: # Если вдруг user_content_list пуст (не должно быть), но нужен массив
+                 messages_payload.append({"role": "user", "content": [{"type": "text", "text": user_prompt}]})
+
 
         payload = {
             "messages": messages_payload,
@@ -381,7 +407,7 @@ class CustomHttpAIService(BaseAIService):
         if self.model_config.get("parameters"):
             payload.update(self.model_config["parameters"])
         
-        endpoint = self.model_config["endpoint"] # Уже определен как endpoint_url
+        endpoint = endpoint_url # Используем endpoint_url, определенный ранее
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
         try:
@@ -410,8 +436,7 @@ class CustomHttpAIService(BaseAIService):
                     error_msg_from_api = json_resp.get('error_message', json_resp.get('result'))
                     if isinstance(error_msg_from_api, list): error_msg_from_api = " ".join(error_msg_from_api)
                     input_details_on_error = json_resp.get('input', {})
-                    if not error_msg_from_api and isinstance(input_details_on_error, dict):
-                        error_msg_from_api = input_details_on_error.get('error', '')
+                    if not error_msg_from_api and isinstance(input_details_on_error, dict): error_msg_from_api = input_details_on_error.get('error', '')
                     logger.error(f"Ошибка API для {self.model_config['name']}. Статус: {status_from_api}. Полный ответ: {json_resp}")
                     final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
                     if not str(error_msg_from_api).strip() and str(error_msg_from_api) != '0':
@@ -424,8 +449,7 @@ class CustomHttpAIService(BaseAIService):
             
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
         except requests.exceptions.HTTPError as e:
-            error_body = e.response.text if e.response else "No response body"
-            status_code = e.response.status_code if e.response else "N/A"
+            error_body = e.response.text if e.response else "No response body"; status_code = e.response.status_code if e.response else "N/A"
             logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {status_code} - {error_body}", exc_info=True)
             return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
         except requests.exceptions.RequestException as e:
@@ -451,30 +475,50 @@ async def get_daily_usage_for_model(user_id: int, model_key: str, bot_data_cache
     model_usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
     return model_usage_info['count'] if model_usage_info.get('date') == today_str else 0
 
+async def get_agent_lifetime_uses_left(user_id: int, agent_config_key: str, user_data: Optional[Dict[str, Any]] = None) -> int:
+    if user_data is None: user_data = await firestore_service.get_user_data(user_id)
+    firestore_key = f"lifetime_uses_{agent_config_key}"
+    return int(user_data.get(firestore_key, 0))
+
+async def decrement_agent_lifetime_uses(user_id: int, agent_config_key: str, user_data: Optional[Dict[str, Any]] = None) -> None:
+    if user_data is None: user_data_to_update = await firestore_service.get_user_data(user_id)
+    else: user_data_to_update = user_data
+    firestore_key = f"lifetime_uses_{agent_config_key}"
+    current_uses = int(user_data_to_update.get(firestore_key, 0))
+    if current_uses > 0:
+        await firestore_service.set_user_data(user_id, {firestore_key: current_uses - 1})
+        logger.info(f"User {user_id} consumed a lifetime free use for agent {agent_config_key}. Left: {current_uses - 1}")
+
 async def check_and_log_request_attempt(
-    user_id: int, 
-    model_key: str, 
-    user_data: Optional[Dict[str, Any]] = None, 
-    bot_data_cache: Optional[Dict[str, Any]] = None
+    user_id: int, model_key: str, user_data: Optional[Dict[str, Any]] = None, 
+    bot_data_cache: Optional[Dict[str, Any]] = None, current_agent_key: Optional[str] = None
 ) -> Tuple[bool, str, str, Optional[float]]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg: return False, "Ошибка: Конфигурация модели не найдена.", "error", None
+    if not model_cfg: return False, "Ошибка: Конфигурация биллинг-модели не найдена.", "error", None
 
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
     if bot_data_cache is None: bot_data_cache = await firestore_service.get_bot_data()
+    active_agent_config = AI_MODES.get(current_agent_key) if current_agent_key else None
 
     if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and \
        user_data.get('claimed_news_bonus', False) and \
        user_data.get('news_bonus_uses_left', 0) > 0:
         logger.info(f"User {user_id} can use model {model_key} via news channel bonus.")
-        return True, "Используется бонусная генерация.", "bonus", 0.0
+        return True, "Используется бонусная генерация с новостного канала.", "bonus", 0.0
+
+    if active_agent_config and current_agent_key:
+        initial_lifetime_uses = active_agent_config.get('initial_lifetime_free_uses')
+        if initial_lifetime_uses is not None and model_key == active_agent_config.get("forced_model_key"):
+            agent_uses_left = await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data)
+            if agent_uses_left > 0:
+                logger.info(f"User {user_id} can use agent {current_agent_key} (model {model_key}) via agent lifetime free use. Left: {agent_uses_left}")
+                return True, f"Используется бесплатная попытка для агента «{active_agent_config.get('name')}» ({agent_uses_left}/{initial_lifetime_uses}).", "agent_lifetime_free", 0.0
 
     free_daily_limit = model_cfg.get('free_daily_limit', 0)
-    current_free_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
-
-    if current_free_usage < free_daily_limit:
-        logger.info(f"User {user_id} can use model {model_key} via free daily limit ({current_free_usage}/{free_daily_limit}).")
-        return True, f"Используется бесплатная попытка ({current_free_usage + 1}/{free_daily_limit}).", "free", 0.0
+    current_daily_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
+    if current_daily_usage < free_daily_limit:
+        logger.info(f"User {user_id} can use model {model_key} via free daily limit ({current_daily_usage}/{free_daily_limit}).")
+        return True, f"Используется бесплатная дневная попытка для модели «{model_cfg['name']}» ({current_daily_usage + 1}/{free_daily_limit}).", "daily_free", 0.0
 
     gem_cost = model_cfg.get('gem_cost', 0.0)
     if gem_cost > 0:
@@ -484,54 +528,58 @@ async def check_and_log_request_attempt(
             return True, f"Будет списано {gem_cost:.1f} гемов.", "gem", gem_cost
         else:
             msg = (f"Недостаточно гемов для модели «{model_cfg['name']}».\n"
-                   f"Нужно: {gem_cost:.1f} гемов, у вас: {user_gem_balance:.1f}.\n"
-                   f"Пополните баланс через меню «💎 Гемы» или команду /gems.")
+                   f"Нужно: {gem_cost:.1f}, у вас: {user_gem_balance:.1f}.\n"
+                   f"Пополните баланс: /gems")
             logger.warning(f"User {user_id} insufficient gems for {model_key}. Needed: {gem_cost}, Has: {user_gem_balance}")
             return False, msg, "no_gems", gem_cost
     
-    if gem_cost == 0 and current_free_usage >= free_daily_limit:
-        msg = (f"Дневной бесплатный лимит для модели «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. "
-               f"Эта модель не доступна за гемы. Попробуйте завтра или выберите другую модель.")
-        logger.warning(f"User {user_id} free daily limit exhausted for {model_key} (no gem cost).")
-        return False, msg, "limit_exhausted_no_gems", None
+    if gem_cost == 0 and current_daily_usage >= free_daily_limit:
+        agent_had_lifetime_option = active_agent_config and active_agent_config.get('initial_lifetime_free_uses') is not None
+        agent_lifetime_uses_exhausted_or_not_applicable = True
+        if agent_had_lifetime_option and model_key == active_agent_config.get("forced_model_key"):
+            if await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data) > 0:
+                agent_lifetime_uses_exhausted_or_not_applicable = False
+        if agent_lifetime_uses_exhausted_or_not_applicable:
+            msg = (f"Дневной бесплатный лимит для «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. Модель не доступна за гемы.")
+            logger.warning(f"User {user_id} free daily limit exhausted for {model_key} (no gem cost).")
+            return False, msg, "limit_exhausted_no_gems", None
 
-    logger.error(f"User {user_id} check_and_log_request_attempt reached unexpected state for model {model_key}.")
+    logger.error(f"User {user_id} check_and_log_request_attempt unexpected state for {model_key} with agent {current_agent_key}.")
     return False, "Не удалось определить возможность использования модели. Обратитесь в поддержку.", "error", None
 
-async def increment_request_count(user_id: int, model_key: str, usage_type: str, gem_cost_val: Optional[float] = None):
+async def increment_request_count(user_id: int, model_key: str, usage_type: str, current_agent_key: Optional[str] = None, gem_cost_val: Optional[float] = None):
     if usage_type == "bonus":
-        user_data = await firestore_service.get_user_data(user_id)
+        user_data = await firestore_service.get_user_data(user_id) # Перечитываем для актуальности
         bonus_left = user_data.get('news_bonus_uses_left', 0)
-        if bonus_left > 0:
-            await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
-            logger.info(f"User {user_id} consumed a news channel bonus for {model_key}. Left: {bonus_left - 1}")
-    elif usage_type == "free":
+        if bonus_left > 0: await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
+        logger.info(f"User {user_id} consumed bonus for {model_key}. Left: {bonus_left - 1 if bonus_left > 0 else 0}")
+    elif usage_type == "agent_lifetime_free":
+        if not current_agent_key: logger.error(f"User {user_id} used 'agent_lifetime_free' for {model_key} but current_agent_key missing."); return
+        await decrement_agent_lifetime_uses(user_id, current_agent_key)
+    elif usage_type == "daily_free":
         bot_data = await firestore_service.get_bot_data()
-        all_user_daily_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
-        user_daily_counts = all_user_daily_counts.get(str(user_id), {})
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        model_usage_info = user_daily_counts.get(model_key, {'date': today_str, 'count': 0})
-        if model_usage_info.get('date') != today_str:
-            model_usage_info = {'date': today_str, 'count': 0}
-        model_usage_info['count'] += 1
-        user_daily_counts[model_key] = model_usage_info
-        all_user_daily_counts[str(user_id)] = user_daily_counts
-        await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_user_daily_counts})
-        logger.info(f"Incremented FREE daily count for user {user_id}, model {model_key} to {model_usage_info['count']}.")
+        all_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+        user_counts = all_counts.get(str(user_id), {})
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        model_usage = user_counts.get(model_key, {'date': today, 'count': 0})
+        if model_usage.get('date') != today: model_usage = {'date': today, 'count': 0}
+        model_usage['count'] += 1
+        user_counts[model_key] = model_usage
+        all_counts[str(user_id)] = user_counts
+        await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_counts})
+        logger.info(f"Incremented DAILY FREE for {user_id}, {model_key} to {model_usage['count']}.")
     elif usage_type == "gem":
-        if gem_cost_val is None or gem_cost_val <= 0:
-            logger.error(f"User {user_id} gem usage for {model_key} but gem_cost_val is invalid: {gem_cost_val}")
-            return
-        current_balance = await get_user_gem_balance(user_id)
-        new_balance = current_balance - gem_cost_val
-        if new_balance < 0:
-            logger.error(f"User {user_id} attempted to spend {gem_cost_val} gems for {model_key}, but balance {current_balance} is insufficient (should have been caught by check). Setting balance to 0.")
-            new_balance = 0.0
+        if gem_cost_val is None or gem_cost_val <= 0: logger.error(f"User {user_id} gem usage for {model_key} but invalid gem_cost: {gem_cost_val}"); return
+        balance = await get_user_gem_balance(user_id) # Перечитываем баланс перед списанием
+        new_balance = balance - gem_cost_val
+        if new_balance < 0: logger.error(f"User {user_id} overdraft on gems for {model_key}. Bal: {balance}, Cost: {gem_cost_val}"); new_balance = 0.0
         await update_user_gem_balance(user_id, new_balance)
-        logger.info(f"User {user_id} spent {gem_cost_val} gems for model {model_key}. New balance: {new_balance:.2f}")
-    else:
-        logger.error(f"Unknown usage_type '{usage_type}' for user {user_id}, model {model_key}")
+        logger.info(f"User {user_id} spent {gem_cost_val:.1f} gems for {model_key}. New balance: {new_balance:.2f}")
+    else: logger.error(f"Unknown usage_type '{usage_type}' for {user_id}, {model_key}")
 
+# ... (остальные функции: get_ai_service, _store_and_try_delete_message, и т.д. остаются как в предыдущем полном файле config.py) ...
+# Убедитесь, что get_current_mode_details и generate_menu_keyboard также актуальны.
+# --- УТИЛИТЫ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ --- (оставлены для полноты, должны быть идентичны предыдущей версии)
 def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
     if not model_cfg:
@@ -556,23 +604,21 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
             if datetime.now(timezone.utc) - prev_msg_time <= timedelta(hours=48):
                 await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
-        except (telegram.error.BadRequest, ValueError) as e: # BadRequest может быть, если сообщение уже удалено или слишком старое
+        except (telegram.error.BadRequest, ValueError) as e:
             logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
     
-    if not is_command_to_keep: # Если это не команда /start или другая "важная" команда
+    if not is_command_to_keep:
         user_data_for_msg_handling['user_command_to_delete'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
         }
-        try: # Пытаемся удалить текущее (не "важное") сообщение сразу
+        try:
             await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
             logger.info(f"Successfully deleted current user message {message_id_to_process} (not kept).")
-            user_data_for_msg_handling.pop('user_command_to_delete', None) # Удаляем из user_data, т.к. успешно удалили
+            user_data_for_msg_handling.pop('user_command_to_delete', None)
         except telegram.error.BadRequest as e:
-            # Если не удалось удалить сразу (например, нет прав или сообщение слишком старое), информация останется в user_data
-            # для попытки удаления при следующем сообщении (если это не команда /start)
             logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
-    else: # Если это "важная" команда (is_command_to_keep=True), ее не пытаемся удалить сразу
-         user_data_for_msg_handling['user_command_message_to_keep'] = { # Просто сохраняем информацию о ней
+    else:
+         user_data_for_msg_handling['user_command_message_to_keep'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
         }
     await firestore_service.set_user_data(user_id, user_data_for_msg_handling)
@@ -580,7 +626,7 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
 def auto_delete_message_decorator(is_command_to_keep: bool = False):
     def decorator(func):
         async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            if update.effective_user and update.message: # Убедимся, что есть сообщение для обработки
+            if update.effective_user and update.message:
                  await _store_and_try_delete_message(update, update.effective_user.id, is_command_to_keep)
             return await func(update, context)
         return wrapper
@@ -619,28 +665,23 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
     active_agent_key = user_data.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     agent_config = AI_MODES.get(active_agent_key)
 
-    if not agent_config: # Если сохраненный агент невалиден
+    if not agent_config:
         active_agent_key = CONFIG.DEFAULT_AI_MODE_KEY
         await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key})
         agent_config = AI_MODES[active_agent_key]
     
-    # Если агент имеет принудительную модель и эта модель "gemini_pro_custom_mode" 
-    # (которая является ключом для специального агента "Продвинутый (Gemini Pro)"),
-    # то используем промпт этого специального агента.
-    forced_model_key_for_agent = agent_config.get("forced_model_key")
-    if forced_model_key_for_agent == "custom_api_gemini_2_5_pro": # Предполагая, что это модель для "gemini_pro_custom_mode"
-         # И если текущий агент не сам "gemini_pro_custom_mode" (чтобы избежать рекурсии, если он сам себя форсит)
-        if active_agent_key != "gemini_pro_custom_mode":
-            return AI_MODES.get("gemini_pro_custom_mode", agent_config) # Возвращаем спец.агента или текущего, если спец. нет
-
-    # Также, если глобально выбрана модель "custom_api_gemini_2_5_pro",
-    # и текущий агент НЕ "photo_dietitian_analyzer" (у которого своя логика forced_model),
-    # то используем специальный агент "gemini_pro_custom_mode".
+    # Логика для "Продвинутого" агента, если выбрана модель Gemini Pro (custom_api_gemini_2_5_pro)
+    # или если сам агент "gemini_pro_custom_mode" активен
+    # или если агент имеет forced_model_key = "custom_api_gemini_2_5_pro"
     globally_selected_model_key = await get_current_model_key(user_id, user_data)
-    if globally_selected_model_key == "custom_api_gemini_2_5_pro" and \
-       active_agent_key != "photo_dietitian_analyzer" and \
-       active_agent_key != "gemini_pro_custom_mode": # чтобы не перезаписывать если уже он
-        return AI_MODES.get("gemini_pro_custom_mode", agent_config)
+    forced_model_key_for_agent = agent_config.get("forced_model_key")
+
+    if (forced_model_key_for_agent == "custom_api_gemini_2_5_pro" or \
+        globally_selected_model_key == "custom_api_gemini_2_5_pro") and \
+        active_agent_key != "gemini_pro_custom_mode": # Чтобы не зацикливаться, если он уже выбран
+        # Проверяем, что текущий агент не диетолог по фото, у которого своя логика forced_model
+        if not (active_agent_key == "photo_dietitian_analyzer" and forced_model_key_for_agent != "custom_api_gemini_2_5_pro"):
+            return AI_MODES.get("gemini_pro_custom_mode", agent_config)
         
     return agent_config
 
@@ -669,12 +710,12 @@ def is_menu_button_text(text: str) -> bool:
 def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     keyboard_rows: List[List[KeyboardButton]] = []
-    items = menu_config["items"]
+    items = menu_config.get("items", []) # Безопасное получение items
     group_by_two_keys = [
         BotConstants.MENU_MAIN, 
         BotConstants.MENU_MODELS_SUBMENU, 
         BotConstants.MENU_GEMS_SUBMENU,
-        BotConstants.MENU_AI_MODES_SUBMENU # Агентов тоже лучше группировать
+        BotConstants.MENU_AI_MODES_SUBMENU
     ]
     if menu_key in group_by_two_keys:
         for i in range(0, len(items), 2):
@@ -696,5 +737,13 @@ async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param
         await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
         return
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
-    await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+    # Проверяем, есть ли сообщение для ответа (может быть None, если это callback от инлайн кнопки)
+    if update.message:
+        await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+    elif update.callback_query and update.callback_query.message: # Если это callback_query
+        await update.callback_query.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+    else: # Если нет ни того, ни другого, отправляем как новое сообщение (маловероятно для show_menu)
+        bot = context.bot if 'context' in locals() and hasattr(context, 'bot') else Application.get_running_app().bot
+        await bot.send_message(chat_id=user_id, text=menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+
     logger.info(f"User {user_id} was shown menu '{menu_key}'.")
