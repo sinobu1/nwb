@@ -1,6 +1,7 @@
 # В начало файла handlers.py
 import telegram
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ParseMode, ChatAction
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode, ChatAction
 from telegram.ext import ContextTypes
 from datetime import datetime, timezone
 
