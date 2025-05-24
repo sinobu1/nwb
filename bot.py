@@ -1,593 +1,651 @@
-import telegram
-from telegram import (
-    ReplyKeyboardMarkup, KeyboardButton, Update,
-    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
-)
-from telegram.constants import ParseMode, ChatAction
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
-)
-import google.generativeai as genai
-import google.api_core.exceptions
-import requests
-import logging
-import traceback
 import os
+import logging
 import asyncio
-import nest_asyncio
+from datetime import datetime, timezone
 import json
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, Tuple, List 
-
-# --- ИМПОРТЫ ---
+import requests
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
+from telegram import BotCommand, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    PreCheckoutQueryHandler,
+    filters,
+    ContextTypes,
+)
+from telegram.constants import ParseMode
+from firebase_admin import initialize_app, firestore
 import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
-from abc import ABC, abstractmethod
-# ---------------------------------
 
-nest_asyncio.apply()
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-# --- КОНФИГУРАЦИЯ (с вашими значениями по умолчанию из bot (48).py) ---
+# Константы
+class BotConstants:
+    FS_USERS_COLLECTION = "users"
+    FS_BOT_DATA_COLLECTION = "bot_data"
+    FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"
+
+# Конфигурация
 class AppConfig:
-    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0")
-    GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI")
-    CUSTOM_GEMINI_PRO_API_KEY = os.getenv("CUSTOM_GEMINI_PRO_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
-    CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
-    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "390540012:LIVE:70602")
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152")) 
-    FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
-    FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json" 
-
-    MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
-    MAX_MESSAGE_LENGTH_TELEGRAM = 4000
-    MIN_AI_REQUEST_LENGTH = 4
-
-    DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY = 72 
-    DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 48 
-
-    NEWS_CHANNEL_USERNAME = "@timextech" 
-    NEWS_CHANNEL_LINK = "https://t.me/timextech" 
-    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro" 
-    NEWS_CHANNEL_BONUS_GENERATIONS = 1 
-
-    DEFAULT_AI_MODE_KEY = "universal_ai_basic"
-    DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
+    TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "YOUR_TELEGRAM_TOKEN")
+    PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "YOUR_PAYMENT_PROVIDER_TOKEN")
+    ADMIN_ID = os.getenv("ADMIN_ID", None)
+    MIN_AI_REQUEST_LENGTH = 10
+    MAX_MESSAGE_LENGTH_TELEGRAM = 4096
+    DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY = 25
+    GEMS_PER_REQUEST_GEMINI_PRO = 2.5
+    GEMS_PER_REQUEST_GROK_3 = 2.5
+    GEMS_PER_REQUEST_GPT4O_MINI = 0.5
+    CALLBACK_URL = os.getenv("CALLBACK_URL", "https://your-server.com/callback")
+    DEFAULT_MAX_TOKENS = 4096
+    DEFAULT_TEMPERATURE = 1.0
+    DEFAULT_TOP_P = 1.0
+    DEFAULT_FREQUENCY_PENALTY = 0.0
+    DEFAULT_PRESENCE_PENALTY = 0.0
 
 CONFIG = AppConfig()
 
+# API ключи
 _API_KEYS_PROVIDER = {
-    "CUSTOM_GEMINI_PRO_API_KEY": CONFIG.CUSTOM_GEMINI_PRO_API_KEY,
-    "CUSTOM_GROK_3_API_KEY": CONFIG.CUSTOM_GROK_3_API_KEY, 
-    "CUSTOM_GPT4O_MINI_API_KEY": CONFIG.CUSTOM_GPT4O_MINI_API_KEY, 
+    "CUSTOM_GEMINI_2_5_PRO_API_KEY": os.getenv("CUSTOM_GEMINI_2_5_PRO_API_KEY", "YOUR_GEMINI_API_KEY"),
+    "CUSTOM_GROK_3_API_KEY": os.getenv("CUSTOM_GROK_3_API_KEY", "YOUR_GROK_3_API_KEY"),
+    "CUSTOM_GPT4O_MINI_API_KEY": os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "sk-MHulnEHU3bRxsnDjr0nq68lTcRYa5IpQATY1pUG4NaxpWSMJzvzsJ4KCVu0P")
 }
 
-class BotConstants:
-    FS_USERS_COLLECTION = "users"; FS_BOT_DATA_COLLECTION = "bot_data"; FS_BOT_DATA_DOCUMENT = "data"
-    FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"; MENU_MAIN = "main_menu"
-    MENU_AI_MODES_SUBMENU = "ai_modes_submenu"; MENU_MODELS_SUBMENU = "models_submenu"
-    MENU_LIMITS_SUBMENU = "limits_submenu"; MENU_BONUS_SUBMENU = "bonus_submenu"
-    MENU_GEMS_SUBMENU = "gems_submenu"; MENU_HELP_SUBMENU = "help_submenu"
-    CALLBACK_ACTION_SUBMENU = "submenu"; CALLBACK_ACTION_SET_AGENT = "set_agent"
-    CALLBACK_ACTION_SET_MODEL = "set_model"; CALLBACK_ACTION_SHOW_LIMITS = "show_limits"
-    CALLBACK_ACTION_CHECK_BONUS = "check_bonus"; CALLBACK_ACTION_BUY_GEMS = "buy_gems"
-    CALLBACK_ACTION_SHOW_HELP = "show_help"; API_TYPE_GOOGLE_GENAI = "google_genai"
-    API_TYPE_CUSTOM_HTTP = "custom_http_api"
-
-AI_MODES = {
-    "universal_ai_basic": {"name": "Универсальный", "prompt": "Ты — Gemini, продвинутый ИИ-ассистент...", "welcome": "Активирован агент 'Универсальный'. Какой у вас запрос?"}, # Промпты сокращены
-    "gemini_pro_custom_mode": {"name": "Продвинутый", "prompt": "Ты — Gemini 2.5 Pro...", "welcome": "Активирован агент 'Продвинутый'. Какой у вас запрос?"},
-    "creative_helper": {"name": "Творческий", "prompt": "Ты — Gemini, креативный ИИ-партнёр...", "welcome": "Агент 'Творческий' к вашим услугам! Над какой задачей поработаем?"},
-    "analyst": {"name": "Аналитик", "prompt": "Ты — ИИ-аналитик на базе Gemini...", "welcome": "Агент 'Аналитик' активирован. Какую задачу проанализировать?"},
-    "joker": {"name": "Шутник", "prompt": "Ты — ИИ с чувством юмора...", "welcome": "Агент 'Шутник' включен! 😄 Готов ответить с улыбкой!"}
-}
-
+# Модели
 AVAILABLE_TEXT_MODELS = {
-    "google_gemini_2_0_flash": {"name": "Gemini 2.0", "id": "gemini-2.0-flash", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI, "is_limited": True, "limit_type": "daily_free", "limit": CONFIG.DEFAULT_FREE_REQUESTS_GOOGLE_FLASH_DAILY},
-    "google_gemini_2_5_flash_preview": {"name": "Gemini 2.5", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI, "is_limited": True, "limit_type": "daily_free", "limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY},
-    "custom_api_gemini_2_5_pro": {"name": "Gemini Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY", "is_limited": True, "limit_type": "gems_based", "gem_cost": 2.5},
-    "custom_api_grok_3": {"name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY", "is_limited": True, "limit_type": "gems_based", "gem_cost": 2.5},
-    "custom_api_gpt_4o_mini": {"name": "GPT-4o mini", "id": "gpt-4o-mini", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY", "is_limited": True, "limit_type": "daily_free_or_gems", "limit": 25, "gem_cost": 0.5}
+    "custom_api_gemini_2_5_pro": {
+        "name": "Gemini 2.5 Pro",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro",
+        "api_key_var_name": "CUSTOM_GEMINI_2_5_PRO_API_KEY",
+        "is_limited": True,
+    },
+    "custom_api_grok_3": {
+        "name": "Grok 3",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3",
+        "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
+        "is_limited": True,
+    },
+    "custom_api_gpt_4o_mini": {
+        "name": "GPT-4o Mini",
+        "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini",
+        "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
+        "is_limited": True,
+    }
 }
-DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]["id"]
 
-MENU_STRUCTURE = { 
-    BotConstants.MENU_MAIN: {"title": "📋 Главное меню", "items": [{"text": "🤖 Агенты ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_AI_MODES_SUBMENU}, {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU}, {"text": "📊 Лимиты", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_LIMITS_SUBMENU}, {"text": "🎁 Бонус", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_BONUS_SUBMENU}, {"text": "💎 Гемы", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_GEMS_SUBMENU}, {"text": "❓ Помощь", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_HELP_SUBMENU}], "parent": None, "is_submenu": False},
-    BotConstants.MENU_AI_MODES_SUBMENU: {"title": "Выберите агент ИИ", "items": [{"text": mode["name"], "action": BotConstants.CALLBACK_ACTION_SET_AGENT, "target": key} for key, mode in AI_MODES.items() if key != "gemini_pro_custom_mode"], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_MODELS_SUBMENU: {"title": "Выберите модель ИИ", "items": [{"text": model["name"], "action": BotConstants.CALLBACK_ACTION_SET_MODEL, "target": key} for key, model in AVAILABLE_TEXT_MODELS.items()], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_LIMITS_SUBMENU: {"title": "Ваши лимиты и баланс", "items": [{"text": "📊 Показать", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "usage"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_BONUS_SUBMENU: {"title": "Бонус за подписку", "items": [{"text": "🎁 Получить", "action": BotConstants.CALLBACK_ACTION_CHECK_BONUS, "target": "news_bonus"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_GEMS_SUBMENU: {"title": "💎 Покупка Гемов", "items": [{"text": "🛒 100 💎 (150 RUB)", "action": BotConstants.CALLBACK_ACTION_BUY_GEMS, "target": "100_150"}, {"text": "🛒 250 💎 (350 RUB)", "action": BotConstants.CALLBACK_ACTION_BUY_GEMS, "target": "250_350"}, {"text": "🛒 500 💎 (600 RUB)", "action": BotConstants.CALLBACK_ACTION_BUY_GEMS, "target": "500_600"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
-    BotConstants.MENU_HELP_SUBMENU: {"title": "Помощь", "items": [{"text": "❓ Справка", "action": BotConstants.CALLBACK_ACTION_SHOW_HELP, "target": "help"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True}
+# Структура меню
+MENU_STRUCTURE = {
+    "main_menu": {
+        "title": "📋 Главное меню",
+        "items": [
+            {"text": "🤖 Агенты ИИ", "action": "submenu", "target": "ai_modes_submenu"},
+            {"text": "⚙️ Модели ИИ", "action": "submenu", "target": "models_submenu"},
+            {"text": "📊 Лимиты", "action": "submenu", "target": "limits_submenu"},
+            {"text": "🎁 Бонус", "action": "submenu", "target": "bonus_submenu"},
+            {"text": "💎 Купить гемы", "action": "show_subscription", "target": "buy_gems"},
+            {"text": "❓ Помощь", "action": "submenu", "target": "help_submenu"}
+        ],
+        "parent": None,
+        "is_submenu": False
+    },
+    "ai_modes_submenu": {
+        "title": "🤖 Выберите режим ИИ",
+        "items": [
+            {"text": "🧑‍💻 Программист", "action": "set_mode", "target": "programmer"},
+            {"text": "📚 Учитель", "action": "set_mode", "target": "teacher"},
+            {"text": "🧠 Психолог", "action": "set_mode", "target": "psychologist"},
+            {"text": "🔙 Назад", "action": "submenu", "target": "main_menu"}
+        ],
+        "parent": "main_menu",
+        "is_submenu": True
+    },
+    "models_submenu": {
+        "title": "⚙️ Выберите модель ИИ",
+        "items": [
+            {"text": "Gemini 2.5 Pro", "action": "set_model", "target": "custom_api_gemini_2_5_pro"},
+            {"text": "Grok 3", "action": "set_model", "target": "custom_api_grok_3"},
+            {"text": "GPT-4o Mini", "action": "set_model", "target": "custom_api_gpt_4o_mini"},
+            {"text": "🔙 Назад", "action": "submenu", "target": "main_menu"}
+        ],
+        "parent": "main_menu",
+        "is_submenu": True
+    },
+    "limits_submenu": {
+        "title": "📊 Лимиты",
+        "items": [
+            {"text": "🔙 Назад", "action": "submenu", "target": "main_menu"}
+        ],
+        "parent": "main_menu",
+        "is_submenu": True
+    },
+    "bonus_submenu": {
+        "title": "🎁 Бонус",
+        "items": [
+            {"text": "🔙 Назад", "action": "submenu", "target": "main_menu"}
+        ],
+        "parent": "main_menu",
+        "is_submenu": True
+    },
+    "help_submenu": {
+        "title": "❓ Помощь",
+        "items": [
+            {"text": "🔙 Назад", "action": "submenu", "target": "main_menu"}
+        ],
+        "parent": "main_menu",
+        "is_submenu": True
+    }
 }
 
-class FirestoreService: # (Как в v8/v9)
-    def __init__(self, cert_path: str, creds_json_str: Optional[str] = None):
-        self._db: Optional[Any] = None
-        try:
-            cred_obj = None
-            if creds_json_str and creds_json_str.strip() and creds_json_str != "ЗАГЛУШКА_JSON_FIREBASE": # Добавил проверку на заглушку
-                try:
-                    cred_dict = json.loads(creds_json_str)
-                    cred_obj = credentials.Certificate(cred_dict)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error decoding FIREBASE_CREDENTIALS_JSON_STR: {e}. Using file path if available.")
-                    cred_obj = None
-            if not cred_obj and os.path.exists(cert_path):
-                cred_obj = credentials.Certificate(cert_path)
-                logger.info(f"Using Firebase credentials from file: {cert_path}")
-            elif not cred_obj: # Если до сих пор нет cred_obj, то проблема
-                 if creds_json_str == "ЗАГЛУШКА_JSON_FIREBASE" or not creds_json_str.strip(): # Если была заглушка или пусто
-                    logger.warning("FIREBASE_CREDENTIALS_JSON_STR is placeholder or empty and cert file not found.")
-                 else: # Если была строка, но невалидная
-                    logger.error("FIREBASE_CREDENTIALS_JSON_STR was provided but invalid, and cert file not found.")
-                 # Не выбрасываем ошибку, _db останется None, проверки ниже это обработают
-            
-            if cred_obj: # Только если есть учетные данные, инициализируем
-                if not firebase_admin._apps: # type: ignore
-                    initialize_app(cred_obj)
-                self._db = firestore.client()
-                logger.info("Firestore client successfully initialized.")
-            else: # Если cred_obj так и не был создан
-                logger.error("Firestore credentials could not be loaded. Firestore will not be available.")
-                self._db = None
+# Сервис Firestore
+class FirestoreService:
+    def __init__(self):
+        self._db = firestore.client() if firebase_admin._apps else None
 
-        except Exception as e:
-            logger.error(f"Critical error during Firestore initialization: {e}", exc_info=True)
-            self._db = None
-    async def _execute_firestore_op(self, func, *args, **kwargs):
-        if not self._db: return None
-        return await asyncio.get_event_loop().run_in_executor(None, lambda: func(*args, **kwargs))
     async def get_user_data(self, user_id: int) -> Dict[str, Any]:
-        if not self._db: return {}
+        if not self._db:
+            return {}
         doc_ref = self._db.collection(BotConstants.FS_USERS_COLLECTION).document(str(user_id))
         doc = await self._execute_firestore_op(doc_ref.get)
-        return doc.to_dict() if doc and doc.exists else {}
+        return doc.to_dict() if doc.exists else {}
+
     async def set_user_data(self, user_id: int, data: Dict[str, Any]) -> None:
-        if not self._db: return
+        if not self._db:
+            return
         doc_ref = self._db.collection(BotConstants.FS_USERS_COLLECTION).document(str(user_id))
         await self._execute_firestore_op(doc_ref.set, data, merge=True)
+        logger.debug(f"User data for {user_id} updated with keys: {list(data.keys())}")
+
     async def get_bot_data(self) -> Dict[str, Any]:
-        if not self._db: return {}
-        doc_ref = self._db.collection(BotConstants.FS_BOT_DATA_COLLECTION).document(BotConstants.FS_BOT_DATA_DOCUMENT)
+        if not self._db:
+            return {}
+        doc_ref = self._db.collection(BotConstants.FS_BOT_DATA_COLLECTION).document("data")
         doc = await self._execute_firestore_op(doc_ref.get)
-        return doc.to_dict() if doc and doc.exists else {}
+        return doc.to_dict() if doc.exists else {}
+
     async def set_bot_data(self, data: Dict[str, Any]) -> None:
-        if not self._db: return
-        doc_ref = self._db.collection(BotConstants.FS_BOT_DATA_COLLECTION).document(BotConstants.FS_BOT_DATA_DOCUMENT)
+        if not self._db:
+            return
+        doc_ref = self._db.collection(BotConstants.FS_BOT_DATA_COLLECTION).document("data")
         await self._execute_firestore_op(doc_ref.set, data, merge=True)
 
-firestore_service = FirestoreService(CONFIG.FIREBASE_CERT_PATH, CONFIG.FIREBASE_CREDENTIALS_JSON_STR)
+    async def _execute_firestore_op(self, op, *args, **kwargs):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: op(*args, **kwargs))
 
-class BaseAIService(ABC): # (Как в v8/v9)
-    def __init__(self, model_config: Dict[str, Any]):
+firestore_service = FirestoreService()
+
+# Базовый класс AI сервиса
+class BaseAIService:
+    def __init__(self, model_id: str, model_config: Dict[str, Any]):
+        self.model_id = model_id
         self.model_config = model_config
-        self.model_id = model_config["id"]
-    @abstractmethod
-    async def generate_response(self, system_prompt: str, user_prompt: str) -> str: pass
 
-class GoogleGenAIService(BaseAIService): # (Как в v8/v9)
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
-        full_prompt = f"{system_prompt}\n\n**Запрос:**\n{user_prompt}"
-        try:
-            model_genai = genai.GenerativeModel(self.model_id, generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB})
-            response = await asyncio.to_thread(model_genai.generate_content, full_prompt)
-            return response.text.strip() if response.text else "Ответ Google GenAI пуст."
-        except Exception as e:
-            logger.error(f"Google GenAI API error for model {self.model_id}: {e}", exc_info=True)
-            return f"Ошибка Google API ({type(e).__name__}) при обращении к {self.model_id}."
+        raise NotImplementedError
 
-class CustomHttpAIService(BaseAIService): # (Как в v8/v9, с исправлением заголовков и парсинга)
+# HTTP AI сервис
+class CustomHttpAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
-        
-        if not actual_key or ("ЗАГЛУШКА_" in actual_key and actual_key in [CONFIG.CUSTOM_GEMINI_PRO_API_KEY, CONFIG.CUSTOM_GROK_3_API_KEY, CONFIG.CUSTOM_GPT4O_MINI_API_KEY]):
-            logger.error(f"API key for {self.model_id} is a placeholder default and not overridden by env var: '{actual_key}'")
+
+        if not actual_key or "YOUR_" in actual_key or not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")):
+            logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
-        
-        headers = {"Authorization": f"Bearer {actual_key}", "Accept": "application/json"}
-        messages_payload = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
-        payload = {"messages": messages_payload, "model": self.model_id, "is_sync": True, "max_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB}
+
+        headers = {
+            "Authorization": f"Bearer {actual_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+
+        is_gpt4o_like = (self.model_id == "custom_api_gpt_4o_mini")
+
+        messages_payload = []
+        if system_prompt:
+            messages_payload.append({
+                "role": "system",
+                "content": [{"type": "text", "text": system_prompt}] if is_gpt4o_like else system_prompt
+            })
+        messages_payload.append({
+            "role": "user",
+            "content": [{"type": "text", "text": user_prompt}] if is_gpt4o_like else user_prompt
+        })
+
+        payload = {
+            "callback_url": CONFIG.CALLBACK_URL,
+            "is_sync": False,
+            "messages": messages_payload,
+            "model": self.model_id,
+            "max_tokens": self.model_config.get("max_tokens", CONFIG.DEFAULT_MAX_TOKENS),
+            "temperature": CONFIG.DEFAULT_TEMPERATURE,
+            "top_p": CONFIG.DEFAULT_TOP_P,
+            "frequency_penalty": CONFIG.DEFAULT_FREQUENCY_PENALTY,
+            "presence_penalty": CONFIG.DEFAULT_PRESENCE_PENALTY,
+            "response_format": {"type": "text"}
+        }
+
         endpoint = self.model_config["endpoint"]
 
         try:
-            response = await asyncio.to_thread(requests.post, endpoint, headers=headers, json=payload, timeout=45)
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=45)
+            )
             response.raise_for_status()
-            try:
-                json_resp = response.json()
-            except json.JSONDecodeError:
-                logger.error(f"Failed to decode JSON from API for {self.model_id}. Status: {response.status_code}. Response text: {response.text[:500]}")
-                return f"Ошибка API: не удалось обработать ответ от сервера (не является JSON). Текст ответа: {response.text[:200]}"
-            
-            extracted_text = None
-            if self.model_id == "gpt-4o-mini":
-                try:
-                    if isinstance(json_resp.get("response"), list) and json_resp["response"]:
-                        message_obj = json_resp["response"][0].get("message", {})
-                        extracted_text = message_obj.get("content", "").strip()
-                    if not extracted_text:
-                        if ("status" in json_resp and json_resp.get("status") != "success") or not extracted_text :
-                             logger.warning(f"API for gpt-4o-mini returned an unexpected structure or non-success status. Status: '{json_resp.get('status', 'N/A')}'. Full JSON: {json.dumps(json_resp, ensure_ascii=False, indent=2)}")
-                             error_msg = json_resp.get("error_message", "Ответ не содержит текста или статус ошибки.")
-                             extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
-                except (TypeError, IndexError, AttributeError) as e_parse:
-                    logger.error(f"Error parsing gpt-4o-mini response structure for {self.model_id}. Error: {e_parse}. Full JSON: {json.dumps(json_resp, ensure_ascii=False, indent=2)}", exc_info=True)
-                    extracted_text = f"Ошибка обработки ответа от {self.model_config['name']} (структура)."
-            elif self.model_id == "grok-3-beta":
-                if "response" in json_resp and isinstance(json_resp.get("response"), list) and json_resp["response"]:
-                    extracted_text = json_resp["response"][0].get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-            elif self.model_id == "gemini-2.5-pro-preview-03-25":
-                 output_val = json_resp.get("output")
-                 if isinstance(output_val, str): extracted_text = output_val.strip()
-                 elif isinstance(output_val, dict): extracted_text = output_val.get("text", output_val.get("content", "")).strip()
-                 if not extracted_text: extracted_text = json_resp.get("text", "").strip()
-                 if json_resp.get("status") != "success" and not extracted_text:
-                     logger.warning(f"API for {self.model_id} returned status '{json_resp.get('status')}' with no parsable text and no 'error_message'. Full JSON response: {json.dumps(json_resp, ensure_ascii=False, indent=2)}")
-                     error_msg = json_resp.get("error_message", "Неизвестная ошибка API")
-                     extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
-            if not extracted_text: 
-                for key_check in ["text", "content", "output"]:
-                    if isinstance(json_resp.get(key_check), str) and (check_val := json_resp[key_check].strip()):
-                        extracted_text = check_val
-                        logger.info(f"Used fallback text extraction on key '{key_check}' for model {self.model_id}")
-                        break
-            return extracted_text if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста."
+            json_resp = response.json()
+
+            if json_resp.get("status") == "starting":
+                request_id = json_resp.get("request_id")
+                if request_id:
+                    return f"REQUEST_ID:{request_id}"
+                return "Ошибка: request_id не получен от API."
+            else:
+                return f"Ошибка API: {json_resp.get('status', 'N/A')}. {json_resp.get('error_message', '')}"
+
         except requests.exceptions.HTTPError as e:
-            logger.error(f"Custom API HTTPError for {self.model_id}: {e.response.status_code} - {e.response.text}")
-            try:
-                error_json = e.response.json(); error_message = error_json.get("error", e.response.text)
-                return f"Ошибка API ({e.response.status_code}) для {self.model_config['name']}: {error_message}"
-            except json.JSONDecodeError: return f"Ошибка сети API ({e.response.status_code}) для {self.model_config['name']}: {e.response.text[:100]}"
-        except Exception as e: 
-            logger.error(f"Unexpected Custom API error for {self.model_id}: {e}", exc_info=True)
-            return f"Неожиданная ошибка API ({type(e).__name__}) для {self.model_config['name']}."
+            logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {e.response.status_code} - {e.response.text}", exc_info=True)
+            return f"Ошибка сети Custom API ({e.response.status_code}) для {self.model_config['name']}."
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Custom API RequestException for {self.model_id} ({endpoint}): {e}", exc_info=True)
+            return f"Сетевая ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
+        except Exception as e:
+            logger.error(f"Unexpected Custom API error for {self.model_id} ({endpoint}): {e}", exc_info=True)
+            return f"Неожиданная ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
 
-def get_ai_service(model_key: str) -> Optional[BaseAIService]: # (Как в v8/v9)
+def get_ai_service(model_key: str) -> Optional[BaseAIService]:
+    model_config = AVAILABLE_TEXT_MODELS.get(model_key)
+    if not model_config:
+        return None
+    return CustomHttpAIService(model_key, model_config)
+
+# Утилиты
+def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
+    if len(text) <= max_length:
+        return text, False
+    return text[:max_length - 3] + "...", True
+
+def is_menu_button_text(text: str) -> bool:
+    return any(item["text"] == text for menu in MENU_STRUCTURE.values() for item in menu["items"])
+
+async def get_current_model_key(user_id: int, user_data: Dict[str, Any]) -> str:
+    return user_data.get("current_model", "custom_api_gpt_4o_mini")
+
+async def get_current_mode_details(user_id: int, user_data: Dict[str, Any]) -> Dict[str, str]:
+    return {"prompt": "You are a helpful AI assistant."}  # Упрощено для примера
+
+async def get_user_actual_limit_for_model(
+    user_id: int,
+    model_key: str,
+    user_data: Optional[Dict[str, Any]] = None,
+    bot_data_cache: Optional[Dict[str, Any]] = None
+) -> int:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg: logger.error(f"Model config for key '{model_key}' not found."); return None
-    api_type = model_cfg.get("api_type")
-    if api_type == BotConstants.API_TYPE_GOOGLE_GENAI: return GoogleGenAIService(model_cfg)
-    if api_type == BotConstants.API_TYPE_CUSTOM_HTTP: return CustomHttpAIService(model_cfg)
-    logger.error(f"Unknown API type '{api_type}' for model_key '{model_key}'."); return None
+    if not model_cfg:
+        return 0
 
-async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> str: # (Как в v8/v9)
     user_data_loc = user_data if user_data is not None else await firestore_service.get_user_data(user_id)
-    selected_id = user_data_loc.get('selected_model_id', DEFAULT_MODEL_ID)
-    # selected_api_type = user_data_loc.get('selected_api_type') # Не используется в этой версии функции, т.к. ID моделей уникальны
+    gems_balance = user_data_loc.get('gems_balance', 0.0)
 
-    for key, info in AVAILABLE_TEXT_MODELS.items():
-        if info["id"] == selected_id:
-            # Убедимся, что selected_api_type в Firestore соответствует выбранной модели, если он там есть
-            # Это больше для консистентности данных, т.к. ID уже уникальны
-            if 'selected_api_type' not in user_data_loc or user_data_loc.get('selected_api_type') != info.get("api_type"):
-                 if info.get("api_type"): # Сохраняем, только если у модели есть api_type
-                    await firestore_service.set_user_data(user_id, {'selected_api_type': info.get("api_type")})
-            return key
-            
-    logger.warning(f"Selected model_id '{selected_id}' for user {user_id} not found. Reverting to default.")
-    default_key = CONFIG.DEFAULT_MODEL_KEY
-    default_cfg = AVAILABLE_TEXT_MODELS[default_key]
-    await firestore_service.set_user_data(user_id, {
-        'selected_model_id': default_cfg["id"], 
-        'selected_api_type': default_cfg.get("api_type") # Сохраняем и тип для дефолтной модели
-    })
-    return default_key
+    if model_key == "custom_api_gpt_4o_mini":
+        return CONFIG.DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY
 
-async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]: # (Как в v8/v9)
-    user_data_loc = user_data if user_data is not None else await firestore_service.get_user_data(user_id)
-    current_model_k_loc = await get_current_model_key(user_id, user_data_loc)
-    mode_k_loc = user_data_loc.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
-    if current_model_k_loc == "custom_api_gemini_2_5_pro": return AI_MODES["gemini_pro_custom_mode"]
-    return AI_MODES.get(mode_k_loc, AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY])
+    cost = CONFIG.GEMS_PER_REQUEST_GEMINI_PRO if model_key in ["custom_api_gemini_2_5_pro", "custom_api_grok_3"] else CONFIG.GEMS_PER_REQUEST_GPT4O_MINI
+    return int(gems_balance / cost) if cost > 0 else float('inf')
 
-def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]: # (Как в v8/v9)
-    if not isinstance(text, str) or len(text) <= max_length: return str(text), False
-    suffix = "\n\n(...ответ был сокращен)"
-    adjusted_max_length = max(0, max_length - len(suffix))
-    if adjusted_max_length == 0: return text[:max_length - 3] + "..." if max_length > 3 else text[:max_length], True
-    truncated_text = text[:adjusted_max_length]
-    for separator in ['\n\n', '. ', '! ', '? ', '\n', ' ']: 
-        position = truncated_text.rfind(separator)
-        if position != -1:
-            actual_cut_position = position + (len(separator) if separator != ' ' else 0) 
-            if actual_cut_position > 0 and actual_cut_position > adjusted_max_length * 0.3:
-                 return text[:actual_cut_position].strip() + suffix, True
-    return text[:adjusted_max_length].strip() + suffix, True
-
-async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[bool, str]: # (Как в v8/v9)
+async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[bool, str, int]:
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg or not model_cfg.get("is_limited"): return True, ""
-    user_data = await firestore_service.get_user_data(user_id)
-    limit_type = model_cfg.get("limit_type")
-    if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and user_data.get('news_bonus_uses_left', 0) > 0:
-        return True, "bonus_use"
-    all_counts = (await firestore_service.get_bot_data()).get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
-    user_counts = all_counts.get(str(user_id), {})
-    model_usage = user_counts.get(model_key, {'date': '', 'count': 0})
-    current_usage = model_usage['count'] if model_usage['date'] == today_str else 0
-    if limit_type == "daily_free":
-        if current_usage >= model_cfg.get("limit", 0): return False, f"Достигнут дневной лимит ({current_usage}/{model_cfg['limit']}) для «{model_cfg['name']}»."
-        return True, "daily_free_use"
-    if limit_type == "gems_based":
-        cost = model_cfg.get("gem_cost", 0.0); balance = user_data.get("gem_balance", 0.0)
-        if balance < cost: return False, f"Недостаточно гемов для «{model_cfg['name']}». Требуется: {cost:.1f}💎, у вас: {balance:.1f}💎."
-        return True, "use_gems"
-    if limit_type == "daily_free_or_gems":
-        if current_usage < model_cfg.get("limit", 0): return True, "daily_free_use"
-        cost = model_cfg.get("gem_cost", 0.0); balance = user_data.get("gem_balance", 0.0)
-        if balance < cost: return False, f"Бесплатные попытки для «{model_cfg['name']}» закончились ({current_usage}/{model_cfg.get('limit', 0)}). Требуется: {cost:.1f}💎, у вас: {balance:.1f}💎."
-        return True, "use_gems"
-    return True, ""
+    user_data_loc = await firestore_service.get_user_data(user_id)
+    gems_balance = user_data_loc.get('gems_balance', 0.0)
 
-async def increment_request_count(user_id: int, model_key: str, flag: str): # (Как в v8/v9)
+    if not model_cfg.get("is_limited") or model_key == "custom_api_gpt_4o_mini":
+        all_user_daily_counts = (await firestore_service.get_bot_data()).get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+        user_daily_counts = all_user_daily_counts.get(str(user_id), {})
+        model_usage_info = user_daily_counts.get(model_key, {'date': today_str, 'count': 0})
+
+        if model_usage_info['date'] != today_str:
+            model_usage_info = {'date': today_str, 'count': 0}
+            user_daily_counts[model_key] = model_usage_info
+            all_user_daily_counts[str(user_id)] = user_daily_counts
+            await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_user_daily_counts})
+
+        current_usage_count = model_usage_info['count']
+        limit = CONFIG.DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY if model_key == "custom_api_gpt_4o_mini" else float('inf')
+
+        if current_usage_count >= limit:
+            return False, f"Достигнут дневной лимит ({current_usage_count}/{limit}) для модели «{model_cfg['name']}».", current_usage_count
+        return True, "", current_usage_count
+
+    cost = CONFIG.GEMS_PER_REQUEST_GEMINI_PRO if model_key in ["custom_api_gemini_2_5_pro", "custom_api_grok_3"] else CONFIG.GEMS_PER_REQUEST_GPT4O_MINI
+    if gems_balance < cost:
+        return False, f"Недостаточно гемов ({gems_balance:.1f}). Требуется: {cost:.1f}. Пополните баланс через /buy_gems.", 0
+    return True, "", 0
+
+async def increment_request_count(user_id: int, model_key: str):
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
-    if not model_cfg or not model_cfg.get("is_limited"): return
-    if flag == "bonus_use":
-        user_data = await firestore_service.get_user_data(user_id); bonus_left = user_data.get('news_bonus_uses_left', 0)
-        if bonus_left > 0: await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1}); logger.info(f"User {user_id} consumed bonus use for {model_key}. Left: {bonus_left - 1}")
+    user_data_loc = await firestore_service.get_user_data(user_id)
+
+    if not model_cfg.get("is_limited") or model_key == "custom_api_gpt_4o_mini":
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        bot_data_loc = await firestore_service.get_bot_data()
+        all_user_daily_counts = bot_data_loc.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+        user_daily_counts = all_user_daily_counts.get(str(user_id), {})
+        
+        model_usage_info = user_daily_counts.get(model_key, {'date': today_str, 'count': 0})
+        if model_usage_info['date'] != today_str:
+            model_usage_info = {'date': today_str, 'count': 0}
+        
+        model_usage_info['count'] += 1
+        user_daily_counts[model_key] = model_usage_info
+        all_user_daily_counts[str(user_id)] = user_daily_counts
+        await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_user_daily_counts})
+        logger.info(f"Incremented daily count for user {user_id}, model {model_key} to {model_usage_info['count']}.")
         return
-    if flag == "use_gems":
-        cost = model_cfg.get("gem_cost", 0.0); user_data = await firestore_service.get_user_data(user_id); balance = user_data.get("gem_balance", 0.0)
-        new_balance = balance - cost; await firestore_service.set_user_data(user_id, {'gem_balance': new_balance}); logger.info(f"Deducted {cost} gems from user {user_id} for {model_key}. New balance: {new_balance:.1f}")
-        return
-    if flag == "daily_free_use":
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d"); bot_data = await firestore_service.get_bot_data()
-        all_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {}); user_counts = all_counts.get(str(user_id), {})
-        model_usage = user_counts.get(model_key, {'date': today_str, 'count': 0})
-        if model_usage['date'] != today_str: model_usage = {'date': today_str, 'count': 0}
-        model_usage['count'] += 1; user_counts[model_key] = model_usage; all_counts[str(user_id)] = user_counts
-        await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_counts}); logger.info(f"Incremented daily count for user {user_id}, model {model_key} to {model_usage['count']}.")
 
-def is_menu_button_text(text: str) -> bool: # (Как в v8/v9)
-    if text in ["⬅️ Назад", "🏠 Главное меню"]: return True
-    for menu_data in MENU_STRUCTURE.values():
-        for item in menu_data.get("items", []):
-            if item["text"] == text: return True
-    return False
+    cost = CONFIG.GEMS_PER_REQUEST_GEMINI_PRO if model_key in ["custom_api_gemini_2_5_pro", "custom_api_grok_3"] else CONFIG.GEMS_PER_REQUEST_GPT4O_MINI
+    new_balance = user_data_loc.get('gems_balance', 0.0) - cost
+    await firestore_service.set_user_data(user_id, {'gems_balance': new_balance})
+    logger.info(f"User {user_id} spent {cost:.1f} gems on model {model_key}. New balance: {new_balance:.1f}")
 
-def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup: # (Как в v8/v9)
-    menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN]); items = menu_config["items"]
-    group_size = 2 if menu_key in [BotConstants.MENU_MAIN, BotConstants.MENU_MODELS_SUBMENU] else 1
-    keyboard_rows = [[KeyboardButton(items[j]["text"]) for j in range(i, min(i + group_size, len(items)))] for i in range(0, len(items), group_size)]
-    if menu_config.get("is_submenu"):
-        nav_row = [KeyboardButton("🏠 Главное меню")]
-        if menu_config.get("parent"): nav_row.insert(0, KeyboardButton("⬅️ Назад"))
-        keyboard_rows.append(nav_row)
-    return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True)
-
-async def show_menu(update: Update, user_id: int, menu_key: str): # (Как в v8/v9)
-    menu_cfg = MENU_STRUCTURE.get(menu_key)
-    if not menu_cfg: logger.error(f"Menu key '{menu_key}' not found. Defaulting to main for user {user_id}."); menu_key = BotConstants.MENU_MAIN
-    await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
-    message_to_reply = update.effective_message if update.effective_message else update.message
-    if not message_to_reply: await update.get_bot().send_message(chat_id=user_id, text=MENU_STRUCTURE[menu_key]["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True); return
-    await message_to_reply.reply_text(MENU_STRUCTURE[menu_key]["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
-
-async def show_limits(update: Update, user_id: int): # (Как в v8/v9)
-    user_data = await firestore_service.get_user_data(user_id); bot_data = await firestore_service.get_bot_data(); gem_balance = user_data.get('gem_balance', 0.0)
-    parts = [f"<b>💎 Ваш баланс: {gem_balance:.1f} гемов</b>\n"]; today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    all_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {}); user_counts = all_counts.get(str(user_id), {})
-    for key, cfg in AVAILABLE_TEXT_MODELS.items():
-        if not cfg.get("is_limited"): continue
-        limit_type = cfg.get("limit_type")
-        if limit_type == "daily_free": usage = user_counts.get(key, {'count': 0, 'date': ''}); count = usage['count'] if usage['date'] == today_str else 0; parts.append(f"▫️ {cfg['name']}: <b>{count} / {cfg['limit']}</b> в день")
-        elif limit_type == "gems_based": parts.append(f"▫️ {cfg['name']}: <b>{cfg['gem_cost']:.1f} 💎</b> за запрос")
-        elif limit_type == "daily_free_or_gems": usage = user_counts.get(key, {'count': 0, 'date': ''}); count = usage['count'] if usage['date'] == today_str else 0; parts.append(f"▫️ {cfg['name']}: <b>{count} / {cfg['limit']}</b> бесплатных, затем <b>{cfg['gem_cost']:.1f} 💎</b>")
-    if (bonus_left := user_data.get('news_bonus_uses_left', 0)) > 0: parts.append(f"\n✅ У вас есть <b>{bonus_left}</b> бонусных генераций для {AVAILABLE_TEXT_MODELS[CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY]['name']}.")
-    await update.effective_message.reply_text("\n".join(parts), parse_mode=ParseMode.HTML, disable_web_page_preview=True, reply_markup=generate_menu_keyboard(user_data.get('current_menu', BotConstants.MENU_LIMITS_SUBMENU)))
-
-async def claim_news_bonus_logic(update: Update, user_id: int): # (Как в v8/v9)
-    user_data = await firestore_service.get_user_data(user_id); reply_menu_key = user_data.get('current_menu', BotConstants.MENU_BONUS_SUBMENU)
-    if MENU_STRUCTURE.get(reply_menu_key, {}).get("parent"): reply_menu_key = MENU_STRUCTURE[reply_menu_key]["parent"]
-    else: reply_menu_key = BotConstants.MENU_MAIN
-    bonus_model_config = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
-    if not bonus_model_config: await update.effective_message.reply_text("Настройка бонусной модели неисправна.", reply_markup=generate_menu_keyboard(reply_menu_key)); return
-    bonus_model_name = bonus_model_config['name']
-    if user_data.get('claimed_news_bonus', False):
-        uses_left = user_data.get('news_bonus_uses_left', 0); msg = f"Вы уже активировали бонус. " + (f"Осталось: <b>{uses_left}</b> для {bonus_model_name}." if uses_left > 0 else f"Бонус для {bonus_model_name} использован.")
-        await update.effective_message.reply_text(msg, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_key), disable_web_page_preview=True); return
-    try:
-        member_status = await update.get_bot().get_chat_member(chat_id=CONFIG.NEWS_CHANNEL_USERNAME, user_id=user_id)
-        if member_status.status in ['member', 'administrator', 'creator']:
-            await firestore_service.set_user_data(user_id, {'claimed_news_bonus': True, 'news_bonus_uses_left': CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS})
-            msg = f'🎉 Спасибо за подписку! Вам начислен бонус: <b>{CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS}</b> генераций для {bonus_model_name}.'
-            await update.effective_message.reply_text(msg, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN), disable_web_page_preview=True)
-            await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
-        else:
-            msg = f'Для бонуса подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">{CONFIG.NEWS_CHANNEL_USERNAME}</a> и попробуйте снова.'
-            inline_kb = InlineKeyboardMarkup([[InlineKeyboardButton(f"📢 Перейти на {CONFIG.NEWS_CHANNEL_USERNAME}", url=CONFIG.NEWS_CHANNEL_LINK)]])
-            await update.effective_message.reply_text(msg, parse_mode=ParseMode.HTML, reply_markup=inline_kb, disable_web_page_preview=True)
-    except Exception as e: logger.error(f"News bonus claim error for user {user_id}: {e}"); await update.effective_message.reply_text("Ошибка при проверке подписки. Попробуйте позже.", reply_markup=generate_menu_keyboard(reply_menu_key))
-
-async def send_gems_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, target: str): # (Как в v8/v9)
-    user_id = update.effective_user.id
-    try: amount_str, price_str = target.split('_'); amount, price = int(amount_str), int(price_str)
-    except (ValueError, IndexError): await update.effective_message.reply_text("Ошибка в выборе пакета гемов."); return
-    title = f"Покупка {amount} 💎"; description = f"Пакет из {amount} гемов для использования в боте."; payload = f"buy_gems_{amount}_user_{user_id}"
-    await context.bot.send_invoice(chat_id=user_id, title=title, description=description, payload=payload, provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN, currency="RUB", prices=[LabeledPrice(f"{amount} 💎", price * 100)])
-
-async def show_help(update: Update, user_id: int): # (Как в v8/v9)
-    user_data = await firestore_service.get_user_data(user_id)
-    help_text = "<b>❓ Справка по использованию бота</b>\n\n1.  <b>Запросы к ИИ</b>: ...\n2.  <b>Меню</b>: ...\n3.  <b>Команды</b>: ..." # Сокращено
-    await update.effective_message.reply_text(help_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(user_data.get('current_menu', BotConstants.MENU_HELP_SUBMENU)), disable_web_page_preview=True)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): # (Как в v8/v9, с инициализацией gem_balance)
-    user_id = update.effective_user.id; user_data = await firestore_service.get_user_data(user_id); updates_to_db = {}
-    if 'current_ai_mode' not in user_data: updates_to_db['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
-    if 'current_menu' not in user_data: updates_to_db['current_menu'] = BotConstants.MENU_MAIN
-    if 'gem_balance' not in user_data: updates_to_db['gem_balance'] = 0.0 
-    default_model_cfg = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]
-    if 'selected_model_id' not in user_data: updates_to_db['selected_model_id'] = default_model_cfg["id"]
-    if 'selected_api_type' not in user_data : updates_to_db['selected_api_type'] = default_model_cfg.get("api_type") # Добавлено сохранение типа API для дефолтной модели
-    if updates_to_db: await firestore_service.set_user_data(user_id, updates_to_db)
-    greeting = f"👋 Привет, {update.effective_user.first_name}!"
-    await update.effective_message.reply_text(greeting, reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
-    await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
-
-async def open_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE): await show_menu(update, update.effective_user.id, BotConstants.MENU_MAIN)
-async def usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE): await show_limits(update, update.effective_user.id)
-async def get_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE): await claim_news_bonus_logic(update, update.effective_user.id)
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE): await show_help(update, update.effective_user.id)
-
-async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE): # Обновлен для UX
-    if not (update.message and update.message.text): return
-    user_id = update.effective_user.id; button_text = update.message.text.strip()
-    if not is_menu_button_text(button_text): return
-    try: await update.message.delete()
-    except Exception: pass
-    user_data = await firestore_service.get_user_data(user_id); current_menu_key = user_data.get('current_menu', BotConstants.MENU_MAIN)
-    
-    if button_text == "⬅️ Назад":
-        parent_key = MENU_STRUCTURE.get(current_menu_key, {}).get("parent", BotConstants.MENU_MAIN)
-        await show_menu(update, user_id, parent_key); return
-    if button_text == "🏠 Главное меню":
-        await show_menu(update, user_id, BotConstants.MENU_MAIN); return
-    
-    action_item = None; action_origin_menu_key = current_menu_key
-    for item in MENU_STRUCTURE.get(current_menu_key, {}).get("items", []): # Ищем в текущем меню
-        if item["text"] == button_text: action_item = item; break
-    if not action_item: # Если не нашли, ищем во всех (маловероятно, но для надежности)
-        for menu_key_search, menu_cfg_search in MENU_STRUCTURE.items():
-            for item_search in menu_cfg_search.get("items",[]):
-                if item_search["text"] == button_text: action_item = item_search; action_origin_menu_key = menu_key_search; break
-            if action_item: break
-    if not action_item: logger.warning(f"Button '{button_text}' not matched by user {user_id}"); return
-
-    action, target = action_item["action"], action_item["target"]
-    
-    # --- ИЗМЕНЕНИЕ UX: Возврат в то же подменю для SET_AGENT и SET_MODEL ---
-    return_menu_after_action = action_origin_menu_key # По умолчанию возвращаемся в меню, где была нажата кнопка
-
-    if action == BotConstants.CALLBACK_ACTION_SUBMENU: await show_menu(update, user_id, target)
-    elif action == BotConstants.CALLBACK_ACTION_SET_AGENT:
-        await firestore_service.set_user_data(user_id, {'current_ai_mode': target})
-        response_message = f"🤖 Агент изменен на: <b>{AI_MODES[target]['name']}</b>."
-        await context.bot.send_message(chat_id=user_id, text=response_message, parse_mode=ParseMode.HTML)
-        await show_menu(update, user_id, action_origin_menu_key) # Остаемся в меню выбора агентов
-    elif action == BotConstants.CALLBACK_ACTION_SET_MODEL:
-        model_info = AVAILABLE_TEXT_MODELS[target]
-        # --- ИСПРАВЛЕНИЕ: Сохраняем и ID, и тип API ---
-        await firestore_service.set_user_data(user_id, {
-            'selected_model_id': model_info["id"],
-            'selected_api_type': model_info.get("api_type") 
-        })
-        # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
-        response_message = f"⚙️ Модель изменена на: <b>{model_info['name']}</b>."
-        await context.bot.send_message(chat_id=user_id, text=response_message, parse_mode=ParseMode.HTML)
-        await show_menu(update, user_id, action_origin_menu_key) # Остаемся в меню выбора моделей
-    elif action == BotConstants.CALLBACK_ACTION_SHOW_LIMITS: await show_limits(update, user_id) 
-    elif action == BotConstants.CALLBACK_ACTION_CHECK_BONUS: await claim_news_bonus_logic(update, user_id)
-    elif action == BotConstants.CALLBACK_ACTION_BUY_GEMS: await send_gems_invoice(update, context, target) 
-    elif action == BotConstants.CALLBACK_ACTION_SHOW_HELP: await show_help(update, user_id)
-
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE): # (Как в v8, с обновленной is_successful_response)
-    user_id = update.effective_user.id
-    if not (update.message and update.message.text): return
-    user_message_text = update.message.text.strip()
-    if is_menu_button_text(user_message_text): return
-    try: await update.message.delete()
-    except Exception: pass
-    if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
-        await update.message.reply_text("Ваш запрос слишком короткий."); return
-    user_data = await firestore_service.get_user_data(user_id)
-    model_key = await get_current_model_key(user_id, user_data)
-    can_proceed, flag_or_msg = await check_and_log_request_attempt(user_id, model_key)
-    if not can_proceed:
-        await update.message.reply_text(flag_or_msg, parse_mode=ParseMode.HTML, disable_web_page_preview=True); return
-    ai_service = get_ai_service(model_key)
-    if not ai_service:
-        await update.message.reply_text("Ошибка при выборе AI модели."); return
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    mode_details = await get_current_mode_details(user_id, user_data)
-    ai_response = await ai_service.generate_response(mode_details["prompt"], user_message_text)
-    is_successful_response = not (
-        ai_response.lower().startswith("ошибка") or 
-        "не содержит текста" in ai_response.lower() or 
-        "ответ google genai пуст" in ai_response.lower() or 
-        "не удалось обработать ответ от сервера" in ai_response.lower() or
-        ai_response.startswith("Неожиданная ошибка API"))
-    final_reply, _ = smart_truncate(ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-    if is_successful_response:
-        await increment_request_count(user_id, model_key, flag_or_msg)
-    else: logger.warning(f"AI response error for user {user_id}. Usage not incremented. Response: {ai_response}")
-    await update.message.reply_text(final_reply, parse_mode=ParseMode.HTML if '<' in final_reply and '>' in final_reply else None, disable_web_page_preview=True)
-
-async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): # (Как в v8/v9)
-    query = update.pre_checkout_query
-    if query.invoice_payload.startswith("buy_gems_") and query.invoice_payload.count('_') == 3: 
-        await query.answer(ok=True)
-    else: logger.warning(f"Invalid precheckout payload: {query.invoice_payload}"); await query.answer(ok=False, error_message="Ошибка запроса.")
-
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): # (Как в v8/v9)
-    user_id = update.effective_user.id; payment = update.message.successful_payment; payload = payment.invoice_payload
-    if payload.startswith("buy_gems_"):
-        try:
-            parts = payload.split('_'); gems_to_add = int(parts[1]) 
-            user_data = await firestore_service.get_user_data(user_id); new_balance = user_data.get('gem_balance', 0.0) + gems_to_add
-            await firestore_service.set_user_data(user_id, {'gem_balance': new_balance})
-            await update.message.reply_text(f"🎉 Оплата прошла! Вам начислено <b>{gems_to_add}💎</b>. Ваш новый баланс: <b>{new_balance:.1f}💎</b>.", parse_mode=ParseMode.HTML)
-            if CONFIG.ADMIN_ID and CONFIG.ADMIN_ID != 0 :
-                admin_msg = f"🔔 Новая покупка: {gems_to_add}💎 от user {user_id} (@{update.effective_user.username or 'N/A'}). Сумма: {payment.total_amount / 100} {payment.currency}."
-                await context.bot.send_message(CONFIG.ADMIN_ID, admin_msg)
-        except (IndexError, ValueError) as e: logger.error(f"Failed to parse gem payment payload '{payload}': {e}"); await update.message.reply_text("Ошибка при обработке платежа. Свяжитесь с поддержкой.")
-    else: logger.warning(f"Unknown successful payment payload: {payload} from user {user_id}")
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE): # (Как в v8/v9)
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
-    tb_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-    if isinstance(update, Update) and update.effective_chat:
-        try: await context.bot.send_message(chat_id=update.effective_chat.id, text="Произошла внутренняя ошибка. Попробуйте /start.")
-        except Exception: pass
-    if CONFIG.ADMIN_ID and CONFIG.ADMIN_ID != 0:
-        user_info = "N/A"; msg_text = "N/A"
-        if isinstance(update, Update) and update.effective_user: user_info = f"ID: {update.effective_user.id} (@{update.effective_user.username or 'N/A'})"
-        if isinstance(update, Update) and update.message and hasattr(update.message, 'text'): msg_text = update.message.text
-        details = (f"🤖 Ошибка:\nUser: {user_info}\nMsg: {msg_text}\nErr: {context.error.__class__.__name__}: {context.error}\n\nTrace:\n```\n{tb_string[:3000]}\n```")
-        try:
-            escaped_details = telegram.helpers.escape_markdown(details, version=2)
-            await context.bot.send_message(CONFIG.ADMIN_ID, escaped_details[:4096], parse_mode=ParseMode.MARKDOWN_V2)
-        except Exception: 
-            try: await context.bot.send_message(CONFIG.ADMIN_ID, details[:4096])
-            except Exception as e_plain: logger.error(f"Failed to send plain text error report to admin: {e_plain}")
-
-async def main(): # (Как в v8/v9)
-    if CONFIG.GOOGLE_GEMINI_API_KEY and not CONFIG.GOOGLE_GEMINI_API_KEY.startswith("ЗАГЛУШКА_") and CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"):
-        genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY); logger.info("Google Gemini API configured.")
-    else: logger.warning(f"Google Gemini API key not configured or invalid (value: {CONFIG.GOOGLE_GEMINI_API_KEY}).")
-    
-    # Проверка на заглушки в критичных токенах, если они не переопределены переменными окружения
-    if CONFIG.TELEGRAM_TOKEN == "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0" and "ЗАГЛУШКА_TOKEN" in "8185454402:AAEgJLaBSaUSyP9Z_zv76Fn0PtEwltAqga0": # Пример, если бы токен был заглушкой
-        logger.error("TELEGRAM_TOKEN is a placeholder default and not overridden by environment variable!")
-    if CONFIG.PAYMENT_PROVIDER_TOKEN == "ЗАГЛУШКА_PAYMENT_TOKEN": # Если дефолт был бы заглушкой
-        logger.warning("PAYMENT_PROVIDER_TOKEN is a placeholder default. Payments might fail.")
-    if CONFIG.ADMIN_ID == 0 : logger.warning("ADMIN_ID is 0 (default or env var). Admin notifications disabled.")
-    
-    if not firestore_service._db: logger.critical("Firestore not initialized! Bot cannot work."); return
-    
-    app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).read_timeout(30).connect_timeout(30).build()
-    handlers = [
-        CommandHandler("start", start), CommandHandler("menu", open_menu_command),
-        CommandHandler("usage", usage_command), CommandHandler("bonus", get_bonus_command),
-        CommandHandler("help", help_command),
-        MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler, block=False), 
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), 
-        PreCheckoutQueryHandler(precheckout_callback),
-        MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback)
+def generate_menu_keyboard(current_menu: str) -> InlineKeyboardMarkup:
+    menu_data = MENU_STRUCTURE.get(current_menu, MENU_STRUCTURE["main_menu"])
+    buttons = [
+        InlineKeyboardButton(item["text"], callback_data=f"{item['action']}:{item['target']}")
+        for item in menu_data["items"]
     ]
-    for handler in handlers: app.add_handler(handler)
-    app.add_error_handler(error_handler)
-    
-    bot_commands = [BotCommand("start", "🚀 Меню"), BotCommand("menu", "📋 Меню"),
-                    BotCommand("usage", "📊 Лимиты"), BotCommand("bonus", "🎁 Бонус"), BotCommand("help", "❓ Справка")]
-    await app.bot.set_my_commands(bot_commands)
-    logger.info("Bot is starting...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES)
+    keyboard = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(keyboard)
 
-if __name__ == '__main__':
-    asyncio.run(main())
+# Обработчики
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    await firestore_service.set_user_data(user_id, {
+        "current_menu": "main_menu",
+        "current_model": "custom_api_gpt_4o_mini",
+        "gems_balance": 0.0
+    })
+    await update.message.reply_text(
+        "Добро пожаловать! Выберите опцию в меню:",
+        reply_markup=generate_menu_keyboard("main_menu")
+    )
+
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_data = await firestore_service.get_user_data(user_id)
+    await update.message.reply_text(
+        "📋 Главное меню",
+        reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu'))
+    )
+
+async def show_limits(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_data_loc = await firestore_service.get_user_data(user_id)
+    bot_data_loc = await firestore_service.get_bot_data()
+    
+    gems_balance = user_data_loc.get('gems_balance', 0.0)
+    parts = [f"<b>📊 Ваш текущий баланс</b>: <b>{gems_balance:.1f}</b> гемов\n"]
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    all_user_daily_counts = bot_data_loc.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
+    user_counts_today = all_user_daily_counts.get(str(user_id), {})
+
+    for model_key, model_config in AVAILABLE_TEXT_MODELS.items():
+        if model_config.get("is_limited"):
+            usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
+            current_day_usage = usage_info['count'] if usage_info['date'] == today_str else 0
+            
+            if model_key == "custom_api_gpt_4o_mini":
+                actual_limit = CONFIG.DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY
+                cost = CONFIG.GEMS_PER_REQUEST_GPT4O_MINI
+                parts.append(f"▫️ {model_config['name']}: <b>{current_day_usage} / {actual_limit}</b> (бесплатно, затем {cost} гема/запрос)")
+            else:
+                cost = CONFIG.GEMS_PER_REQUEST_GEMINI_PRO if model_key in ["custom_api_gemini_2_5_pro", "custom_api_grok_3"] else 0
+                parts.append(f"▫️ {model_config['name']}: {cost} гема/запрос")
+
+    parts.append("\n💎 Пополните баланс гемов через команду /buy_gems или кнопку «💎 Купить гемы» в меню.")
+    
+    current_menu_for_reply = user_data_loc.get('current_menu', 'limits_submenu')
+    await update.message.reply_text(
+        "\n".join(parts),
+        parse_mode=ParseMode.HTML,
+        reply_markup=generate_menu_keyboard(current_menu_for_reply),
+        disable_web_page_preview=True
+    )
+
+async def buy_gems_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_data_loc = await firestore_service.get_user_data(user_id)
+    
+    gems_balance = user_data_loc.get('gems_balance', 0.0)
+    message = (
+        f"<b>💎 Покупка гемов</b>\n\n"
+        f"Ваш текущий баланс: <b>{gems_balance:.1f}</b> гемов.\n\n"
+        f"Стоимость запросов:\n"
+        f"▫️ Gemini Pro: {CONFIG.GEMS_PER_REQUEST_GEMINI_PRO} гема\n"
+        f"▫️ Grok 3: {CONFIG.GEMS_PER_REQUEST_GROK_3} гема\n"
+        f"▫️ GPT-4o Mini: {CONFIG.GEMS_PER_REQUEST_GPT4O_MINI} гема (первые {CONFIG.DEFAULT_FREE_REQUESTS_GPT4O_MINI_DAILY} бесплатно ежедневно)\n\n"
+        f"Выберите количество гемов для покупки:"
+    )
+    
+    inline_keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("10 гемов - $1", callback_data="buy_gems_10"),
+            InlineKeyboardButton("50 гемов - $4", callback_data="buy_gems_50")
+        ],
+        [InlineKeyboardButton("100 гемов - $7", callback_data="buy_gems_100")]
+    ])
+    
+    await update.message.reply_text(
+        message,
+        parse_mode=ParseMode.HTML,
+        reply_markup=inline_keyboard,
+        disable_web_page_preview=True
+    )
+
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    data = query.data
+    action, target = data.split(":", 1) if ":" in data else (data, "")
+    
+    user_data = await firestore_service.get_user_data(user_id)
+    
+    if action == "submenu":
+        await firestore_service.set_user_data(user_id, {"current_menu": target})
+        await query.message.edit_text(
+            MENU_STRUCTURE[target]["title"],
+            reply_markup=generate_menu_keyboard(target)
+        )
+    elif action == "set_model":
+        await firestore_service.set_user_data(user_id, {"current_model": target})
+        await query.message.edit_text(
+            f"Выбрана модель: {AVAILABLE_TEXT_MODELS[target]['name']}",
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu'))
+        )
+    elif action == "set_mode":
+        await firestore_service.set_user_data(user_id, {"current_mode": target})
+        await query.message.edit_text(
+            f"Выбран режим: {target}",
+            reply_markup=generate_menu_keyboard(user_data.get('current_menu', 'main_menu'))
+        )
+    elif action == "show_subscription" and target == "buy_gems":
+        await buy_gems_command(update, context)
+    elif action in ["buy_gems_10", "buy_gems_50", "buy_gems_100"]:
+        gems_packages = {
+            "buy_gems_10": {"gems": 10, "amount": 100},
+            "buy_gems_50": {"gems": 50, "amount": 400},
+            "buy_gems_100": {"gems": 100, "amount": 700}
+        }
+        package = gems_packages[action]
+        await context.bot.send_invoice(
+            chat_id=update.effective_chat.id,
+            title=f"Покупка {package['gems']} гемов",
+            description=f"Пополнение баланса на {package['gems']} гемов для использования платных моделей ИИ.",
+            payload=f"gems_{package['gems']}_user_{user_id}",
+            provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN,
+            currency="USD",
+            prices=[LabeledPrice(f"{package['gems']} гемов", package['amount'] * 100)],
+            start_parameter=f"gems_{package['gems']}"
+        )
+
+async def pre_checkout_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.answer_pre_checkout_query(
+        pre_checkout_query_id=update.pre_checkout_query.id,
+        ok=True
+    )
+
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    payment_info = update.message.successful_payment
+    payload = payment_info.invoice_payload
+    
+    logger.info(f"Successful payment received from user {user_id}. Amount: {payment_info.total_amount} {payment_info.currency}. Payload: {payload}")
+    
+    try:
+        gems_count = int(payload.split("_")[1])
+        user_data_loc = await firestore_service.get_user_data(user_id)
+        current_balance = user_data_loc.get('gems_balance', 0.0)
+        new_balance = current_balance + gems_count
+        
+        await firestore_service.set_user_data(user_id, {
+            'gems_balance': new_balance,
+            'last_gems_purchase': datetime.now(timezone.utc).isoformat()
+        })
+        
+        confirmation_message = (
+            f"🎉 Оплата прошла успешно! Вам начислено <b>{gems_count}</b> гемов.\n"
+            f"Новый баланс: <b>{new_balance:.1f}</b> гемов."
+        )
+        await update.message.reply_text(
+            confirmation_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu', 'main_menu'))
+        )
+        
+        if CONFIG.ADMIN_ID:
+            admin_message = (
+                f"🔔 Новая покупка гемов!\n"
+                f"Пользователь: {user_id} (@{update.effective_user.username})\n"
+                f"Гемов: {gems_count}\n"
+                f"Сумма: {payment_info.total_amount / 100} {payment_info.currency}\n"
+                f"Payload: {payload}"
+            )
+            await context.bot.send_message(CONFIG.ADMIN_ID, admin_message)
+            
+    except Exception as e:
+        logger.error(f"Error processing payment for user {user_id}: {e}", exc_info=True)
+        await update.message.reply_text(
+            "Ошибка при начислении гемов. Пожалуйста, свяжитесь с поддержкой.",
+            reply_markup=generate_menu_keyboard(user_data_loc.get('current_menu', 'main_menu'))
+        )
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not update.message or not update.message.text:
+        return
+
+    user_message_text = update.message.text.strip()
+    
+    if is_menu_button_text(user_message_text):
+        logger.debug(f"User {user_id} sent menu button text '{user_message_text}' that reached handle_text. Ignoring.")
+        return
+
+    if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
+        user_data_cache = await firestore_service.get_user_data(user_id)
+        await update.message.reply_text(
+            "Ваш запрос слишком короткий. Пожалуйста, сформулируйте его более подробно.",
+            reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', 'main_menu'))
+        )
+        return
+
+    logger.info(f"User {user_id} sent AI request: '{user_message_text[:100]}...'")
+    
+    user_data_cache = await firestore_service.get_user_data(user_id)
+    current_model_key_val = await get_current_model_key(user_id, user_data_cache)
+    
+    can_proceed, limit_message, _ = await check_and_log_request_attempt(user_id, current_model_key_val)
+    if not can_proceed:
+        await update.message.reply_text(
+            limit_message,
+            parse_mode=ParseMode.HTML,
+            reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', 'main_menu')),
+            disable_web_page_preview=True
+        )
+        return
+
+    ai_service = get_ai_service(current_model_key_val)
+    if not ai_service:
+        await update.message.reply_text(
+            "Ошибка: Не удалось выбрать AI модель. Попробуйте /start.",
+            reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', 'main_menu'))
+        )
+        return
+
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    mode_details_val = await get_current_mode_details(user_id, user_data_cache)
+    system_prompt_val = mode_details_val["prompt"]
+    
+    ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
+    try:
+        ai_response_text = await ai_service.generate_response(system_prompt_val, user_message_text)
+        if ai_response_text.startswith("REQUEST_ID:"):
+            request_id = ai_response_text.split(":", 1)[1]
+            await firestore_service.set_user_data(user_id, {
+                'pending_request': {
+                    'request_id': request_id,
+                    'model_key': current_model_key_val,
+                    'chat_id': update.effective_chat.id,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+            })
+            ai_response_text = "Ваш запрос принят и обрабатывается. Ответ будет отправлен, как только он будет готов."
+        else:
+            await increment_request_count(user_id, current_model_key_val)
+    except Exception as e:
+        logger.error(f"Error in AI service {type(ai_service).__name__} for model {current_model_key_val}: {e}", exc_info=True)
+        ai_response_text = f"Ошибка при обработке запроса моделью {ai_service.model_config['name']}."
+
+    final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+    await update.message.reply_text(
+        final_reply_text,
+        reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', 'main_menu')),
+        disable_web_page_preview=True
+    )
+    logger.info(f"Sent response to user {user_id} for model {current_model_key_val}.")
+
+# Главная функция
+async def main():
+    app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
+    
+    bot_commands = [
+        BotCommand("start", "🚀 Перезапуск бота / Главное меню"),
+        BotCommand("menu", "📋 Открыть главное меню"),
+        BotCommand("usage", "📊 Показать мой баланс и лимиты"),
+        BotCommand("buy_gems", "💎 Купить гемы для использования платных моделей"),
+        BotCommand("bonus", "🎁 Получить бонус за подписку на канал"),
+        BotCommand("help", "❓ Получить справку по боту")
+    ]
+    await app.bot.set_my_commands(bot_commands)
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", menu_command))
+    app.add_handler(CommandHandler("usage", show_limits))
+    app.add_handler(CommandHandler("buy_gems", buy_gems_command))
+    app.add_handler(CallbackQueryHandler(callback_query_handler))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout_query))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    
+    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
