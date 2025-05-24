@@ -35,7 +35,9 @@ class AppConfig:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152"))
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
     FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
-
+    
+    CUSTOM_GEMINI_PRO_ENDPOINT = os.getenv("CUSTOM_GEMINI_PRO_ENDPOINT", "https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro")
+    
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
