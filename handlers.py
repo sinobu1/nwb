@@ -232,7 +232,7 @@ async def show_help(update: Update, user_id: int):
         "    ▫️ «💎 Подписка»: Информация о Profi подписке.\n"
         "    ▫️ «❓ Помощь»: Этот раздел справки.\n\n"
         "3.  <b>Основные команды</b>:\n"
-        "    /start, /menu, /usage, /subscribe, /bonus, /help."
+        "    /start, /menu, /usage, /subscribe, /bonus, /help." # /start здесь только для информации
     )
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_MAIN)
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_for_reply), disable_web_page_preview=True)
@@ -268,8 +268,8 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     action_item_found = None
     search_order = [current_menu_key] + [key for key in MENU_STRUCTURE if key != current_menu_key]
     
-    for menu_key in search_order:
-        for item in MENU_STRUCTURE.get(menu_key, {}).get("items", []):
+    for menu_key_search_loop in search_order: # Изменил имя переменной цикла, чтобы не конфликтовать
+        for item in MENU_STRUCTURE.get(menu_key_search_loop, {}).get("items", []):
             if item["text"] == button_text:
                 action_item_found = item
                 break
@@ -284,31 +284,25 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     action_type = action_item_found["action"]
     action_target = action_item_found["target"]
 
-     if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
-        # Код для этого условия с правильным отступом
+    if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
         await show_menu(update, user_id, action_target)
     
-    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT: # <--- Убедитесь, что эта строка на одном уровне с if выше
-        # Весь код ниже должен быть с ОДИНАКОВЫМ отступом (на 4 пробела больше, чем elif)
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
         await firestore_service.set_user_data(user_id, {'current_ai_mode': action_target})
         agent_name = AI_MODES.get(action_target, {}).get('name', 'N/A')
         response_text = f"🤖 Агент ИИ изменен на: <b>{agent_name}</b>."
-        
-        # user_data_loc уже был получен выше в menu_button_handler
-        # current_menu_key также уже был получен выше
+        # current_menu_key здесь - это меню, из которого была нажата кнопка (т.е. MENU_AI_MODES_SUBMENU)
         reply_menu_after_set_agent = current_menu_key 
         
         await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_set_agent))
         await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_set_agent})
 
-    elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL: # <--- Эта строка на том же уровне, что и elif выше
-        # Код для этого условия с правильным отступом (на 4 пробела больше, чем этот elif)
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL:
         model_info = AVAILABLE_TEXT_MODELS.get(action_target, {})
         update_payload = {
             'selected_model_id': model_info.get("id"), 
             'selected_api_type': model_info.get("api_type")
         }
-        # user_data_loc уже был получен выше
         if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and \
            user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
             update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
@@ -329,7 +323,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         response_text = (f"⚙️ Модель ИИ изменена на: <b>{model_info.get('name', 'N/A')}</b>.\n"
                          f"Дневной лимит: {current_usage_string} / {limit_display_string}.")
         
-        # current_menu_key также уже был получен выше
+        # current_menu_key здесь - это меню, из которого была нажата кнопка (т.е. MENU_MODELS_SUBMENU)
         reply_menu_after_set_model = current_menu_key
 
         await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_set_model))
@@ -354,6 +348,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     user_id = update.effective_user.id
     user_message_text = update.message.text.strip()
+    # Сообщение пользователя больше не удаляется
+    # await _store_and_try_delete_message(update, user_id, is_command_to_keep=False)
 
     if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
         user_data_cache = await firestore_service.get_user_data(user_id)
@@ -373,7 +369,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(limit_message, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_after_reset), disable_web_page_preview=True)
         return
 
-    current_model_key = await get_current_model_key(user_id, user_data_cache)
+    current_model_key = await get_current_model_key(user_id, user_data_cache) # Перечитываем на случай смены
     ai_service = get_ai_service(current_model_key)
 
     if not ai_service:
@@ -426,6 +422,9 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     if is_user_profi_subscriber(current_user_subscription):
         try:
             previous_valid_until = datetime.fromisoformat(current_user_subscription['valid_until'])
+            if previous_valid_until.tzinfo is None: # Добавим проверку и установку tzinfo если отсутствует
+                previous_valid_until = previous_valid_until.replace(tzinfo=timezone.utc)
+
             if previous_valid_until > now_utc:
                 subscription_start_date = previous_valid_until
         except (ValueError, KeyError):
@@ -480,9 +479,17 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             f"Пользователь: ID {update.effective_user.id} (@{update.effective_user.username})\n"
             f"Сообщение: {update.message.text if update.message else 'N/A'}\n"
             f"Ошибка: {context.error}\n\n"
-            f"Traceback:\n```\n{tb_string[:3500]}\n```"
+            f"Traceback:\n```\n{tb_string[:3500]}\n```" # Markdown v2 требует экранирования для ```
         )
+        # Для MarkdownV2 нужно экранировать некоторые символы внутри ``` блока, если они есть
+        # Но для простоты, если есть проблемы, можно отправить без форматирования Markdown
         try:
-            await context.bot.send_message(CONFIG.ADMIN_ID, error_details)
-        except Exception as e:
-            logger.error(f"Failed to send detailed error report to admin: {e}")
+            await context.bot.send_message(CONFIG.ADMIN_ID, error_details) # Попробуем отправить как есть
+        except telegram.error.TelegramError as e_md:
+            logger.error(f"Failed to send detailed error report to admin with Markdown: {e_md}. Sending as plain text.")
+            try:
+                 # Убираем форматирование Markdown, если оно вызывает ошибку
+                 plain_error_details = error_details.replace("```", "") 
+                 await context.bot.send_message(CONFIG.ADMIN_ID, plain_error_details)
+            except Exception as e_plain:
+                 logger.error(f"Failed to send plain text detailed error report to admin: {e_plain}")
