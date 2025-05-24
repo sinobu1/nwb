@@ -423,32 +423,44 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     user_id = update.effective_user.id
     user_message_text = update.message.text.strip()
-    user_data_cache = await firestore_service.get_user_data(user_id) # Получаем один раз в начале
+    user_data_cache = await firestore_service.get_user_data(user_id)
     current_ai_mode_key = user_data_cache.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     active_agent_config = AI_MODES.get(current_ai_mode_key)
 
-    # --- >>> НОВАЯ ЛОГИКА для диетолога с фото <<< ---
+    # --- >>> ИСПРАВЛЕННАЯ ЛОГИКА для диетолога с фото <<< ---
     if active_agent_config and \
        active_agent_config.get("multimodal_capable") and \
        context.user_data.get('dietitian_state') == 'awaiting_weight' and \
        'dietitian_pending_photo_id' in context.user_data:
 
         photo_file_id = context.user_data['dietitian_pending_photo_id']
-        model_to_use = context.user_data.get('dietitian_model_to_use', active_agent_config.get("forced_model_key")) # Берем сохраненную модель
+        # Используем модель, принудительно заданную для агента
+        model_to_use = active_agent_config.get("forced_model_key")
         
-        # Сохраненные параметры использования
-        usage_type = context.user_data.get('dietitian_usage_type', 'error') 
-        gem_cost_for_request = context.user_data.get('dietitian_gem_cost', None)
-
-        if usage_type == 'error' or not model_to_use:
-            logger.error(f"Error in dietitian state for user {user_id}: missing model_to_use or usage_type.")
-            await update.message.reply_text("Произошла внутренняя ошибка состояния. Попробуйте отправить фото заново.")
+        if not model_to_use or model_to_use not in AVAILABLE_TEXT_MODELS:
+            logger.error(f"Dietitian agent '{current_ai_mode_key}' has invalid or missing 'forced_model_key': {model_to_use}")
+            await update.message.reply_text("Ошибка конфигурации модели для агента-диетолога. Сообщите администратору.")
+            # Очистка состояния
             context.user_data.pop('dietitian_state', None)
             context.user_data.pop('dietitian_pending_photo_id', None)
-            # ... (очистить другие dietitian_... переменные)
+            context.user_data.pop('dietitian_model_to_use', None) # На случай если оно там было
+            context.user_data.pop('dietitian_usage_type', None)
+            context.user_data.pop('dietitian_gem_cost', None)
             return
 
-        logger.info(f"User {user_id} (agent {current_ai_mode_key}) provided weight: '{user_message_text}' for photo {photo_file_id}. Model: {model_to_use}")
+        # ПРОВЕРКА ЛИМИТОВ И ГЕМОВ ДЛЯ ПРИНУДИТЕЛЬНОЙ МОДЕЛИ (повторяем из photo_handler, но это важно)
+        # так как с момента отправки фото до отправки веса мог пройти день или баланс измениться
+        bot_data_cache = await firestore_service.get_bot_data()
+        can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
+            user_id, model_to_use, user_data_cache, bot_data_cache
+        )
+
+        if not can_proceed:
+            await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML)
+            # Состояние не сбрасываем, чтобы пользователь мог пополнить гемы и попробовать снова с тем же фото
+            return
+        
+        logger.info(f"User {user_id} (agent {current_ai_mode_key}) provided weight: '{user_message_text}' for photo {photo_file_id}. Model: {model_to_use}. Usage: {usage_type}")
         
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
         
@@ -459,37 +471,44 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         # ---- TODO: Реализация отправки фото и текста в AI ----
-        # Это самый сложный момент. Зависит от того, как ваш `custom_api_gemini_2_5_pro`
-        # принимает изображения (URL, base64, или если это вообще другая модель/API).
-        # 
-        # Примерная логика, если CustomHttpAIService был бы доработан:
-        # 1. Скачать фото по photo_file_id: `file = await context.bot.get_file(photo_file_id)`
-        # 2. Получить URL или байты: `photo_url = file.file_path` (если у TG есть прямой URL) или скачать `file.download_as_bytearray()`
-        # 3. Если нужен base64: `import base64; photo_base64 = base64.b64encode(byte_array).decode('utf-8')`
-        #
-        # Промпт для модели уже содержит инструкции. Теперь нужно передать ей фото и вес.
-        # user_prompt_for_multimodal = f"Вес порции: {user_message_text} грамм. Проанализируй фото и рассчитай КБЖУ."
-        #
-        # ai_response_text = await ai_service.generate_response_multimodal(
-        #     system_prompt=active_agent_config["prompt"], 
-        #     user_prompt=user_prompt_for_multimodal,
-        #     image_data={"type": "url", "value": photo_url} # или "base64"
-        # )
-        # ---- КОНЕЦ TODO ----
+        # Эта часть по-прежнему требует вашей реализации или уточнения формата API gen-api.ru
+        photo_file = await context.bot.get_file(photo_file_id)
+        # photo_url = photo_file.file_path # Это не прямой URL, а путь для скачивания с токеном
+        # Для передачи в gen-api.ru нужен либо прямой публичный URL, либо base64
+        # Пример, если бы вы загрузили фото на хостинг и получили URL:
+        # image_data_for_api = {"type": "url", "value": "ПУБЛИЧНЫЙ_URL_ИЗОБРАЖЕНИЯ"}
+        # Или, если передаете base64 (формат JSON для gen-api.ru нужно уточнить!):
+        # file_bytes = await photo_file.download_as_bytearray()
+        # import base64
+        # photo_base64 = base64.b64encode(bytes(file_bytes)).decode('utf-8')
+        # image_data_for_api = {"type": "base64", "value": photo_base64, "mime_type": "image/jpeg"}
 
-        # ЗАГЛУШКА ответа, пока не реализована мультимодальная часть:
-        ai_response_text = (f"Заглушка: Получил фото ID: {photo_file_id} и вес: {user_message_text} г. "
-                            f"Модель для анализа: {model_to_use}. Тип использования: {usage_type}. "
-                            "Здесь будет расчет КБЖУ после интеграции мультимодального API.")
-        logger.warning("Multimodal AI call is currently a STUB.")
+        user_prompt_for_multimodal = f"Вес порции: {user_message_text}. Проанализируй фото и рассчитай КБЖУ."
+        system_prompt_for_dietitian = active_agent_config["prompt"]
+        
+        ai_response_text = "ЗАГЛУШКА: Мультимодальный запрос еще не реализован до конца."
+        try:
+            # Замените эту заглушку на реальный вызов, когда будете готовы:
+            # ai_response_text = await ai_service.generate_response(
+            #     system_prompt=system_prompt_for_dietitian, 
+            #     user_prompt=user_prompt_for_multimodal,
+            #     image_data=image_data_for_api # <--- передаем данные изображения
+            # )
+            logger.warning(f"User {user_id} dietitian multimodal call STUBBED. Photo: {photo_file_id}, Weight: {user_message_text}")
+            ai_response_text = (f"Получил фото ID: {photo_file_id} и вес: {user_message_text}. "
+                                f"Модель: {model_to_use}. Тип: {usage_type}. "
+                                "Расчет КБЖУ будет здесь, когда мультимодальность будет полностью интегрирована с вашим API.")
+
+        except Exception as e:
+            logger.error(f"Error during dietitian multimodal AI call for user {user_id}: {e}", exc_info=True)
+            ai_response_text = "Произошла ошибка при обработке вашего запроса с изображением."
         
         await increment_request_count(user_id, model_to_use, usage_type, gem_cost_for_request)
         
         final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_GEMS_SUBMENU) # Возвращаем в меню гемов или агентов
         await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu))
         
-        # Очистка состояния диетолога
         context.user_data.pop('dietitian_state', None)
         context.user_data.pop('dietitian_pending_photo_id', None)
         context.user_data.pop('dietitian_model_to_use', None)
@@ -497,14 +516,73 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.pop('dietitian_gem_cost', None)
         return 
     
-    # --- >>> КОНЕЦ НОВОЙ ЛОГИКИ для диетолога с фото <<< ---
+    # --- КОНЕЦ ИСПРАВЛЕННОЙ ЛОГИКИ для диетолога с фото ---
 
-    # Обычная обработка текста для других агентов или текстовых запросов к диетологу
-    # Если это агент "photo_dietitian_analyzer", но состояние не "awaiting_weight", 
-    # значит это текстовый запрос к нему, и он должен использовать свою "forced_model_key"
+    # Обычная обработка текста для других агентов или текстовых запросов к диетологу (без фото)
+    # или если агент диетолога не в состоянии ожидания веса.
+    
+    final_model_key_for_request = ""
     if active_agent_config and active_agent_config.get("forced_model_key"):
-        current_model_key = active_agent_config.get("forced_model_key")
-        logger.info(f"Agent '{current_ai_mode_key}' forcing model to '{current_model_key}' for text request.")
+        final_model_key_for_request = active_agent_config.get("forced_model_key")
+        logger.info(f"Agent '{current_ai_mode_key}' forcing model to '{final_model_key_for_request}' for text request.")
+    else:
+        final_model_key_for_request = await get_current_model_key(user_id, user_data_cache)
+
+    # Проверка лимитов/гемов для выбранной (или принудительной) модели
+    bot_data_cache_for_check = await firestore_service.get_bot_data()
+    can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
+        user_id, final_model_key_for_request, user_data_cache, bot_data_cache_for_check
+    )
+        
+    if not can_proceed:
+        await update.message.reply_text(
+            limit_or_gem_message, 
+            parse_mode=ParseMode.HTML, 
+            reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), 
+            disable_web_page_preview=True
+        )
+        return
+
+    if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text("Ваш запрос слишком короткий.", reply_markup=generate_menu_keyboard(current_menu))
+        return
+
+    logger.info(f"User {user_id} (agent: {current_ai_mode_key}, model: {final_model_key_for_request}) sent AI request: '{user_message_text[:100]}...'")
+
+    ai_service = get_ai_service(final_model_key_for_request)
+    if not ai_service:
+        logger.critical(f"Could not get AI service for model key '{final_model_key_for_request}'.")
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text("Критическая ошибка при выборе AI модели.", reply_markup=generate_menu_keyboard(current_menu))
+        return
+
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    # Для текстовых запросов к диетологу (без фото) используется его же промпт
+    system_prompt_to_use = active_agent_config["prompt"] if active_agent_config else AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"]
+    
+    ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
+    try:
+        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text)
+    except Exception as e:
+        model_name_for_error = AVAILABLE_TEXT_MODELS.get(final_model_key_for_request, {}).get('name', final_model_key_for_request)
+        logger.error(f"Unhandled exception in AI service for model {model_name_for_error}: {e}", exc_info=True)
+        ai_response_text = f"Произошла внутренняя ошибка при обработке вашего запроса моделью {model_name_for_error}."
+    
+    await increment_request_count(user_id, final_model_key_for_request, usage_type, gem_cost_for_request)
+
+    final_reply_text, was_truncated = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+    if was_truncated:
+        logger.info(f"AI response for user {user_id} was truncated.")
+    
+    current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+    await update.message.reply_text(
+        final_reply_text, 
+        reply_markup=generate_menu_keyboard(current_menu), 
+        disable_web_page_preview=True
+    )
+    logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
     else:
         current_model_key = await get_current_model_key(user_id, user_data_cache) # Глобальная модель
 
