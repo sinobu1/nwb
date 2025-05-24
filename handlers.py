@@ -40,6 +40,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if updates_to_user_data:
         await firestore_service.set_user_data(user_id, updates_to_user_data)
         user_data_loc.update(updates_to_user_data)
+        
+    if 'gem_balance' not in user_data_loc: # Инициализация баланса гемов
+    updates_to_user_data['gem_balance'] = CONFIG.GEMS_FOR_NEW_USER # Например, 0 или приветственный бонус
 
     current_model_key_val = await get_current_model_key(user_id, user_data_loc)
     mode_details_res = await get_current_mode_details(user_id, user_data_loc)
@@ -88,60 +91,47 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_limits(update: Update, user_id: int):
     user_data_loc = await firestore_service.get_user_data(user_id)
-    bot_data_loc = await firestore_service.get_bot_data()
-    
-    user_subscriptions = bot_data_loc.get(BotConstants.FS_USER_SUBSCRIPTIONS_KEY, {}).get(str(user_id), {})
-    is_profi = is_user_profi_subscriber(user_subscriptions)
-    
-    subscription_status_display = "Бесплатный"
-    if is_profi:
-        try:
-            valid_until_dt = datetime.fromisoformat(user_subscriptions['valid_until']).astimezone(timezone.utc)
-            subscription_status_display = f"Профи (активна до {valid_until_dt.strftime('%d.%m.%Y')})"
-        except (ValueError, KeyError):
-            subscription_status_display = "Профи (ошибка в дате)"
-    elif user_subscriptions.get('level') == CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY:
-        try:
-            expired_dt = datetime.fromisoformat(user_subscriptions['valid_until']).astimezone(timezone.utc)
-            subscription_status_display = f"Профи (истекла {expired_dt.strftime('%d.%m.%Y')})"
-        except (ValueError, KeyError):
-             subscription_status_display = "Профи (истекла, ошибка в дате)"
+    bot_data_loc = await firestore_service.get_bot_data() # Получаем один раз
 
-    parts = [f"<b>📊 Ваши текущие лимиты</b> (Статус: <b>{subscription_status_display}</b>)\n"]
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    user_counts_today = bot_data_loc.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {}).get(str(user_id), {})
+    user_gem_balance = await get_user_gem_balance(user_id, user_data_loc) # Используем новую функцию
+
+    parts = [f"<b>💎 Ваш баланс: {user_gem_balance:.1f} гемов</b>\n"] # Баланс с 1 знаком после запятой
+    parts.append("<b>📊 Ваши дневные бесплатные лимиты и стоимость:</b>\n")
 
     for model_key, model_config in AVAILABLE_TEXT_MODELS.items():
         if model_config.get("is_limited"):
-            usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
-            current_day_usage = usage_info['count'] if usage_info.get('date') == today_str else 0
-            actual_limit = await get_user_actual_limit_for_model(user_id, model_key, user_data_loc, bot_data_loc)
-            
+            current_free_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_loc)
+            free_daily_limit = model_config.get('free_daily_limit', 0)
+            gem_cost = model_config.get('gem_cost', 0.0)
+
+            usage_display = f"Бесплатно сегодня: {current_free_usage}/{free_daily_limit}"
+            cost_display = f"Стоимость: {gem_cost:.1f} гемов" if gem_cost > 0 else "Только бесплатно"
+
             bonus_notification = ""
-            if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and not is_profi and user_data_loc.get('claimed_news_bonus', False):
-                bonus_left = user_data_loc.get('news_bonus_uses_left', 0)
-                if bonus_left > 0:
-                    bonus_notification = f" (включая <b>{bonus_left}</b> бонусных)"
-            
-            limit_display = '∞' if actual_limit == float('inf') else str(int(actual_limit))
-            parts.append(f"▫️ {model_config['name']}: <b>{current_day_usage} / {limit_display}</b>{bonus_notification}")
+            if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and \
+               user_data_loc.get('claimed_news_bonus', False) and \
+               (bonus_left := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
+                bonus_notification = f" (еще <b>{bonus_left}</b> бонусных)"
+
+            parts.append(f"▫️ {model_config['name']}: {usage_display}{bonus_notification}. {cost_display}")
 
     parts.append("")
-    bonus_model_name_display = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY, {}).get('name', 'бонусной модели')
+    bonus_model_cfg = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
+    if bonus_model_cfg:
+        bonus_model_name_display = bonus_model_cfg['name']
+        if not user_data_loc.get('claimed_news_bonus', False):
+            parts.append(f'🎁 Подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">канал новостей</a>, чтобы получить бонусные генерации ({CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS} для {bonus_model_name_display})! Нажмите «🎁 Бонус» в меню.')
+        elif (bonus_left_val := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
+            parts.append(f"✅ У вас есть <b>{bonus_left_val}</b> бонусных генераций с канала новостей для модели {bonus_model_name_display}.")
+        else:
+            parts.append(f"ℹ️ Бонус с канала новостей для модели {bonus_model_name_display} был использован.")
 
-    if not user_data_loc.get('claimed_news_bonus', False):
-        parts.append(f'🎁 Подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">канал новостей</a>, чтобы получить бонусные генерации ({CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS} для {bonus_model_name_display})! Нажмите «🎁 Бонус» в меню.')
-    elif (bonus_left_val := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
-        parts.append(f"✅ У вас есть <b>{bonus_left_val}</b> бонусных генераций для модели {bonus_model_name_display}.")
-    else:
-        parts.append(f"ℹ️ Бонус с канала новостей для модели {bonus_model_name_display} был использован.")
-        
-    if not is_profi:
-        parts.append("\n💎 Хотите больше лимитов? Оформите подписку Profi через команду /subscribe или меню.")
-        
+    parts.append("\n💎 Пополнить баланс гемов можно через меню «Гемы» (скоро).") # Заглушка
+
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_MAIN)
     await update.message.reply_text(
-        "\n".join(parts), parse_mode=ParseMode.HTML, 
+        "\n".join(parts), 
+        parse_mode=ParseMode.HTML, 
         reply_markup=generate_menu_keyboard(current_menu_for_reply),
         disable_web_page_preview=True
     )
@@ -358,16 +348,34 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     logger.info(f"User {user_id} sent AI request: '{user_message_text[:100]}...'")
-    
-    user_data_cache = await firestore_service.get_user_data(user_id) 
-    current_model_key = await get_current_model_key(user_id, user_data_cache)
-    can_proceed, limit_message, _ = await check_and_log_request_attempt(user_id, current_model_key)
-    
-    if not can_proceed:
-        user_data_cache_after_reset = await firestore_service.get_user_data(user_id)
-        current_menu_after_reset = user_data_cache_after_reset.get('current_menu', BotConstants.MENU_MAIN)
-        await update.message.reply_text(limit_message, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_after_reset), disable_web_page_preview=True)
-        return
+
+user_data_cache = await firestore_service.get_user_data(user_id) 
+bot_data_cache_for_check = await firestore_service.get_bot_data() # Получаем один раз для передачи
+current_model_key = await get_current_model_key(user_id, user_data_cache)
+
+# Теперь check_and_log_request_attempt возвращает больше информации
+can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
+    user_id, current_model_key, user_data_cache, bot_data_cache_for_check
+)
+
+if not can_proceed:
+    # ... (обработка limit_or_gem_message как раньше) ...
+    # limit_or_gem_message уже содержит информацию о нехватке гемов или исчерпании лимита
+    await update.message.reply_text(
+        limit_or_gem_message, 
+        parse_mode=ParseMode.HTML, 
+        reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), 
+        disable_web_page_preview=True
+    )
+    return
+
+# Если can_proceed, то limit_or_gem_message содержит информационное сообщение (о бонусе, бесплатной попытке или списании гемов)
+# Можно его отправить пользователю, если это уместно, или просто продолжить
+# Например, если это списание гемов, можно уведомить:
+if usage_type == "gem" and gem_cost_for_request:
+     # Можно отправить отдельным сообщением или добавить к ответу ИИ
+     # await update.message.reply_text(f"🤖 {limit_or_gem_message}", parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+     pass # Решите, нужно ли это сообщение
 
     current_model_key = await get_current_model_key(user_id, user_data_cache) # Перечитываем на случай смены
     ai_service = get_ai_service(current_model_key)
@@ -388,6 +396,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Unhandled exception in AI service for model {current_model_key}: {e}", exc_info=True)
         ai_response_text = f"Произошла внутренняя ошибка при обработке вашего запроса."
+        # После успешного ответа от AI, вызываем increment_request_count
+# final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM) # Это уже есть
+    await increment_request_count(user_id, current_model_key, usage_type, gem_cost_for_request)
 
     final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
     await increment_request_count(user_id, current_model_key)
