@@ -352,7 +352,7 @@ class CustomHttpAIService(BaseAIService):
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
-        if not actual_key or ("YOUR_" in actual_key and not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy")))):
+        if not actual_key or ("YOUR_" in actual_key and not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy"))):
             logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
 
