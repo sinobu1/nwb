@@ -20,7 +20,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple, List
 
-# --- ДОБАВЛЕННЫЕ ИСПРАВЛЕНИЯ ---
+# --- ИМПОРТЫ ---
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
 from abc import ABC, abstractmethod
@@ -96,7 +96,7 @@ class BotConstants:
 AI_MODES = {
     "universal_ai_basic": {
         "name": "Универсальный",
-        "prompt": ("Ты — Gemini, продвинутый ИИ-ассистент..."), # Сокращено для краткости
+        "prompt": ("Ты — Gemini, продвинутый ИИ-ассистент..."), 
         "welcome": "Активирован агент 'Универсальный'. Какой у вас запрос?"
     },
     "gemini_pro_custom_mode": {
@@ -272,25 +272,20 @@ class CustomHttpAIService(BaseAIService):
             json_resp = response.json()
             
             extracted_text = None
-            # Specific parsing for grok
             if self.model_id == "grok-3-beta":
                 if "response" in json_resp and isinstance(json_resp.get("response"), list) and json_resp["response"]:
                     extracted_text = json_resp["response"][0].get("choices", [{}])[0].get("message", {}).get("content", "").strip()
             
-            # More robust parsing for gen-api.ru style responses
             elif self.model_id in ["gemini-2.5-pro-preview-03-25", "gpt-4o-mini"]:
                  output_val = json_resp.get("output")
                  if isinstance(output_val, str): extracted_text = output_val.strip()
                  elif isinstance(output_val, dict): extracted_text = output_val.get("text", output_val.get("content", "")).strip()
-                 # Fallback to top-level 'text' field
                  if not extracted_text: extracted_text = json_resp.get("text", "").strip()
                  
-                 # Report error status if no text was found
                  if json_resp.get("status") != "success" and not extracted_text:
                      error_msg = json_resp.get("error_message", "Неизвестная ошибка API")
                      extracted_text = f"Ошибка API для {self.model_config['name']}: {error_msg}"
             
-            # General fallback for any other model
             if extracted_text is None:
                 for key in ["text", "content", "message", "output", "response"]:
                     if isinstance(json_resp.get(key), str) and (val := json_resp[key].strip()):
@@ -300,7 +295,13 @@ class CustomHttpAIService(BaseAIService):
             return extracted_text if extracted_text else f"Ответ API {self.model_config['name']} не содержит текста."
         except requests.exceptions.HTTPError as e:
             logger.error(f"Custom API HTTPError for {self.model_id}: {e.response.status_code} - {e.response.text}")
-            return f"Ошибка сети API ({e.response.status_code}) для {self.model_config['name']}."
+            # Try to parse the error from API response
+            try:
+                error_json = e.response.json()
+                error_message = error_json.get("error", e.response.text)
+                return f"Ошибка API ({e.response.status_code}) для {self.model_config['name']}: {error_message}"
+            except json.JSONDecodeError:
+                return f"Ошибка сети API ({e.response.status_code}) для {self.model_config['name']}."
         except Exception as e:
             logger.error(f"Unexpected Custom API error for {self.model_id}: {e}", exc_info=True)
             return f"Неожиданная ошибка API ({type(e).__name__}) для {self.model_config['name']}."
@@ -346,11 +347,9 @@ async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[b
     user_data = await firestore_service.get_user_data(user_id)
     limit_type = model_cfg.get("limit_type")
 
-    # Bonus uses have priority
     if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and user_data.get('news_bonus_uses_left', 0) > 0:
         return True, "bonus_use"
 
-    # Get daily usage
     all_counts = (await firestore_service.get_bot_data()).get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
     user_counts = all_counts.get(str(user_id), {})
     model_usage = user_counts.get(model_key, {'date': '', 'count': 0})
@@ -371,14 +370,13 @@ async def check_and_log_request_attempt(user_id: int, model_key: str) -> Tuple[b
     if limit_type == "daily_free_or_gems":
         if current_usage < model_cfg.get("limit", 0):
             return True, "daily_free_use"
-        # Free attempts are over, check for gems
         cost = model_cfg.get("gem_cost", 0.0)
         balance = user_data.get("gem_balance", 0.0)
         if balance < cost:
             return False, f"Бесплатные попытки для «{model_cfg['name']}» закончились. Требуется: {cost}💎, у вас: {balance:.1f}💎."
         return True, "use_gems"
         
-    return True, "" # Default case
+    return True, ""
 
 async def increment_request_count(user_id: int, model_key: str, flag: str):
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
@@ -414,7 +412,6 @@ async def increment_request_count(user_id: int, model_key: str, flag: str):
         await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_counts})
         logger.info(f"Incremented daily count for user {user_id}, model {model_key} to {model_usage['count']}.")
 
-
 # --- ФУНКЦИИ МЕНЮ ---
 def is_menu_button_text(text: str) -> bool:
     if text in ["⬅️ Назад", "🏠 Главное меню"]: return True
@@ -442,13 +439,8 @@ async def show_menu(update: Update, user_id: int, menu_key: str):
     if not menu_cfg: menu_key = BotConstants.MENU_MAIN
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
     
-    # Use context.bot.send_message if update.message is not available (e.g., from callback)
-    # This prevents errors when handling menu buttons.
-    bot = update.get_bot()
-    chat_id = update.effective_chat.id
-    
-    await bot.send_message(
-        chat_id=chat_id,
+    await update.get_bot().send_message(
+        chat_id=update.effective_chat.id,
         text=MENU_STRUCTURE[menu_key]["title"],
         reply_markup=generate_menu_keyboard(menu_key),
         disable_web_page_preview=True
@@ -619,18 +611,19 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if response_message:
         await context.bot.send_message(chat_id=user_id, text=response_message, parse_mode=ParseMode.HTML)
 
-
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not (update.message and update.message.text): return
     user_message = update.message.text.strip()
     if is_menu_button_text(user_message): return
     
-    try: await update.message.delete()
-    except Exception: pass
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
     
     if len(user_message) < CONFIG.MIN_AI_REQUEST_LENGTH:
-        await update.message.reply_text("Запрос слишком короткий.")
+        await update.message.reply_text("Ваш запрос слишком короткий. Пожалуйста, сформулируйте его более подробно.")
         return
 
     user_data = await firestore_service.get_user_data(user_id)
@@ -638,22 +631,37 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     can_proceed, flag_or_msg = await check_and_log_request_attempt(user_id, model_key)
     if not can_proceed:
-        await update.message.reply_text(flag_or_msg, parse_mode=ParseMode.HTML)
+        await update.message.reply_text(flag_or_msg, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
         return
 
     ai_service = get_ai_service(model_key)
     if not ai_service:
-        await update.message.reply_text("Ошибка при выборе AI модели.")
+        await update.message.reply_text("Произошла критическая ошибка при выборе AI модели.")
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     mode_details = await get_current_mode_details(user_id, user_data)
     
     ai_response = await ai_service.generate_response(mode_details["prompt"], user_message)
+
+    is_successful_response = not (
+        ai_response.startswith("Ошибка") or
+        "не содержит текста" in ai_response or
+        "Ответ Google GenAI пуст" in ai_response
+    )
+
     final_reply, _ = smart_truncate(ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
     
-    await increment_request_count(user_id, model_key, flag_or_msg)
-    await update.message.reply_text(final_reply)
+    if is_successful_response:
+        await increment_request_count(user_id, model_key, flag_or_msg)
+    else:
+        logger.warning(f"AI response indicated an error for user {user_id}. Usage not incremented. Response: {ai_response}")
+    
+    await update.message.reply_text(
+        final_reply,
+        parse_mode=ParseMode.HTML if '<' in final_reply and '>' in final_reply else None,
+        disable_web_page_preview=True
+    )
 
 # --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ ---
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -709,20 +717,15 @@ async def main():
 
     app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).read_timeout(30).connect_timeout(30).build()
     
-    # Group 0: Commands
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
     app.add_handler(CommandHandler("bonus", get_bonus_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
-    # Group 1: Menu buttons
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
-    
-    # Group 2: AI requests
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
     
-    # Payment handlers
     app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     
