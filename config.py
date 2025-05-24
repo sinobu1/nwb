@@ -338,6 +338,7 @@ class GoogleGenAIService(BaseAIService):
             logger.error(f"Google GenAI API error for model {self.model_id}: {e}", exc_info=True)
             return f"Ошибка Google API ({type(e).__name__}) при обращении к {self.model_id}."
 
+
 class CustomHttpAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
         api_key_name = self.model_config.get("api_key_var_name")
@@ -353,37 +354,26 @@ class CustomHttpAIService(BaseAIService):
             "Accept": "application/json"
         }
         
-        # Формирование messages payload
-        # gen-api.ru для gpt-4o-mini ожидает content в виде массива [{ "type": "text", "text": "..." }]
-        # Это уже учтено переменной is_gpt4o_like
-        is_gpt4o_like_format = (
-            self.model_id == "gpt-4o-mini" or 
-            self.model_config.get("endpoint", "").startswith("https://api.gen-api.ru")
-        ) # Применяем такой формат для всех gen-api.ru
+        is_gen_api_format = self.model_config.get("endpoint", "").startswith("https://api.gen-api.ru")
 
         messages_payload = []
         if system_prompt:
             messages_payload.append({
                 "role": "system", 
-                "content": [{"type": "text", "text": system_prompt}] if is_gpt4o_like_format else system_prompt
+                "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
             })
         messages_payload.append({
             "role": "user", 
-            "content": [{"type": "text", "text": user_prompt}] if is_gpt4o_like_format else user_prompt
+            "content": [{"type": "text", "text": user_prompt}] if is_gen_api_format else user_prompt
         })
 
-        # Формирование основного payload
         payload = {
             "messages": messages_payload,
-            "is_sync": True, # gen-api.ru использует is_sync [cite: 1]
+            "is_sync": True,
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
         
-        # Параметр 'model' не нужен в теле запроса для gen-api.ru, т.к. модель определяется эндпоинтом
-        # Если бы у вас были другие Custom API, которые требуют 'model' в теле, логика была бы сложнее.
-        # Сейчас все кастомные API в конфиге используют gen-api.ru.
-
-        if self.model_config.get("parameters"): # Добавляем дополнительные параметры, если они есть в конфиге модели
+        if self.model_config.get("parameters"):
             payload.update(self.model_config["parameters"])
         
         endpoint = self.model_config["endpoint"]
@@ -393,47 +383,59 @@ class CustomHttpAIService(BaseAIService):
                 None,
                 lambda: requests.post(endpoint, headers=headers, json=payload, timeout=45)
             )
-            response.raise_for_status() # Проверка на HTTP ошибки (4xx, 5xx)
+            response.raise_for_status()
             json_resp = response.json()
             
             extracted_text = None
 
-            # Обработка ответа для gen-api.ru (включая gpt-4o-mini)
-            if json_resp.get("status") == "success":
-                output_val = json_resp.get("output")
-                if isinstance(output_val, str): 
-                    extracted_text = output_val.strip()
-                elif isinstance(output_val, dict): # Иногда ответ может быть в словаре внутри output
-                    extracted_text = output_val.get("text", output_val.get("content", "")).strip()
-                elif output_val is not None: 
-                    extracted_text = str(output_val).strip()
+            # Обработка ответа для gen-api.ru (GPT-4o mini, Grok, Gemini Pro через этот API)
+            if is_gen_api_format:
+                if "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
+                    first_response_item = json_resp["response"][0]
+                    if "message" in first_response_item and "content" in first_response_item["message"]:
+                        extracted_text = first_response_item["message"]["content"]
+                    # Дополнительная проверка для Gemini Pro через gen-api, если у него другой формат вывода
+                    elif self.model_id == "gemini-2.5-pro-preview-03-25" and "text" in first_response_item: # Это было предположение, gen-api может вернуть "text" на верхнем уровне
+                         extracted_text = first_response_item["text"]
                 
-                # Специфичная логика для Grok, если она отличается от общего "output"
-                if self.model_id == "grok-3-beta" and not extracted_text:
-                     if "response" in json_resp and isinstance(json_resp["response"], list) and \
-                        json_resp["response"] and "choices" in json_resp["response"][0] and \
-                        isinstance(json_resp["response"][0]["choices"], list) and json_resp["response"][0]["choices"]:
-                        extracted_text = json_resp["response"][0]["choices"][0].get("message",{}).get("content","").strip()
+                # Если для Gemini Pro текст на верхнем уровне ответа (не в 'response')
+                if self.model_id == "gemini-2.5-pro-preview-03-25" and "text" in json_resp and not extracted_text:
+                    extracted_text = json_resp.get("text","").strip()
                 
-                # Специфичная логика для Gemini Pro через gen-api.ru, если отличается
-                elif self.model_id == "gemini-2.5-pro-preview-03-25" and not extracted_text:
-                     extracted_text = json_resp.get("text","").strip() # Этот API возвращает текст в поле "text"
+                # Если это был не "success" статус (например, ошибка валидации от gen-api)
+                # но мы все равно получили какой-то JSON
+                if not extracted_text and json_resp.get("status") != "success": # "status" может отсутствовать при прямом ответе
+                    status_from_api = json_resp.get('status','N/A (предполагается успех из-за наличия данных)')
+                    error_msg_from_api = json_resp.get('error_message', '')
+                    input_details_on_error = json_resp.get('input', {})
 
-            else: # Если статус не "success"
-                status_from_api = json_resp.get('status','N/A')
-                error_msg_from_api = json_resp.get('error_message', '')
-                input_details_on_error = json_resp.get('input', {}) # gen-api.ru может вернуть детали ошибки в поле 'input'
+                    if not error_msg_from_api and isinstance(input_details_on_error, dict):
+                        error_msg_from_api = input_details_on_error.get('error', '')
 
-                if not error_msg_from_api and isinstance(input_details_on_error, dict):
-                    error_msg_from_api = input_details_on_error.get('error', '') # Ищем ошибку внутри 'input'
-
-                logger.error(f"API Error for {self.model_config['name']}. Status: {status_from_api}. Full response: {json_resp}")
-                extracted_text = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
-                if not error_msg_from_api.strip() and str(error_msg_from_api) != '0': # Добавил проверку на '0', если это не ошибка
-                    extracted_text = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали ответа: {str(json_resp)[:200]}"
+                    # Если мы не смогли извлечь текст, но есть поле "response", это странно, но залогируем
+                    if "response" in json_resp:
+                         logger.warning(f"API for {self.model_config['name']} returned 'response' field but text extraction failed. Full 'response' field: {json_resp['response']}")
+                         # Попробуем извлечь текст из 'output', если он есть (для совместимости с другими кейсами gen-api)
+                         if 'output' in json_resp and isinstance(json_resp['output'], str) :
+                             extracted_text = json_resp['output'].strip()
 
 
-            return extracted_text if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или произошла ошибка."
+                    # Если текст так и не извлечен, формируем сообщение об ошибке
+                    if not extracted_text:
+                        logger.error(f"API Error or unexpected response structure for {self.model_config['name']}. Status: {status_from_api}. Full response: {json_resp}")
+                        final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
+                        if not error_msg_from_api.strip() and str(error_msg_from_api) != '0':
+                            final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Не удалось извлечь текст. Детали ответа: {str(json_resp)[:200]}"
+                        return final_error_message # Возвращаем сообщение об ошибке
+
+            else: # Логика для других API, не gen-api.ru (если появятся)
+                # Здесь можно оставить общую логику извлечения или добавить специфичную для других API
+                for key_check in ["text", "content", "message", "output", "response"]:
+                    if isinstance(json_resp.get(key_check), str) and (check_val := json_resp[key_check].strip()):
+                        extracted_text = check_val
+                        break
+            
+            return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
 
         except requests.exceptions.HTTPError as e:
             error_body = e.response.text
