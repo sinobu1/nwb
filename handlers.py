@@ -215,13 +215,24 @@ async def show_help(update: Update, user_id: int):
 
 # --- ОБРАБОТЧИК КНОПОК МЕНЮ ---
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код без изменений, он будет работать с импортами из config) ...
-    if not update.message or not update.message.text or not is_menu_button_text(update.message.text.strip()):
+    """
+    Обрабатывает ТОЛЬКО нажатия на кнопки ReplyKeyboardMarkup.
+    Имеет более высокий приоритет, чем handle_text.
+    """
+    if not update.message or not update.message.text:
+        return
+
+    button_text = update.message.text.strip()
+
+    # Если это не текст кнопки из нашего меню, то этот обработчик ничего не делает,
+    # и управление переходит к следующему обработчику (handle_text).
+    if not is_menu_button_text(button_text):
         return
 
     user_id = update.effective_user.id
-    button_text = update.message.text.strip()
+    logger.info(f"User {user_id} pressed menu button: '{button_text}'")
     
+    # Кнопка обработана, удаляем сообщение с ней
     try:
         await update.message.delete()
     except telegram.error.TelegramError as e:
@@ -230,50 +241,146 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_data_loc = await firestore_service.get_user_data(user_id)
     current_menu_key = user_data_loc.get('current_menu', BotConstants.MENU_MAIN)
 
+    # Обработка универсальных навигационных кнопок
     if button_text == "⬅️ Назад":
         parent_key = MENU_STRUCTURE.get(current_menu_key, {}).get("parent", BotConstants.MENU_MAIN)
         await show_menu(update, user_id, parent_key)
-        return 
+        return
     elif button_text == "🏠 Главное меню":
         await show_menu(update, user_id, BotConstants.MENU_MAIN)
         return
 
-    # ... (остальная логика поиска и выполнения действия по кнопке) ...
+    # Поиск действия для нажатой кнопки по всем меню (для надежности)
+    action_item_found = None
+    search_order = [current_menu_key] + [key for key in MENU_STRUCTURE if key != current_menu_key]
     
-
-# --- ОБРАБОТЧИК ТЕКСТА (ЗАПРОСЫ К AI) ---
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код без изменений, он будет работать с импортами из config) ...
-    if not update.message or not update.message.text or is_menu_button_text(update.message.text.strip()):
-        if update.message and is_menu_button_text(update.message.text.strip()):
-            logger.debug("Text message was a menu button, handled by menu_button_handler.")
+    for menu_key in search_order:
+        for item in MENU_STRUCTURE.get(menu_key, {}).get("items", []):
+            if item["text"] == button_text:
+                action_item_found = item
+                break
+        if action_item_found:
+            break
+    
+    if not action_item_found:
+        logger.error(f"Button '{button_text}' was identified as a menu button, but no action was found.")
+        await show_menu(update, user_id, BotConstants.MENU_MAIN) # Возвращаем в главное меню при ошибке
         return
 
+    # Выполнение действия
+    action_type = action_item_found["action"]
+    action_target = action_item_found["target"]
+
+    if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
+        await show_menu(update, user_id, action_target)
+    
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
+        await firestore_service.set_user_data(user_id, {'current_ai_mode': action_target})
+        agent_name = AI_MODES.get(action_target, {}).get('name', 'N/A')
+        response_text = f"🤖 Агент ИИ изменен на: <b>{agent_name}</b>."
+        # После смены агента, возвращаемся в главное меню для ясности
+        await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
+        await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
+
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL:
+        model_info = AVAILABLE_TEXT_MODELS.get(action_target, {})
+        await firestore_service.set_user_data(user_id, {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")})
+        response_text = f"⚙️ Модель ИИ изменена на: <b>{model_info.get('name', 'N/A')}</b>."
+        # После смены модели, возвращаемся в главное меню
+        await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
+        await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
+
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_LIMITS:
+        await show_limits(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_CHECK_BONUS:
+        await claim_news_bonus_logic(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_SUBSCRIPTION:
+        await show_subscription(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_HELP:
+        await show_help(update, user_id)
+    else:
+        logger.warning(f"Unknown action type '{action_type}' for button '{button_text}'")
+        await show_menu(update, user_id, BotConstants.MENU_MAIN)
+
+
+# --- ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ (ЗАПРОСЫ К AI) ---
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Обрабатывает обычные текстовые сообщения, которые НЕ являются кнопками меню.
+    """
+    # Этот обработчик не должен срабатывать на кнопки меню.
+    # Это проверка на всякий случай, если что-то пойдет не так с приоритетами обработчиков.
+    if not update.message or not update.message.text or is_menu_button_text(update.message.text.strip()):
+        return
+        
     user_id = update.effective_user.id
     user_message_text = update.message.text.strip()
+
+    # Удаляем сообщение пользователя, чтобы не засорять чат
     await _store_and_try_delete_message(update, user_id, is_command_to_keep=False)
 
     if len(user_message_text) < CONFIG.MIN_AI_REQUEST_LENGTH:
-        # ... (ответ о коротком запросе) ...
+        user_data_cache = await firestore_service.get_user_data(user_id)
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text(
+            "Ваш запрос слишком короткий. Пожалуйста, сформулируйте его более подробно.",
+            reply_markup=generate_menu_keyboard(current_menu)
+        )
         return
 
-    # ... (остальная логика проверки лимитов, вызова AI и отправки ответа) ...
+    logger.info(f"User {user_id} sent AI request: '{user_message_text[:100]}...'")
     
+    user_data_cache = await firestore_service.get_user_data(user_id) 
+    current_model_key = await get_current_model_key(user_id, user_data_cache)
+    
+    can_proceed, limit_message, _ = await check_and_log_request_attempt(user_id, current_model_key)
+    
+    if not can_proceed:
+        # Если лимит исчерпан, check_and_log_request_attempt уже мог сменить модель на дефолтную
+        # Поэтому обновляем user_data_cache, чтобы показать правильное меню
+        user_data_cache_after_reset = await firestore_service.get_user_data(user_id)
+        current_menu_after_reset = user_data_cache_after_reset.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text(
+            limit_message, 
+            parse_mode=ParseMode.HTML, 
+            reply_markup=generate_menu_keyboard(current_menu_after_reset), 
+            disable_web_page_preview=True
+        )
+        return
 
-# --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ ---
-async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код без изменений) ...
-    query = update.pre_checkout_query
-    expected_payload_part = f"subscription_{CONFIG.PRO_SUBSCRIPTION_LEVEL_KEY}" 
-    if query.invoice_payload and expected_payload_part in query.invoice_payload:
-        await query.answer(ok=True)
-    else:
-        await query.answer(ok=False, error_message="Неверный запрос на оплату.")
+    # Получаем ключ модели еще раз на случай, если check_and_log_request_attempt сменил его
+    current_model_key = await get_current_model_key(user_id, user_data_cache)
+    ai_service = get_ai_service(current_model_key)
 
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ... (код без изменений, но с импортами из config) ...
-    user_id = update.effective_user.id
-    # ... (логика начисления подписки) ...
+    if not ai_service:
+        logger.critical(f"Could not get AI service for model key '{current_model_key}'")
+        current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+        await update.message.reply_text(
+            "Произошла критическая ошибка при выборе AI модели. Сообщите администратору.",
+            reply_markup=generate_menu_keyboard(current_menu)
+        )
+        return
+
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    mode_details = await get_current_mode_details(user_id, user_data_cache)
+    system_prompt = mode_details["prompt"]
+    
+    try:
+        ai_response_text = await ai_service.generate_response(system_prompt, user_message_text)
+    except Exception as e:
+        logger.error(f"Unhandled exception in AI service for model {current_model_key}: {e}", exc_info=True)
+        ai_response_text = f"Произошла внутренняя ошибка при обработке вашего запроса. Попробуйте позже."
+
+    final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+    await increment_request_count(user_id, current_model_key)
+    
+    current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
+    await update.message.reply_text(
+        final_reply_text, 
+        reply_markup=generate_menu_keyboard(current_menu), 
+        disable_web_page_preview=True
+    )
     
 
 # --- ОБРАБОТЧИК ОШИБОК ---
