@@ -12,9 +12,10 @@ from config import CONFIG, logger, firestore_service, genai
 # Импортируем все наши обработчики из handlers.py
 from handlers import (
     start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command, # <--- ИСПРАВЛЕНО
+    gems_info_command, get_news_bonus_info_command, help_command, # убедитесь, что gems_info_command
     menu_button_handler, handle_text, precheckout_callback,
-    successful_payment_callback, error_handler
+    successful_payment_callback, error_handler,
+    photo_handler # <<< ДОБАВЛЯЕМ НОВЫЙ ОБРАБОТЧИК
 )
 
 async def main():
@@ -58,6 +59,11 @@ async def main():
     app.add_handler(CommandHandler("gems", gems_info_command), group=0) # <--- ДОБАВЛЯЕМ ЭТУ СТРОКУ
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
+
+
+    # --- >>> НОВЫЙ ОБРАБОТЧИК ФОТО <<< ---
+    # Добавляем его с приоритетом таким же или чуть ниже кнопок меню, но выше обычного текста
+    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
     
     # Группа 1: Обработчик кнопок меню
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
