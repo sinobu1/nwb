@@ -146,7 +146,7 @@ AI_MODES = {
         "welcome": "Загрузите фото блюда, и я помогу с анализом КБЖУ! Если у вас общий вопрос по диетологии, просто напишите его.",
         "multimodal_capable": True,
         "forced_model_key": "custom_api_gemini_2_5_pro", 
-        "native_vision_model_id": "gemini-1.5-flash-latest" 
+        "native_vision_model_id": "gemini-2.5-flash-preview-04-17" 
     },
     "gemini_pro_custom_mode": {
         "name": "Продвинутый (Gemini Pro)",
