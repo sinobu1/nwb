@@ -39,7 +39,7 @@ class AppConfig:
     CUSTOM_GROK_3_API_KEY = os.getenv("CUSTOM_GROK_3_API_KEY", "ВАШ_GEN-API_КЛЮЧ") # Ключ от gen-api.ru
     CUSTOM_GPT4O_MINI_API_KEY = os.getenv("CUSTOM_GPT4O_MINI_API_KEY", "ВАШ_GEN-API_КЛЮЧ") # Ключ от gen-api.ru
     PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "ВАШ_PAYMENT_TOKEN") # Токен провайдера платежей
-    ADMIN_ID = int(os.getenv("ADMIN_ID", "ВАШ_ADMIN_ID")) # ID админа
+    ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152")) # ID админа
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
     FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json" # Путь к файлу Firebase
 
