@@ -286,7 +286,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
         await show_menu(update, user_id, action_target)
-     elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
+    elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
         await firestore_service.set_user_data(user_id, {'current_ai_mode': action_target})
         agent_name = AI_MODES.get(action_target, {}).get('name', 'N/A')
         response_text = f"🤖 Агент ИИ изменен на: <b>{agent_name}</b>."
@@ -311,7 +311,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             'selected_api_type': model_info.get("api_type")
         }
         # Сброс агента, если выбранная модель несовместима с текущим "Продвинутым" агентом
-        if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and \
+    if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and \
            user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
             update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
             logger.info(f"User {user_id} selected model {action_target}, AI mode reset from gemini_pro_custom_mode to default.")
