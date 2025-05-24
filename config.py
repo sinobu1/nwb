@@ -335,7 +335,7 @@ class GoogleGenAIService(BaseAIService):
             return f"Ошибка Google API ({type(e).__name__}) при обращении к {self.model_id}."
 
 class CustomHttpAIService(BaseAIService):
-    async def generate_response(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
@@ -357,10 +357,32 @@ class CustomHttpAIService(BaseAIService):
                 "role": "system", 
                 "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
             })
-        messages_payload.append({
-            "role": "user", 
-            "content": [{"type": "text", "text": user_prompt}] if is_gen_api_format else user_prompt
-        })
+        messages_payload = []
+        if system_prompt:
+            # Для gen-api.ru системный промпт всегда текстовый, даже если есть картинка в user_prompt
+            messages_payload.append({
+                "role": "system",
+                "content": [{"type": "text", "text": system_prompt}] if is_gen_api_format else system_prompt
+            })
+
+        # Формирование user_content (может быть мультимодальным)
+        user_content_parts = []
+        if is_gen_api_format:
+            if image_data:
+                if image_data.get("type") == "url" and image_data.get("value"):
+                    user_content_parts.append({"type": "image_url", "image_url": {"url": image_data["value"]}})
+                elif image_data.get("type") == "base64" and image_data.get("value"):
+                    # Формат для base64 может отличаться, уточните в документации gen-api.ru
+                    # Например: {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data['value']}"}}
+                    user_content_parts.append({"type": "image_base64", "base64_data": image_data["value"], "mime_type": image_data.get("mime_type", "image/jpeg")}) # ПРИМЕР!
+            user_content_parts.append({"type": "text", "text": user_prompt})
+            messages_payload.append({"role": "user", "content": user_content_parts})
+        else: # Для других API, которые могут не поддерживать такой формат content array
+            if image_data:
+                # TODO: Как другие API обрабатывают image + text? Возможно, image_data не используется.
+                logger.warning(f"Image data provided for non-gen-api endpoint {self.model_config['endpoint']}, but handling is not defined.")
+            messages_payload.append({"role": "user", "content": user_prompt})
+
 
         payload = {
             "messages": messages_payload,
