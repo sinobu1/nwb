@@ -167,8 +167,11 @@
                 // Записываем данные для отправки в саму кнопку (в кастомное свойство)
                 tg.MainButton.dataToSend = dataToSend;
                 
-                // Устанавливаем текст кнопки и показываем ее
-                tg.MainButton.setText(buttonText).show();
+                // Устанавливаем текст кнопки
+                tg.MainButton.setText(buttonText);
+                
+                // АКТИВИРУЕМ кнопку и ПОКАЗЫВАЕМ ее
+                tg.MainButton.enable().show();
 
             } catch (error) {
                 console.error("Failed to setup Main Button:", error);
