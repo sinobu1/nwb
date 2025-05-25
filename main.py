@@ -1,30 +1,32 @@
 # main.py
 import asyncio
-from telegram import BotCommand, Update
+from telegram import BotCommand, Update, Message
 from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler, BaseFilter
+    Application, CommandHandler, MessageHandler,
+    ContextTypes, PreCheckoutQueryHandler
+)
+# ИМПОРТИРУЕМ ФИЛЬТРЫ ИЗ ОТДЕЛЬНОГО МОДУЛЯ
+from telegram.ext import filters
+from telegram.ext.filters import BaseFilter
+
+# Импортируем конфигурацию, логгер, и т.д.
+from config import CONFIG, logger, firestore_service, genai
+from handlers import (
+    start, open_menu_command, usage_command,
+    gems_info_command, get_news_bonus_info_command, help_command,
+    open_mini_app_command,
+    web_app_data_handler,
+    menu_button_handler, handle_text, precheckout_callback,
+    successful_payment_callback, error_handler,
+    photo_handler
 )
 
-# --- ДОБАВЬТЕ ЭТОТ КЛАСС ---
+# НАШ КАСТОМНЫЙ ФИЛЬТР (оставляем как есть)
 class WebAppDataFilter(BaseFilter):
     """Фильтр для сообщений, содержащих данные от Web App"""
     def filter(self, message: Message) -> bool:
         return message.web_app_data is not None
 
-# Импортируем конфигурацию, логгер, сервисы и глобальные объекты из config.py
-from config import CONFIG, logger, firestore_service, genai # genai импортируется для настройки в main
-
-# Импортируем все наши обработчики из handlers.py
-from handlers import (
-    start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command,
-    open_mini_app_command,  # <-- Наш новый обработчик для команды /app
-    web_app_data_handler,   # <-- Наш новый обработчик для данных из Mini App
-    menu_button_handler, handle_text, precheckout_callback,
-    successful_payment_callback, error_handler,
-    photo_handler 
-)
 
 async def main():
     """Основная функция для запуска бота."""
