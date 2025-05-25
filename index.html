@@ -278,6 +278,14 @@
             window.Telegram.WebApp.MainButton.setText("Закрыть").show().onClick(() => window.Telegram.WebApp.close());
         }
     }
+
+    function sendCommandToBot(command, details = {}) {
+        // --- НАША НОВАЯ СТРОКА ДЛЯ ОТЛАДКИ ---
+        alert('Sending to bot: ' + JSON.stringify({ command, details }));
+        
+        tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
+    }
+
   </script>
 </body>
 </html>
