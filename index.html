@@ -211,91 +211,229 @@ document.addEventListener('DOMContentLoaded', () => {
         tg.sendData(JSON.stringify(data));
     }
 
-    function addMessageToChat(sender, text, options = {}) {
-        const { isTyping = false } = options;
-        const now = new Date();
-        const currentDate = now.toDateString();
-        if (currentDate !== lastMessageInfo.date) {
-            const divider = document.createElement('div');
-            divider.className = 'chat-date-divider';
-            divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-            chatMessagesContainer.appendChild(divider);
-        }
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `chat-message message-${sender}`;
-        const contentSpan = document.createElement('span');
-        contentSpan.className = 'message-content';
-        contentSpan.textContent = text;
-        msgDiv.appendChild(contentSpan);
-        if (!isTyping) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-            const timeSpan = document.createElement('span');
-            timeSpan.textContent = formatTime(now);
-            metaDiv.appendChild(timeSpan);
-            msgDiv.appendChild(metaDiv);
-        } else {
-            msgDiv.classList.add('typing');
-        }
-        chatMessagesContainer.appendChild(msgDiv);
-        lastMessageInfo = { sender: sender, date: currentDate };
-        requestAnimationFrame(() => { chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }); });
-        return msgDiv;
-    }
+   // --- Новые и обновленные функции ---
 
-    function handleSendMessage() {
-        const text = chatInput.value.trim();
-        if (!text) return;
+function saveChatToLocalStorage() {
+    localStorage.setItem('miniAppChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory));
+}
 
-        addMessageToChat('user', text);
-        chatInput.value = '';
-        handleInput.call(chatInput);
+function loadChatFromLocalStorage() {
+    const savedHistory = localStorage.getItem('miniAppChatHistory_' + selectedAgentKey);
+    chatMessagesContainer.innerHTML = ''; // Очищаем перед отрисовкой
+    lastMessageInfo = { sender: null, date: null };
+    currentMiniAppChatHistory = []; // Начинаем с чистого листа для текущей сессии
 
-        const typingIndicator = addMessageToChat('bot', 'Печатает', { isTyping: true });
-
-        // Важно: При вызове sendData может появляться сервисное сообщение,
-        // но приложение НЕ должно закрываться.
-        sendDataToBot({
-            action: 'app_chat_message',
-            payload: {
-                text: text,
-                agentKey: selectedAgentKey,
-                modelKey: selectedModelKey
-            }
+    if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        parsedHistory.forEach(msg => {
+            addMessageToChat(msg.sender, msg.text, { isRestoredFromHistory: true, timestamp: msg.timestamp });
         });
-        
-        // Убираем индикатор через 3 секунды, т.к. прямого ответа мы не ждем.
-        setTimeout(() => {
-            const indicator = chatMessagesContainer.querySelector('.message-bot.typing');
-            if (indicator) indicator.remove();
-        }, 3000);
+    }
+}
+
+function addMessageToChat(sender, text, options = {}) {
+    const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestamp } = options;
+    const now = msgTimestamp ? new Date(msgTimestamp) : new Date(); // Используем переданное время или текущее
+    const currentDate = now.toDateString();
+
+    // Отображение разделителя даты (без изменений)
+    if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
+        const divider = document.createElement('div');
+        divider.className = 'chat-date-divider';
+        const today = new Date().toDateString();
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+        if (currentDate === today) { divider.textContent = 'Сегодня'; }
+        else if (currentDate === yesterday) { divider.textContent = 'Вчера'; }
+        else { divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); }
+        chatMessagesContainer.appendChild(divider);
     }
     
-    // --- Остальные функции остаются прежними, но без вызовов polling ---
-    function updateChatTitle() {
-        const agent = agents.find(a => a.key === selectedAgentKey);
-        const model = models.find(m => m.key === selectedModelKey);
-        chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
+    const lastMessageElement = chatMessagesContainer.querySelector('.chat-message:last-of-type');
+    if (!isTyping && lastMessageElement && sender === lastMessageInfo.sender && currentDate === lastMessageInfo.date) {
+         lastMessageElement.classList.add('no-tail', 'grouped');
+         lastMessageElement.classList.remove('tailed');
     }
 
-    function openChat() {
-        agentSelect.value = selectedAgentKey;
-        modelSelect.value = selectedModelKey;
-        updateChatTitle();
-        chatMessagesContainer.innerHTML = ''; 
-        lastMessageInfo = { sender: null, date: null };
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-message message-${sender} tailed`;
+    
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'message-content';
+    contentSpan.textContent = text;
+    msgDiv.appendChild(contentSpan);
+
+    if (!isTyping) {
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'message-meta';
+        const timeSpan = document.createElement('span');
+        timeSpan.textContent = formatTime(now);
+        metaDiv.appendChild(timeSpan);
+        msgDiv.appendChild(metaDiv);
+
+        if (sender === 'bot' && !isRestoredFromHistory) { // Добавляем кнопку только для новых сообщений бота
+            const saveButton = document.createElement('button');
+            saveButton.innerHTML = '💾'; // Иконка сохранения
+            saveButton.title = 'Сохранить в основной чат';
+            saveButton.className = 'save-to-bot-btn'; // Стилизуйте эту кнопку
+            saveButton.style.marginLeft = '8px';
+            saveButton.style.padding = '2px 6px';
+            saveButton.style.border = '1px solid var(--border-color)';
+            saveButton.style.borderRadius = '4px';
+            saveButton.style.background = 'var(--bg-card)';
+            saveButton.style.color = 'var(--text-secondary)';
+            saveButton.style.cursor = 'pointer';
+
+            saveButton.onclick = () => {
+                let userQueryText = "Запрос не найден";
+                // Поиск сообщения пользователя перед этим сообщением бота
+                const allMessages = Array.from(chatMessagesContainer.querySelectorAll('.chat-message'));
+                const botMsgIndex = allMessages.findIndex(el => el === msgDiv);
+                if (botMsgIndex > 0 && allMessages[botMsgIndex - 1].classList.contains('message-user')) {
+                    userQueryText = allMessages[botMsgIndex - 1].querySelector('.message-content').textContent;
+                }
+                
+                tg.sendData(JSON.stringify({
+                    action: 'save_chat_to_telegram',
+                    payload: { user_query: userQueryText, ai_response: text }
+                }));
+                saveButton.textContent = '✅';
+                saveButton.disabled = true;
+                tg.showAlert('Диалог сохранен в основной чат с ботом!');
+            };
+            metaDiv.appendChild(saveButton);
+        }
+    } else {
+        msgDiv.classList.add('typing');
+    }
+    
+    chatMessagesContainer.appendChild(msgDiv);
+    if (!isTyping && !isRestoredFromHistory) {
+        currentMiniAppChatHistory.push({ sender, text, timestamp: now.toISOString() });
+        saveChatToLocalStorage();
+    }
+    lastMessageInfo = { sender: sender, date: currentDate };
+
+    requestAnimationFrame(() => {
+        chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+    });
+    return msgDiv;
+}
+
+async function submitMessageToBackend(userText, agentKey, modelKey) {
+    const userId = tg.initDataUnsafe?.user?.id;
+    if (!userId) {
+        addMessageToChat('bot', "Ошибка: Не удалось определить пользователя.");
+        return;
+    }
+
+    // ВАЖНО: Замените на ваш публичный URL сервера (из CONFIG.WEBHOOK_URL в Python)
+    const backendProcessUrl = `${CONFIG.WEBHOOK_URL.rstrip('/')}/api/process_app_message/${userId}`;
+    // Если CONFIG.WEBHOOK_URL недоступен в JS, впишите URL вручную:
+    // const backendProcessUrl = `https://your-app-name.onrender.com/api/process_app_message/${userId}`;
+
+    try {
+        const response = await fetch(backendProcessUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKey })
+        });
+        if (!response.ok) {
+            // Ошибка от нашего бэкенда, ее не нужно добавлять в чат,
+            // так как ответ для чата придет через polling
+            console.error("Error submitting message to backend:", response.statusText);
+            tg.showAlert("Ошибка отправки сообщения на сервер.");
+        }
+        // Ответ от этого эндпоинта нам не нужен для отображения,
+        // он только подтверждает получение. Ответ ИИ придет через polling.
+    } catch (error) {
+        console.error("Network error submitting message to backend:", error);
+        tg.showAlert("Ошибка сети при отправке сообщения.");
+        const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+        if (typingIndicator) typingIndicator.remove();
+    }
+}
+
+function handleSendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    addMessageToChat('user', text); // Добавляем в UI и локальную историю
+    chatInput.value = '';
+    handleInput.call(chatInput); 
+
+    // Удаляем предыдущий индикатор печати, если был
+    const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+    if(oldTypingIndicator) oldTypingIndicator.remove();
+
+    addMessageToChat('bot', 'Печатает', { isTyping: true }); // Показываем новый индикатор
+
+    // Отправляем сообщение на бэкенд для обработки ИИ
+    submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
+}
+
+// Функция fetchUpdates для опроса остается такой же, как в предыдущем ответе
+// (которая вызывает /api/get_updates/{user_id})
+function fetchUpdates() {
+    const userId = tg.initDataUnsafe?.user?.id;
+    if (!userId || !document.getElementById('chat-screen').classList.contains('active')) {
+        // Не опрашиваем, если ID пользователя нет или экран чата не активен
+        return;
+    }
+    const backendGetUpdatesUrl = `${CONFIG.WEBHOOK_URL.rstrip('/')}/api/get_updates/${userId}`;
+    // Или ваш захардкоженный URL:
+    // const backendGetUpdatesUrl = `https://your-app-name.onrender.com/api/get_updates/${userId}`;
+
+    fetch(backendGetUpdatesUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                if (typingIndicator) typingIndicator.remove();
+                
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.sender, msg.text, { timestamp: msg.timestamp });
+                });
+            }
+        })
+        .catch(error => console.error("Polling error:", error));
+}
+
+let pollingInterval = null;
+function startPolling() {
+    stopPolling(); // Очищаем предыдущий интервал, если он был
+    fetchUpdates(); // Первоначальный вызов
+    pollingInterval = setInterval(fetchUpdates, 3000); // Опрос каждые 3 секунды
+}
+function stopPolling() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = null;
+}
+
+// В openChat запускаем polling и загрузку из localStorage
+function openChat() {
+    agentSelect.value = selectedAgentKey;
+    modelSelect.value = selectedModelKey;
+    updateChatTitle();
+    
+    loadChatFromLocalStorage(); // Загружаем историю при открытии чата
+
+    if (currentMiniAppChatHistory.length === 0) { // Если история пуста, показываем приветствие
         const agent = agents.find(a => a.key === selectedAgentKey);
         addMessageToChat('bot', `Здравствуйте! Я - ${agent.name}. Чем могу помочь?`);
-        switchScreen(chatScreen);
-        tg.BackButton.show();
-        // УБРАЛИ вызов startPolling()
     }
     
-    function closeChat() {
-        // УБРАЛИ вызов stopPolling()
-        switchScreen(mainScreen);
-        tg.BackButton.hide();
-    }
+    switchScreen(chatScreen);
+    tg.BackButton.show();
+    startPolling();
+}
+
+function closeChat() {
+    stopPolling();
+    // Можно добавить saveChatToLocalStorage() здесь, если хотите сохранять при каждом закрытии,
+    // но addMessageToChat уже сохраняет по мере добавления.
+    switchScreen(mainScreen);
+    tg.BackButton.hide();
+}
 
     function fetchUpdates() {
     const userId = tg.initDataUnsafe?.user?.id;
