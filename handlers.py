@@ -603,47 +603,98 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             try: await context.bot.send_message(CONFIG.ADMIN_ID, f"PLAIN TEXT FALLBACK:\n{error_details.replace('```', '')}")
             except Exception as e_plain: logger.error(f"Failed to send plain text error to admin: {e_plain}")
 
+# НОВЫЙ, РАСШИРЕННЫЙ ОБРАБОТЧИК ДАННЫХ ОТ MINI APP
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные, полученные от Mini App."""
+    """Обрабатывает все данные, полученные от Mini App."""
     if not update.message or not update.message.web_app_data:
         return
 
     user_id = update.effective_user.id
     web_app_data = update.message.web_app_data
-
     logger.info(f"Получены данные от Mini App для пользователя {user_id}: {web_app_data.data}")
 
     try:
         data = json.loads(web_app_data.data)
         action = data.get("action")
-        target = data.get("target")
 
-        if not action or not target:
-            logger.warning(f"Некорректные данные от Mini App: {data}")
+        if not action:
+            logger.warning(f"Некорректные данные от Mini App (нет action): {data}")
             return
 
+        # --- Обработка смены АГЕНТА из Mini App ---
         if action == "set_agent":
+            target = data.get("target")
             if target in AI_MODES:
                 await firestore_service.set_user_data(user_id, {'current_ai_mode': target})
-                agent_name = AI_MODES[target].get('name', 'N/A')
-                await update.message.reply_text(f"📱 Агент изменен через Mini App: <b>{agent_name}</b>", parse_mode=ParseMode.HTML)
+                logger.info(f"User {user_id} set agent to '{target}' via Mini App.")
             else:
-                await update.message.reply_text(f"❌ Ошибка: агент '{target}' не найден.")
+                logger.warning(f"User {user_id} tried to set invalid agent '{target}' from Mini App.")
 
+        # --- Обработка смены МОДЕЛИ из Mini App ---
         elif action == "set_model":
+            target = data.get("target")
             if target in AVAILABLE_TEXT_MODELS:
                 model_info = AVAILABLE_TEXT_MODELS[target]
                 update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
                 await firestore_service.set_user_data(user_id, update_payload)
-                model_name = model_info.get('name', 'N/A')
-                await update.message.reply_text(f"📱 Модель изменена через Mini App: <b>{model_name}</b>", parse_mode=ParseMode.HTML)
+                logger.info(f"User {user_id} set model to '{target}' via Mini App.")
             else:
-                await update.message.reply_text(f"❌ Ошибка: модель '{target}' не найдена.")
+                logger.warning(f"User {user_id} tried to set invalid model '{target}' from Mini App.")
 
-        # Здесь можно добавить другие 'elif action == ...' для других функций
+        # --- Обработка СООБЩЕНИЯ ИЗ ЧАТА Mini App ---
+        elif action == "app_chat_message":
+            payload = data.get("payload", {})
+            user_message_text = payload.get("text")
+            agent_key = payload.get("agentKey")
+            model_key = payload.get("modelKey")
+
+            if not all([user_message_text, agent_key, model_key]):
+                logger.error(f"Incomplete chat data from Mini App for user {user_id}: {payload}")
+                return
+
+            logger.info(f"User {user_id} sent message from Mini App. Agent: {agent_key}, Model: {model_key}")
+            
+            # Получаем актуальные данные пользователя
+            user_data_cache = await firestore_service.get_user_data(user_id)
+            
+            # Проверяем лимиты и гемы
+            bot_data_cache = await firestore_service.get_bot_data()
+            can_proceed, _, usage_type, gem_cost = await check_and_log_request_attempt(
+                user_id, model_key, user_data_cache, bot_data_cache, agent_key
+            )
+            
+            if not can_proceed:
+                # Если нельзя, отправляем сообщение об ошибке в основной чат
+                error_message = f"Не удалось обработать запрос из Mini App: лимит исчерпан или недостаточно гемов."
+                await context.bot.send_message(chat_id=user_id, text=error_message)
+                return
+
+            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
+
+            # Получаем сервис ИИ и промпт агента
+            ai_service = get_ai_service(model_key)
+            system_prompt = AI_MODES.get(agent_key, {}).get("prompt", AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
+            
+            ai_response_text = "Ошибка обработки запроса."
+            try:
+                ai_response_text = await ai_service.generate_response(system_prompt, user_message_text, image_data=None)
+            except Exception as e:
+                logger.error(f"AI service error from Mini App request for user {user_id}: {e}", exc_info=True)
+                ai_response_text = "Произошла ошибка при обращении к ИИ."
+            
+            # Увеличиваем счетчик использований / списываем гемы
+            await increment_request_count(user_id, model_key, usage_type, agent_key, gem_cost)
+
+            # Отправляем ответ в ОСНОВНОЙ чат Telegram, чтобы сохранить историю
+            final_reply, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+            await context.bot.send_message(chat_id=user_id, text=final_reply, disable_web_page_preview=True)
+
+            # ВАЖНО: На этом шаге мы не можем напрямую отправить ответ в Mini App.
+            # Ответ уже ушел в основной чат. Для отображения в Mini App нужны
+            # более сложные механизмы (polling или WebSockets), которые выходят за рамки этого файла.
+            # Mini App в текущей реализации увидит ответ, только если пользователь вернется в основной чат.
 
     except json.JSONDecodeError:
         logger.error(f"Ошибка декодирования JSON от Mini App: {web_app_data.data}")
-        await update.message.reply_text("Произошла ошибка при обработке вашего запроса из Mini App.")
     except Exception as e:
-        logger.error(f"Ошибка в web_app_data_handler: {e}", exc_info=True)
+        logger.error(f"Критическая ошибка в web_app_data_handler: {e}", exc_info=True)
