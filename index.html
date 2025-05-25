@@ -16,16 +16,19 @@
       --tg-secondary: #0e1621;
       --tg-text-primary: #e1e3e6;
       --tg-card-bg: #17212b;
-      --gradient-1: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-      --gradient-2: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
-      --gradient-3: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
-      --gradient-4: linear-gradient(45deg, #f83600 0%, #f9d423 100%);
+      /* Определяем наши градиенты здесь */
+      --gradient-purple: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+      --gradient-green: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+      --gradient-pink: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
+      --gradient-orange: linear-gradient(45deg, #f83600 0%, #f9d423 100%);
+      --gradient-blue: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+      --gradient-violet: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
     }
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--tg-theme-bg-color, var(--tg-secondary));
       color: var(--tg-theme-text-color, var(--tg-text-primary));
-      overscroll-behavior: none; /* Убираем "оттягивание" страницы */
+      overscroll-behavior: none;
     }
     .content-card {
         background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg));
@@ -38,10 +41,11 @@
     .tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, rgba(0,0,0,0.6)); z-index: 1; }
     .tool-card h3 { position: relative; z-index: 2; font-weight: 600; }
     .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .menu-button { cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.75rem; background-color: #2c3e50; border-radius: 12px; font-size: 0.75rem; font-weight: 500; transition: background-color 0.2s; aspect-ratio: 1 / 1; }
+    .menu-button { cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.75rem; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 12px; font-size: 0.75rem; font-weight: 500; transition: background-color 0.2s; aspect-ratio: 1 / 1; }
+    .menu-button:hover { background-color: var(--tg-theme-hint-color, rgba(255,255,255,0.1)); }
     .menu-button svg { width: 24px; height: 24px; margin-bottom: 0.5rem; }
     /* Стили для iOS-навигации */
-    .bottom-nav-container { position: fixed; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; padding: 0 1rem; }
+    .bottom-nav-container { position: fixed; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; padding: 0 1rem; z-index: 100; }
     .bottom-nav { position: relative; display: flex; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 20px; padding: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .nav-item { position: relative; z-index: 2; flex: 1; padding: 10px 25px; color: var(--tg-theme-hint-color, #bdc3c7); font-size: 14px; font-weight: 500; border: none; background: none; cursor: pointer; transition: color 0.3s ease; }
     .nav-item.active { color: var(--tg-theme-text-color, white); }
@@ -61,15 +65,13 @@
       <div>
         <h2 class="text-base font-semibold mb-3">Выберите Агента</h2>
         <div class="swiper" id="agents-swiper">
-          <div class="swiper-wrapper" id="agents-wrapper">
-            </div>
+          <div class="swiper-wrapper" id="agents-wrapper"></div>
         </div>
       </div>
       <div>
         <h2 class="text-base font-semibold mb-3">Выберите Модель</h2>
         <div class="swiper" id="models-swiper">
-          <div class="swiper-wrapper" id="models-wrapper">
-            </div>
+          <div class="swiper-wrapper" id="models-wrapper"></div>
         </div>
       </div>
       <div class="content-card">
@@ -108,19 +110,35 @@
     tg.ready();
     tg.expand();
 
+    // --- Карта соответствия ID и стилей ---
+    // Теперь мы можем задать уникальный цвет для каждого агента или модели
+    const styleMap = {
+        'default': 'var(--gradient-blue)',
+        // Агенты
+        'photo_dietitian_analyzer': 'var(--gradient-purple)',
+        'idea_generator': 'var(--gradient-green)',
+        'universal_ai_basic': 'var(--gradient-pink)',
+        'career_coach': 'var(--gradient-orange)',
+        'programming_partner': 'var(--gradient-violet)',
+        // Модели
+        'google_gemini_2_0_flash': 'var(--gradient-blue)',
+        'google_gemini_2_5_flash_preview': 'var(--gradient-purple)',
+        'custom_api_grok_3': 'var(--gradient-orange)',
+    };
+    
     // --- Динамическая генерация каруселей ---
-    function renderCarousel(containerId, data, command, detailKey, gradients) {
+    function renderCarousel(containerId, data, command, detailKey) {
         const wrapper = document.getElementById(containerId);
         if (!wrapper) return;
-        wrapper.innerHTML = ''; // Очищаем контейнер
-        data.forEach((item, index) => {
+        wrapper.innerHTML = '';
+        data.forEach((item) => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
-            const gradient = gradients[index % gradients.length];
-            slide.innerHTML = `<div class="tool-card" style="background: ${gradient};" data-id="${item.id}"><h3>${item.name}</h3></div>`;
+            // Ищем стиль в карте, если не находим - используем стиль по умолчанию
+            const backgroundStyle = styleMap[item.id] || styleMap['default'];
+            slide.innerHTML = `<div class="tool-card" style="background: ${backgroundStyle};" data-id="${item.id}"><h3>${item.name}</h3></div>`;
             slide.querySelector('.tool-card').addEventListener('click', () => {
-                const details = {};
-                details[detailKey] = item.id;
+                const details = { [detailKey]: item.id };
                 sendCommandToBot(command, details);
             });
             wrapper.appendChild(slide);
@@ -134,14 +152,11 @@
 
     // --- Инициализация вкладок и данных ---
     function initializeApp(params) {
-        // Рендеринг каруселей
-        const gradients = ['var(--gradient-1)', 'var(--gradient-2)', 'var(--gradient-3)', 'var(--gradient-4)'];
-        renderCarousel('agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id', gradients);
-        renderCarousel('models-wrapper', params.models_data || [], 'set_model_from_app', 'model_id', gradients.slice().reverse());
+        renderCarousel('agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id');
+        renderCarousel('models-wrapper', params.models_data || [], 'set_model_from_app', 'model_id');
         new Swiper("#agents-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
         new Swiper("#models-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
         
-        // Заполнение профиля
         const user = tg.initDataUnsafe?.user;
         if (user) {
             document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
@@ -187,7 +202,6 @@
         initializeApp(appData);
     } catch(e) {
         console.error("Failed to initialize app with data from URL:", e);
-        // Можно показать сообщение об ошибке пользователю
         document.body.innerHTML = 'Ошибка загрузки данных. Пожалуйста, попробуйте открыть приложение снова.';
     }
   </script>
