@@ -1,309 +1,307 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"/>
-  <title>AI Assistant</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
-  <style>
-    :root {
-      --bg-main: #101010;
-      --bg-card: #1E1E1E;
-      --text-primary: #FFFFFF;
-      --text-secondary: #A0A0A0;
-      --text-accent: #00FFC2;
-      --border-color: #3A3A3C;
-      --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
-    }
-    
-    html, body {
-      position: fixed; inset: 0; overflow: hidden;
-      font-family: var(--font-family);
-      background-color: var(--bg-main);
-      color: var(--text-primary);
-    }
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"/>
+  <title>AI Assistant</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
+  <style>
+    :root {
+      --bg-main: #101010;
+      --bg-card: #1E1E1E;
+      --text-primary: #FFFFFF;
+      --text-secondary: #A0A0A0;
+      --text-accent: #00FFC2;
+      --border-color: #3A3A3C;
+      --gold-highlight: #FFD700; /* Добавили золотой цвет */
+      --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
+    }
+    
+    html, body {
+      position: fixed; inset: 0; overflow: hidden;
+      font-family: var(--font-family);
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+    }
 
-    .app-container { height: 100%; display: flex; flex-direction: column; }
-    .scrollable-content {
-      flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 1.5rem 0 120px 0;
-    }
-    .content-wrapper { padding: 0 1.5rem; }
-    
-    /* Типографика */
-    h1 { font-size: 1.875rem; font-weight: 800; }
-    h2 { font-size: 1.25rem; font-weight: 700; }
-    p.subtitle { font-size: 1rem; color: var(--text-secondary); }
+    .app-container { height: 100%; display: flex; flex-direction: column; }
+    .scrollable-content {
+      flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 1.5rem 0 120px 0;
+    }
+    .content-wrapper { padding: 0 1.5rem; }
+    
+    /* Типографика */
+    h1 { font-size: 1.875rem; font-weight: 800; }
+    h2 { font-size: 1.25rem; font-weight: 700; }
+    p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Точная верстка карусели <<< */
-    .swiper-container-wrapper {
-        margin-top: 2rem;
-        position: relative;
+    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Карусель и карточки <<< */
+    .swiper-container-wrapper {
+        margin-top: 1.5rem; /* Увеличили верхний отступ для заголовков "Агенты" и "Модели" */
+        position: relative;
+       margin-bottom: 2rem; /* Добавили отступ снизу */
+    }
+    .swiper-container-wrapper h2 {
+        margin-bottom: 1rem; /* Добавили отступ от заголовка до карточек */
     }
-    .swiper {
-        padding: 0 1.5rem;
-        margin-left: -1.5rem;
-        margin-right: -1.5rem;
-        overflow: visible;
-    }
-    .swiper-slide {
-      width: 160px; /* Вернули размер карточек как было */
-      height: 170px;
-    }
-    .swiper-pagination {
-        position: absolute;
-        bottom: -30px !important; /* Гарантированно выносим за пределы слайдов */
-        width: 100%;
-        left: 0;
-        pointer-events: none;
-    }
+    .swiper {
+        padding: 0 1.5rem;
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        overflow: visible;
+    }
+    .swiper-slide {
+      width: 180px;  /* ЧУТЬ ПОШИРЕ карточки */
+      height: 160px; /* ЧУТЬ МЕНЬШЕ в длину (высоту) */
+    }
+    .swiper-pagination {
+        position: absolute;
+        bottom: -30px !important;
+        width: 100%;
+        left: 0;
+        pointer-events: none;
+    }
+    
+    .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
+    .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
+    
+    .tg-card {
+      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
+      border-radius: 20px; overflow: hidden;
+      cursor: pointer;
+      height: 100%;
+      border: 2px solid transparent; /* Добавили прозрачную рамку для плавности */
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .tg-card:hover { 
+      transform: translateY(-6px); 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px rgba(255, 215, 0, 0.6); /* Тень + золотое свечение */
+      border-color: var(--gold-highlight); /* ЗОЛОТОЕ ВЫДЕЛЕНИЕ рамкой */
+    }
     /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
-    
-    .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
-    .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
-    
-    .tg-card {
-      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
-      border-radius: 20px; overflow: hidden;
-      cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-      height: 100%;
-    }
-    .tg-card:hover { 
-      transform: translateY(-6px); 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-    .carousel-card {
-      height: 100%; display: flex; flex-direction: column; justify-content: space-between;
-      padding: 1rem; text-align: left;
-    }
-    .card-icon { font-size: 1.75rem; }
-    .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
-    .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
-    
-    .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
-    .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
-    .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
-    .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
-    .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
-    .palette-6 { background-color: #2D2D2D; }
 
-    /* Tab Bar & Profile */
-    .ios-tab-bar {
-      position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
-      width: calc(100% - 2.5rem); max-width: 400px; display: flex;
-      background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      border-radius: 24px; padding: 0.5rem; z-index: 100; border: 1px solid rgba(255,255,255,0.1);
-    }
-    .tab-item {
-      flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      color: var(--text-secondary); cursor: pointer; transition: color 0.2s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .tab-item.active { color: var(--text-accent); }
-    .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
-    .tab-item span { font-size: 0.625rem; font-weight: 500; }
-    #profile-page { display: none; }
-    .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-    .profile-header {
-      display: flex; align-items: center; border-bottom: 1px solid var(--border-color);
-      padding-bottom: 1rem;
-    }
-    .profile-avatar {
-      width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover;
-      background-color: #333;
-    }
-    .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
-    .profile-info p { font-size: 0.9rem; }
-    .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
-    .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
-    .profile-gems .value { font-weight: 700; font-size: 1.1rem; color: var(--text-accent); }
-  </style>
+    .carousel-card {
+      height: 100%; display: flex; flex-direction: column; justify-content: space-between;
+      padding: 1rem; text-align: left;
+    }
+    .card-icon { font-size: 1.75rem; }
+    .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
+    .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
+    
+    .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
+    .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
+    .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
+    .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
+    .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
+    .palette-6 { background-color: #2D2D2D; }
+
+    /* Tab Bar & Profile */
+    .ios-tab-bar {
+      position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+      width: calc(100% - 2.5rem); max-width: 400px; display: flex;
+      background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px; padding: 0.5rem; z-index: 100; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .tab-item {
+      flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-secondary); cursor: pointer; transition: color 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-item.active { color: var(--text-accent); }
+    .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
+    .tab-item span { font-size: 0.625rem; font-weight: 500; }
+    #profile-page { display: none; }
+    .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
+    .profile-header {
+      display: flex; align-items: center; border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1rem;
+    }
+    .profile-avatar {
+      width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover;
+      background-color: #333;
+    }
+    .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
+    .profile-info p { font-size: 0.9rem; }
+    .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
+    .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
+    .profile-gems .value { font-weight: 700; font-size: 1.1rem; color: var(--text-accent); }
+  </style>
 </head>
 <body>
 
 <div class="app-container">
-  <div class="scrollable-content">
-    <div id="main-content" class="content-wrapper">
-      <div class="mb-8">
-        <h1>Панель управления</h1>
-        <p class="subtitle">Выберите инструменты для работы с ИИ</p>
-      </div>
-      <div class="swiper-container-wrapper">
-          <h2>Агенты</h2>
-          <div class="swiper" id="agents-swiper">
-            <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
-            <div class="swiper-pagination"></div>
-          </div>
-      </div>
-      <div class="swiper-container-wrapper">
-          <h2>Модели</h2>
-          <div class="swiper" id="models-swiper">
-            <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
-            <div class="swiper-pagination"></div>
-          </div>
-      </div>
-    </div>
-    <div id="profile-page" class="content-wrapper">
-        <div class="mb-8">
-          <h1>Профиль</h1>
-          <p class="subtitle">Информация о вашем аккаунте</p>
-        </div>
-        <div class="ios-card">
-          <div class="profile-header">
-            <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
-            <div class="profile-info">
-              <h2 id="profile-name">Загрузка...</h2>
-              <p id="profile-id"></p>
-            </div>
-          </div>
-          <div class="profile-gems">
-            <span class="label">💎 Баланс гемов</span>
-            <span id="gem-balance" class="value">Недоступно</span>
-          </div>
-        </div>
-    </div>
-  </div>
-  
-  <nav class="ios-tab-bar">
-    <div class="tab-item active" id="tab-home">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5,3H19V5H17V7H15V9H13V11H11V9H9V7H7V5H5V3M7,9H9V11H7V9M15,9H17V11H15V9M7,13H17V15H13V17H11V15H7V13M9,19V17H7V19H5V21H9V19M15,19V17H17V19H19V21H15V19Z"/></svg>
-      <span>Главная</span>
-    </div>
-    <div class="tab-item" id="tab-profile">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,19.2C9.5,19.2 7.29,17.92 6,16C6.03,14 10,12.9 12,12.9C14,12.9 17.97,14 18,16C16.71,17.92 14.5,19.2 12,19.2M12,5A3,3 0 0,1 15,8A3,3 0 0,1 12,11A3,3 0 0,1 9,8A3,3 0 0,1 12,5M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" /></svg>
-      <span>Профиль</span>
-    </div>
-  </nav>
+  <div class="scrollable-content">
+    <div id="main-content" class="content-wrapper">
+      <div class="mb-8">
+        <h1>Панель управления</h1>
+        <p class="subtitle">Выберите инструменты для работы с ИИ</p>
+      </div>
+      <div class="swiper-container-wrapper">
+          <h2>Агенты</h2>
+          <div class="swiper" id="agents-swiper">
+            <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
+            <div class="swiper-pagination"></div>
+          </div>
+      </div>
+      <div class="swiper-container-wrapper">
+          <h2>Модели</h2>
+          <div class="swiper" id="models-swiper">
+            <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
+            <div class="swiper-pagination"></div>
+          </div>
+      </div>
+    </div>
+    <div id="profile-page" class="content-wrapper">
+        <div class="mb-8">
+          <h1>Профиль</h1>
+          <p class="subtitle">Информация о вашем аккаунте</p>
+        </div>
+        <div class="ios-card">
+          <div class="profile-header">
+            <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
+            <div class="profile-info">
+              <h2 id="profile-name">Загрузка...</h2>
+              <p id="profile-id"></p>
+            </div>
+          </div>
+          <div class="profile-gems">
+            <span class="label">💎 Баланс гемов</span>
+            <span id="gem-balance" class="value">Недоступно</span>
+          </div>
+        </div>
+    </div>
+  </div>
+  
+  <nav class="ios-tab-bar">
+    <div class="tab-item active" id="tab-home">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5,3H19V5H17V7H15V9H13V11H11V9H9V7H7V5H5V3M7,9H9V11H7V9M15,9H17V11H15V9M7,13H17V15H13V17H11V15H7V13M9,19V17H7V19H5V21H9V19M15,19V17H17V19H19V21H15V19Z"/></svg>
+      <span>Главная</span>
+    </div>
+    <div class="tab-item" id="tab-profile">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,19.2C9.5,19.2 7.29,17.92 6,16C6.03,14 10,12.9 12,12.9C14,12.9 17.97,14 18,16C16.71,17.92 14.5,19.2 12,19.2M12,5A3,3 0 0,1 15,8A3,3 0 0,1 12,11A3,3 0 0,1 9,8A3,3 0 0,1 12,5M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" /></svg>
+      <span>Профиль</span>
+    </div>
+  </nav>
 </div>
 
 <script>
-    const tg = window.Telegram.WebApp;
+    const tg = window.Telegram.WebApp;
 
-    const agents = [
-      { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
-      { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
-      { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
-      { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
-      { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
-      { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
-    ];
-    const models = [
-      { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
-      { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
-      { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
-      { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
-      { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
-    ];
+    const agents = [
+      { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
+      { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
+      { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
+      { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
+      { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
+      { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
+    ];
+    const models = [
+      { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
+      { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
+      { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
+      { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
+      { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
+    ];
 
-    const mainContent = document.getElementById('main-content');
-    const profilePage = document.getElementById('profile-page');
-    const tabHome = document.getElementById('tab-home');
-    const tabProfile = document.getElementById('tab-profile');
-    
-    function sendDataToBot(action, target) {
-      tg.sendData(JSON.stringify({ action, target }));
-      tg.HapticFeedback.notificationOccurred('success');
-    }
+    const mainContent = document.getElementById('main-content');
+    const profilePage = document.getElementById('profile-page');
+    const tabHome = document.getElementById('tab-home');
+    const tabProfile = document.getElementById('tab-profile');
+    
+    function sendDataToBot(action, target) {
+      tg.sendData(JSON.stringify({ action, target }));
+      tg.HapticFeedback.notificationOccurred('success');
+    }
 
-    function populateCarousel(containerId, items, action) {
-      const wrapper = document.getElementById(containerId);
-      items.forEach(item => {
-        const slide = document.createElement('div');
-        slide.className = 'swiper-slide';
-        slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
-        slide.addEventListener('click', () => {
-            sendDataToBot(action, item.key);
-            tg.showPopup({
-                title: 'Настройка применена!',
-                message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
-            });
-        });
-        wrapper.appendChild(slide);
-      });
-    }
-    
-    function showPage(page) {
-        mainContent.style.display = 'none';
-        profilePage.style.display = 'none';
-        tabHome.classList.remove('active');
-        tabProfile.classList.remove('active');
-        if (page === 'home') {
-            mainContent.style.display = 'block';
-            tabHome.classList.add('active');
-        } else if (page === 'profile') {
-            profilePage.style.display = 'block';
-            tabProfile.classList.add('active');
+    function populateCarousel(containerId, items, action) {
+      const wrapper = document.getElementById(containerId);
+      items.forEach(item => {
+        const slide = document.createElement('div');
+        slide.className = 'swiper-slide';
+        slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
+        slide.addEventListener('click', () => {
+            sendDataToBot(action, item.key);
+            tg.showPopup({
+                title: 'Настройка применена!',
+                message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
+            });
+        });
+        wrapper.appendChild(slide);
+      });
+    }
+    
+    function showPage(page) {
+        mainContent.style.display = 'none';
+        profilePage.style.display = 'none';
+        tabHome.classList.remove('active');
+        tabProfile.classList.remove('active');
+        if (page === 'home') {
+            mainContent.style.display = 'block';
+            tabHome.classList.add('active');
+        } else if (page === 'profile') {
+            profilePage.style.display = 'block';
+            tabProfile.classList.add('active');
+        }
+    }
+
+    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Исправленная загрузка профиля <<<
+    function displayProfileData() {
+        // Данные могут быть в `tg.initDataUnsafe.user`
+        const user = tg.initDataUnsafe?.user;
+        
+        // Или могут прийти через событие `viewportChanged` после `tg.expand()`
+        if (user && user.id) {
+            document.getElementById('profile-avatar-img').src = user.photo_url || '';
+            // Если фото нет, можно скрыть элемент или поставить заглушку
+            document.getElementById('profile-avatar-img').onerror = function() { this.style.display='none'; };
+            
+            document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+            document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+        } else {
+            // Если данных все еще нет, показываем сообщение
+            document.getElementById('profile-name').textContent = 'Данные не получены';
+            document.getElementById('profile-id').textContent = 'Попробуйте перезайти';
+            console.warn("Telegram user data is not available.");
         }
-    }
-
-    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Надежная загрузка данных профиля <<<
-    function safeDisplayProfileData() {
-        try {
-            const user = tg.initDataUnsafe?.user;
-            if (user && user.id) {
-                document.getElementById('profile-avatar-img').src = user.photo_url || '';
-                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
-            } else {
-                 document.getElementById('profile-name').textContent = 'Не удалось загрузить';
-            }
-        } catch (e) {
-            console.error("Ошибка при отображении данных профиля:", e);
-            document.getElementById('profile-name').textContent = 'Ошибка загрузки';
-        }
-    }
-
-    function loadProfileData() {
-      // Пытаемся отобразить данные сразу
-      safeDisplayProfileData();
-
-      // Если данных нет, делаем несколько попыток с интервалом
-      if (!tg.initDataUnsafe?.user?.id) {
-        let attempts = 0;
-        const interval = setInterval(() => {
-          attempts++;
-          if (tg.initDataUnsafe?.user?.id) {
-            safeDisplayProfileData();
-            clearInterval(interval);
-          } else if (attempts > 10) { // Прекращаем попытки после 1 секунды
-            clearInterval(interval);
-          }
-        }, 100);
-      }
-    }
+    }
     // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
-    
-    // Инициализация
-    function init() {
-        tg.ready();
-        tg.expand();
+    
+    // Инициализация
+    function init() {
+        tg.ready();
+        tg.expand(); // Важно для получения данных о пользователе
 
-        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-        populateCarousel('models-swiper-wrapper', models, 'set_model');
+        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
+        populateCarousel('models-swiper-wrapper', models, 'set_model');
 
-        const swiperOptions = {
-          slidesPerView: 'auto',
-          spaceBetween: 16,
-          pagination: { el: ".swiper-pagination", clickable: true },
-        };
-        new Swiper("#agents-swiper", swiperOptions);
-        new Swiper("#models-swiper", swiperOptions);
-        
-        tabHome.addEventListener('click', () => showPage('home'));
-        tabProfile.addEventListener('click', () => {
-            showPage('profile');
-            loadProfileData(); // Загружаем данные при каждом клике на вкладку
-        });
-        
-        showPage('home');
-    }
+        const swiperOptions = {
+          slidesPerView: 'auto',
+          spaceBetween: 16,
+          pagination: { el: ".swiper-pagination", clickable: true },
+        };
+        new Swiper("#agents-swiper", swiperOptions);
+        new Swiper("#models-swiper", swiperOptions);
+        
+        tabHome.addEventListener('click', () => showPage('home'));
+        tabProfile.addEventListener('click', () => {
+            showPage('profile');
+            // Данные должны быть уже доступны после `tg.ready()`
+            displayProfileData(); 
+        });
+        
+        showPage('home');
+        // Попробуем отобразить данные профиля сразу при загрузке, 
+        // если пользователь перейдет на вкладку.
+        displayProfileData(); 
+    }
 
-    init();
+    init();
 </script>
 </body>
 </html>
