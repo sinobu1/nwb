@@ -3,3 +3,5 @@ requests
 google-generativeai
 nest_asyncio
 firebase-admin
+fastapi 
+uvicorn
