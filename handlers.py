@@ -8,6 +8,7 @@ import telegram
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import ContextTypes
+import json
 
 from config import (
     firestore_service, CONFIG, BotConstants, AVAILABLE_TEXT_MODELS,
@@ -601,3 +602,48 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"Failed to send error to admin (MarkdownV2): {e_md}. Fallback.")
             try: await context.bot.send_message(CONFIG.ADMIN_ID, f"PLAIN TEXT FALLBACK:\n{error_details.replace('```', '')}")
             except Exception as e_plain: logger.error(f"Failed to send plain text error to admin: {e_plain}")
+
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает данные, полученные от Mini App."""
+    if not update.message or not update.message.web_app_data:
+        return
+
+    user_id = update.effective_user.id
+    web_app_data = update.message.web_app_data
+
+    logger.info(f"Получены данные от Mini App для пользователя {user_id}: {web_app_data.data}")
+
+    try:
+        data = json.loads(web_app_data.data)
+        action = data.get("action")
+        target = data.get("target")
+
+        if not action or not target:
+            logger.warning(f"Некорректные данные от Mini App: {data}")
+            return
+
+        if action == "set_agent":
+            if target in AI_MODES:
+                await firestore_service.set_user_data(user_id, {'current_ai_mode': target})
+                agent_name = AI_MODES[target].get('name', 'N/A')
+                await update.message.reply_text(f"📱 Агент изменен через Mini App: <b>{agent_name}</b>", parse_mode=ParseMode.HTML)
+            else:
+                await update.message.reply_text(f"❌ Ошибка: агент '{target}' не найден.")
+
+        elif action == "set_model":
+            if target in AVAILABLE_TEXT_MODELS:
+                model_info = AVAILABLE_TEXT_MODELS[target]
+                update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
+                await firestore_service.set_user_data(user_id, update_payload)
+                model_name = model_info.get('name', 'N/A')
+                await update.message.reply_text(f"📱 Модель изменена через Mini App: <b>{model_name}</b>", parse_mode=ParseMode.HTML)
+            else:
+                await update.message.reply_text(f"❌ Ошибка: модель '{target}' не найдена.")
+
+        # Здесь можно добавить другие 'elif action == ...' для других функций
+
+    except json.JSONDecodeError:
+        logger.error(f"Ошибка декодирования JSON от Mini App: {web_app_data.data}")
+        await update.message.reply_text("Произошла ошибка при обработке вашего запроса из Mini App.")
+    except Exception as e:
+        logger.error(f"Ошибка в web_app_data_handler: {e}", exc_info=True)
