@@ -384,65 +384,58 @@
   </nav>
 
    <script>
-    // Инициализация Swiper (карусели)
-    const swiper = new Swiper(".mySwiper", {
-      slidesPerView: 1.2,
-      spaceBetween: 12,
-      centeredSlides: false,
-      pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-      },
-    });
-
-    // Получаем объект для работы с Telegram
+document.addEventListener('DOMContentLoaded', () => {
+    // --- 1. ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP ---
     const tg = window.Telegram.WebApp;
 
-    // Функция, которая будет вызываться при клике на карточку
-    function handleToolClick(event) {
-        // Находим ближайший родительский элемент с атрибутом data-tool
-        const toolCard = event.target.closest('.tool-card');
-        if (!toolCard) return;
-
-        const toolName = toolCard.dataset.tool;
-        if (toolName) {
-            // Формируем данные для отправки в бот.
-            // Лучше всего использовать формат JSON.
-            const dataToSend = {
-                command: 'select_tool_from_app',
-                tool: toolName,
-                user_id: tg.initDataUnsafe?.user?.id 
-            };
-            
-            // Отправляем данные в бот.
-            // Эта команда закроет Mini App и отправит данные.
-            tg.sendData(JSON.stringify(dataToSend));
-        }
-    }
-
-    // Назначаем обработчик кликов на всю карусель
-    const swiperWrapper = document.querySelector('.swiper-wrapper');
-    if (swiperWrapper) {
-        swiperWrapper.addEventListener('click', handleToolClick);
-    }
-    
-    // --- Инициализация приложения ---
-    
-    // Сообщаем Telegram, что приложение готово к отображению
+    // Сообщаем Telegram, что приложение готово и его можно показывать
     tg.ready();
-    
-    // Расширяем приложение на всю высоту экрана
+    // Растягиваем приложение на весь экран
     tg.expand();
-    
-    // Настраиваем главную кнопку внизу экрана
-    tg.MainButton.setText('Закрыть');
+
+    // Настраиваем главную кнопку внизу экрана.
+    // Она будет просто закрывать приложение.
+    tg.MainButton.setText('Закрыть приложение');
     tg.MainButton.show();
-    
-    // При нажатии на главную кнопку просто закрываем приложение
-    tg.MainButton.onClick(function() {
+    tg.MainButton.onClick(() => {
         tg.close();
     });
 
+    // --- 2. ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ В БОТ ---
+    function sendToolSelection(toolId) {
+        if (!toolId) return;
+
+        // Формируем полезные данные для отправки.
+        // JSON - лучший формат.
+        const dataToSend = {
+            command: 'select_tool_from_app', // команда для нашего бота
+            tool_id: toolId,                   // ID выбранного инструмента
+            user: tg.initDataUnsafe?.user      // информация о пользователе
+        };
+
+        // Используем tg.sendData(), чтобы отправить JSON-строку в бот.
+        // Эта команда также закроет веб-приложение.
+        tg.sendData(JSON.stringify(dataToSend));
+    }
+
+    // --- 3. ДОБАВЛЯЕМ ОБРАБОТЧИКИ КЛИКОВ НА КАРТОЧКИ ---
+    // Находим все карточки по их ID
+    const imageGenCard = document.getElementById('image-gen-card');
+    const textGenCard = document.getElementById('text-gen-card');
+    const chatbotCard = document.getElementById('chatbot-card');
+    const codeGenCard = document.getElementById('code-gen-card');
+    const documentsCard = document.getElementById('documents-card');
+    const translationCard = document.getElementById('translation-card');
+
+    // Навешиваем на каждую карточку обработчик, который вызовет нашу функцию
+    if (imageGenCard) imageGenCard.addEventListener('click', () => sendToolSelection('image_gen'));
+    if (textGenCard) textGenCard.addEventListener('click', () => sendToolSelection('text_gen'));
+    if (chatbotCard) chatbotCard.addEventListener('click', () => sendToolSelection('chatbot'));
+    if (codeGenCard) codeGenCard.addEventListener('click', () => sendToolSelection('code_gen'));
+    if (documentsCard) documentsCard.addEventListener('click', () => sendToolSelection('documents'));
+    if (translationCard) translationCard.addEventListener('click', () => sendToolSelection('translation'));
+    
+});
   </script>
 </body>
 </html>
