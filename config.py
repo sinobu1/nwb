@@ -212,7 +212,7 @@ MENU_STRUCTURE = {
     BotConstants.MENU_MAIN: {
         "title": "📋 Главное меню", "items": [
             # >>> НАЧАЛО ИЗМЕНЕНИЙ
-            {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://your-mini-app-url.com/gemio.html"},
+            {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://sinobu1.github.io/nwb/"},
             # <<< КОНЕЦ ИЗМЕНЕНИЙ
             {"text": "🤖 Агенты ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_AI_MODES_SUBMENU},
             {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU},
