@@ -12,10 +12,12 @@ from config import CONFIG, logger, firestore_service, genai # genai импорт
 # Импортируем все наши обработчики из handlers.py
 from handlers import (
     start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command, # Используем gems_info_command
+    gems_info_command, get_news_bonus_info_command, help_command,
+    open_mini_app_command,  # <-- Наш новый обработчик для команды /app
+    web_app_data_handler,   # <-- Наш новый обработчик для данных из Mini App
     menu_button_handler, handle_text, precheckout_callback,
     successful_payment_callback, error_handler,
-    photo_handler # Добавлен обработчик фото
+    photo_handler 
 )
 
 async def main():
@@ -46,19 +48,23 @@ async def main():
     # Регистрация обработчиков с группами для правильного порядка срабатывания
     # Группа 0: Команды
     app.add_handler(CommandHandler("start", start), group=0)
+    app.add_handler(CommandHandler("app", open_mini_app_command), group=0) # <-- Регистрируем /app
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
     app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
-    # Группа 1: Обработчики фото и кнопок меню (фото должно иметь приоритет или быть специфичным)
-    # Photo handler должен идти перед menu_button_handler, если кнопки - это текст, который может быть частью фото-диалога
-    # Но т.к. фото - это отдельный тип, порядок здесь не так критичен, как для текстовых.
+    # Группа 1: Обработчики сообщений
+    # Обработчик данных от Web App
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
+    # Обработчик фото
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
+    # Обработчик кнопок из ReplyKeyboard
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
     
     # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
+    # Должен идти после более специфичных текстовых обработчиков (menu_button_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
     
     # Обработчики платежей
@@ -68,13 +74,13 @@ async def main():
     # Глобальный обработчик ошибок
     app.add_error_handler(error_handler)
 
-    # Установка команд бота
+    # Установка команд бота, видимых в меню Telegram
     bot_commands = [
-        BotCommand("menu", "📋 Открыть главное меню"),
-        BotCommand("usage", "📊 Лимиты и баланс гемов"),
+        BotCommand("app", "🚀 Открыть приложение GemiO"),
+        BotCommand("menu", "📋 Показать клавиатуру меню"),
+        BotCommand("help", "❓ Помощь"),
+        BotCommand("usage", "📊 Лимиты и баланс"),
         BotCommand("gems", "💎 Магазин Гемов"),
-        BotCommand("bonus", "🎁 Бонус канала"),
-        BotCommand("help", "❓ Помощь")
     ]
     try:
         await app.bot.set_my_commands(bot_commands)
