@@ -46,25 +46,26 @@ async def main():
     app = app_builder.build()
 
     # Регистрация обработчиков с группами для правильного порядка срабатывания
-    # Группа 0: Команды
+    # ПРАВИЛЬНЫЙ БЛОК РЕГИСТРАЦИИ ОБРАБОТЧИКОВ
+
+    # Группа 0: Команды и самый важный обработчик для Web App
     app.add_handler(CommandHandler("start", start), group=0)
-    app.add_handler(CommandHandler("app", open_mini_app_command), group=0) # <-- Регистрируем /app
+    app.add_handler(CommandHandler("app", open_mini_app_command), group=0)
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
     app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
-    # Группа 1: Обработчики сообщений
-   
     
-    # Обработчик фото
+    # --- ВОТ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
+    # Обработчик от Mini App теперь в group=0 и имеет высокий приоритет
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=0)
+    
+    # Группа 1: Обработчики сообщений
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
-    # Обработчик кнопок из ReplyKeyboard
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
     
     # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
-    # Должен идти после более специфичных текстовых обработчиков (menu_button_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
     
     # Обработчики платежей
