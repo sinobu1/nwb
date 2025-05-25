@@ -16,10 +16,12 @@
             --bg-card: #1E1E1E;
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
-            --text-accent: #00FFC2;
             --border-color: #3A3A3C;
             --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
-            --gold-highlight: #FFD700; /* Добавили золотой цвет */
+            
+            /* >>> ИЗМЕНЕНО: Основной акцентный цвет теперь золотой <<< */
+            --gold-highlight: #FFD700;
+            --text-accent: var(--gold-highlight); /* Был #00FFC2, теперь используется золотой */
         }
         
         html, body {
@@ -29,14 +31,17 @@
             color: var(--text-primary);
         }
 
-        .app-container { height: 100%; display: flex; flex-direction: column; }
+        /* >>> ИЗМЕНЕНО: Убрана горизонтальная прокрутка <<< */
+        .app-container { 
+            height: 100%; display: flex; flex-direction: column; 
+            overflow-x: hidden; /* Это свойство предотвращает горизонтальный скролл */
+        }
         .scrollable-content {
             flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
             padding: 1.5rem 0 120px 0;
         }
         .content-wrapper { padding: 0 1.5rem; }
         
-        /* Типографика */
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
         p.subtitle { font-size: 1rem; color: var(--text-secondary); }
@@ -45,9 +50,8 @@
             margin-top: 2rem;
             position: relative;
         }
-        /* >>> НАЧАЛО ИЗМЕНЕНИЙ <<< */
         .swiper-container-wrapper h2 {
-            margin-bottom: 1rem; /* Увеличен отступ от заголовка до карточек */
+            margin-bottom: 1rem;
         }
         .swiper {
             padding: 0 1.5rem;
@@ -56,14 +60,12 @@
             overflow: visible;
         }
         .swiper-slide {
-            width: 180px; /* Карточки стали шире */
-            height: 160px; /* Карточки стали ниже */
+            width: 180px;
+            height: 160px;
         }
         .tg-card.tg-card-selected {
-            /* Выделение золотой рамкой при клике */
             box-shadow: 0 0 0 3px var(--gold-highlight), 0 10px 30px rgba(0,0,0,0.4);
         }
-        /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
 
         .swiper-pagination {
             position: absolute;
@@ -101,7 +103,6 @@
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
 
-        /* Tab Bar & Profile */
         .ios-tab-bar {
             position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
             width: calc(100% - 2.5rem); max-width: 400px; display: flex;
@@ -138,214 +139,13 @@
 <div class="app-container">
     <div class="scrollable-content">
         <div id="main-content" class="content-wrapper">
-            <div class="mb-8">
-                <h1>Панель управления</h1>
-                <p class="subtitle">Выберите инструменты для работы с ИИ</p>
             </div>
-            <div class="swiper-container-wrapper">
-                <h2>Агенты</h2>
-                <div class="swiper" id="agents-swiper">
-                    <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
-                    <div class="swiper-pagination"></div>
-                </div>
-            </div>
-            <div class="swiper-container-wrapper">
-                <h2>Модели</h2>
-                <div class="swiper" id="models-swiper">
-                    <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
-                    <div class="swiper-pagination"></div>
-                </div>
-            </div>
-        </div>
         <div id="profile-page" class="content-wrapper">
-            <div class="mb-8">
-                <h1>Профиль</h1>
-                <p class="subtitle">Информация о вашем аккаунте</p>
             </div>
-            <div class="ios-card">
-                <div class="profile-header">
-                    <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
-                    <div class="profile-info">
-                        <h2 id="profile-name">Загрузка...</h2>
-                        <p id="profile-id"></p>
-                    </div>
-                </div>
-                <div class="profile-gems">
-                    <span class="label">💎 Баланс гемов</span>
-                    <span id="gem-balance" class="value">Недоступно</span>
-                </div>
-            </div>
-        </div>
     </div>
-    
     <nav class="ios-tab-bar">
-        <div class="tab-item active" id="tab-home">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5,3H19V5H17V7H15V9H13V11H11V9H9V7H7V5H5V3M7,9H9V11H7V9M15,9H17V11H15V9M7,13H17V15H13V17H11V15H7V13M9,19V17H7V19H5V21H9V19M15,19V17H17V19H19V21H15V19Z"/></svg>
-            <span>Главная</span>
-        </div>
-        <div class="tab-item" id="tab-profile">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,19.2C9.5,19.2 7.29,17.92 6,16C6.03,14 10,12.9 12,12.9C14,12.9 17.97,14 18,16C16.71,17.92 14.5,19.2 12,19.2M12,5A3,3 0 0,1 15,8A3,3 0 0,1 12,11A3,3 0 0,1 9,8A3,3 0 0,1 12,5M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" /></svg>
-            <span>Профиль</span>
-        </div>
-    </nav>
+        </nav>
 </div>
 
-<script>
-    const tg = window.Telegram.WebApp;
-
-    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Блок для локального тестирования профиля <<<
-    // Если вы тестируете в обычном браузере, а не в Telegram,
-    // `tg.initDataUnsafe.user` будет недоступен.
-    // Раскомментируйте этот блок, чтобы подставить "фальшивые" данные для отладки.
-    /*
-    if (!tg.initDataUnsafe || !tg.initDataUnsafe.user) {
-        tg.initDataUnsafe = {
-            user: {
-                id: 123456789,
-                first_name: "Тест",
-                last_name: "Юзеров",
-                username: "testuser",
-                photo_url: "https://t.me/i/userpic/320/testuser.jpg" // Пример ссылки на аватар
-            }
-        };
-    }
-    */
-    // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
-
-    const agents = [
-        { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
-        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
-        { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
-        { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
-        { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
-        { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
-    ];
-    const models = [
-        { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
-        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
-        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
-        { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
-        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
-    ];
-
-    const mainContent = document.getElementById('main-content');
-    const profilePage = document.getElementById('profile-page');
-    const tabHome = document.getElementById('tab-home');
-    const tabProfile = document.getElementById('tab-profile');
-    
-    function sendDataToBot(action, target) {
-        tg.sendData(JSON.stringify({ action, target }));
-        tg.HapticFeedback.notificationOccurred('success');
-    }
-
-    function populateCarousel(containerId, items, action) {
-        const wrapper = document.getElementById(containerId);
-        items.forEach(item => {
-            const slide = document.createElement('div');
-            slide.className = 'swiper-slide';
-            slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
-            
-            slide.addEventListener('click', () => {
-                // >>> НАЧАЛО ИЗМЕНЕНИЙ: Логика выделения карточки <<<
-                // Сначала убираем выделение со всех карточек в этой карусели
-                const allCardsInCarousel = wrapper.querySelectorAll('.tg-card');
-                allCardsInCarousel.forEach(cardEl => cardEl.classList.remove('tg-card-selected'));
-
-                // Затем добавляем выделение на кликнутую карточку
-                slide.querySelector('.tg-card').classList.add('tg-card-selected');
-                // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
-
-                sendDataToBot(action, item.key);
-                tg.showPopup({
-                    title: 'Настройка применена!',
-                    message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
-                });
-            });
-            wrapper.appendChild(slide);
-        });
-    }
-    
-    function showPage(page) {
-        mainContent.style.display = 'none';
-        profilePage.style.display = 'none';
-        tabHome.classList.remove('active');
-        tabProfile.classList.remove('active');
-        if (page === 'home') {
-            mainContent.style.display = 'block';
-            tabHome.classList.add('active');
-        } else if (page === 'profile') {
-            profilePage.style.display = 'block';
-            tabProfile.classList.add('active');
-            // >>> ИЗМЕНЕНО: Загрузка профиля теперь надежнее <<<
-            loadProfileData(); 
-        }
-    }
-
-    // Функция отображения данных профиля осталась без изменений, но теперь она надежнее вызывается
-    function safeDisplayProfileData() {
-        try {
-            const user = tg.initDataUnsafe?.user;
-            if (user && user.id) {
-                document.getElementById('profile-avatar-img').src = user.photo_url || '';
-                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
-            } else {
-                 document.getElementById('profile-name').textContent = 'Не удалось загрузить';
-                 document.getElementById('profile-id').textContent = 'Попробуйте перезапустить приложение';
-            }
-        } catch (e) {
-            console.error("Ошибка при отображении данных профиля:", e);
-            document.getElementById('profile-name').textContent = 'Ошибка загрузки';
-        }
-    }
-
-    // >>> ИЗМЕНЕНО: Логика загрузки профиля теперь вызывается сразу и при клике <<<
-    function loadProfileData() {
-        // Пытаемся отобразить данные сразу
-        safeDisplayProfileData();
-
-        // Если данных нет (что может случиться при медленной инициализации),
-        // делаем несколько попыток с интервалом
-        if (!tg.initDataUnsafe?.user?.id) {
-            let attempts = 0;
-            const interval = setInterval(() => {
-                attempts++;
-                if (tg.initDataUnsafe?.user?.id) {
-                    safeDisplayProfileData();
-                    clearInterval(interval);
-                } else if (attempts > 10) { // Прекращаем попытки после 1 секунды
-                    clearInterval(interval);
-                    safeDisplayProfileData(); // Последняя попытка отобразить, даже если данных нет (покажет ошибку)
-                }
-            }, 100);
-        }
-    }
-    
-    // Инициализация
-    function init() {
-        tg.ready();
-        tg.expand();
-
-        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-        populateCarousel('models-swiper-wrapper', models, 'set_model');
-
-        const swiperOptions = {
-            slidesPerView: 'auto',
-            spaceBetween: 16,
-            pagination: { el: ".swiper-pagination", clickable: true },
-        };
-        new Swiper("#agents-swiper", swiperOptions);
-        new Swiper("#models-swiper", swiperOptions);
-        
-        tabHome.addEventListener('click', () => showPage('home'));
-        tabProfile.addEventListener('click', () => showPage('profile'));
-        
-        showPage('home');
-        // Загружаем данные профиля один раз при инициализации приложения
-        loadProfileData();
-    }
-
-    init();
-</script>
 </body>
 </html>
