@@ -23,40 +23,27 @@
             --gold-highlight: #d8ab4e;
         }
         
-        html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior-y: contain; }
+        html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior: contain; }
         .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* --- НОВАЯ СТАБИЛЬНАЯ СТРУКТУРА --- */
-        #main-screen {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        #main-content-area {
-            flex-grow: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-            padding: 3rem 1rem;
-        }
-        #main-content-area::-webkit-scrollbar { width: 5px; }
-        #main-content-area::-webkit-scrollbar-thumb { background-color: #444; border-radius: 10px; }
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.2s, visibility 0.2s; }
+        .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        #main-screen { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #main-content-area { flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 3rem 1rem 1rem 1rem; }
+        /* Красивый скроллбар */
+        #main-content-area::-webkit-scrollbar, .chat-messages::-webkit-scrollbar { width: 6px; }
+        #main-content-area::-webkit-scrollbar-track, .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        #main-content-area::-webkit-scrollbar-thumb, .chat-messages::-webkit-scrollbar-thumb { background-color: #333; border-radius: 6px; }
+        #main-content-area::-webkit-scrollbar-thumb:hover, .chat-messages::-webkit-scrollbar-thumb:hover { background-color: #444; }
         
         .content-pane { display: none; }
         .content-pane.active { display: block; }
         
-        #chat-screen {
-            position: absolute; inset: 0; z-index: 200;
-            background-color: var(--bg-main);
-            display: none;
-            flex-direction: column;
-        }
-        #chat-screen.active { display: flex; }
-
+        h1, h2, p { margin: 0; }
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
-        p.subtitle { font-size: 1rem; color: var(--text-secondary); }
+        p.subtitle { font-size: 1rem; color: var(--text-secondary); margin-top: 0.25rem; }
 
         /* Карусели */
         .swiper-container-wrapper { margin-top: 2rem; }
@@ -64,15 +51,15 @@
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s; }
         .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; }
-        .swiper { width: 100%; }
+        .swiper { margin: 0 -1rem; padding: 0 1rem; } /* Компенсация padding родителя */
         .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
         
+        /* Карточки */
         .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; }
         .card-icon { font-size: 1.75rem; }
         .card-title { font-size: 1rem; font-weight: 700; }
         .card-description { font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem; }
-        
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
         .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
         .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
@@ -80,22 +67,19 @@
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
 
-        /* Прочие карточки и элементы */
-        .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
-        .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; }
-        .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
-        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
-
-        /* Чат */
-        .chat-header { flex-shrink: 0; padding: 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
+        /* Экран чата */
+        #chat-screen { background-color: var(--bg-main); }
+        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
         .chat-header .title { font-weight: 600; text-align: center; }
-        .chat-header .settings-btn { cursor: pointer; font-size: 1.5rem; line-height: 1; }
+        .chat-header-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
+        .chat-header-btn:hover { background-color: var(--bg-card); }
         .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-        .chat-input-area { flex-shrink: 0; padding: 1rem; border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.75rem; }
-        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 1rem; padding: 0.75rem 1rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; max-height: 150px; }
-        #send-btn { width: 36px; height: 36px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+        .chat-message { max-width: 80%; padding: 0.75rem 1rem; border-radius: 1.25rem; line-height: 1.4; word-wrap: break-word; }
+        .message-user { background-color: var(--bg-user-msg); align-self: flex-end; border-bottom-right-radius: 0.25rem; }
+        .message-bot { background-color: var(--bg-card); align-self: flex-start; border-bottom-left-radius: 0.25rem; }
+        .chat-input-area { flex-shrink: 0; padding: 0.75rem 1rem 1.25rem 1rem; border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.75rem; }
+        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 24px; padding: 0.75rem 1.25rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; max-height: 150px; }
+        #send-btn { width: 38px; height: 38px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; margin-bottom: 2px; }
         
         /* Модальное окно */
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -108,8 +92,12 @@
         .ios-tab-bar-inner { display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
         .tab-item.active { color: var(--gold-highlight); }
-        .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
-        .tab-item span { font-size: 0.625rem; font-weight: 500; }
+        
+        /* Профиль */
+        .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
+        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
+        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
     </style>
 </head>
 <body>
@@ -120,7 +108,7 @@
                 <div id="home-content" class="content-pane active">
                     <h1>Главная</h1><p class="subtitle">Панель управления ассистентом</p>
                     <div class="full-screen-card" style="margin-top: 1.5rem;">
-                        <div class="icon">🎨</div><div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
+                        <div class="icon" style="font-size: 2rem;">🎨</div><div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
                     </div>
                     <div class="swiper-container-wrapper">
                         <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
@@ -138,15 +126,8 @@
                 <div id="profile-content" class="content-pane">
                     <h1>Профиль</h1><p class="subtitle">Информация о вашем аккаунте</p>
                     <div class="ios-card">
-                       <div class="profile-header">
-                            <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
-                            <div class="profile-info">
-                                <h2 id="profile-name"></h2><p id="profile-id"></p>
-                            </div>
-                        </div>
-                        <div class="profile-gems">
-                            <span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span>
-                        </div>
+                       <div class="profile-header"><img id="profile-avatar-img" alt="Avatar" class="profile-avatar"><div class="profile-info"><h2 id="profile-name"></h2><p id="profile-id"></p></div></div>
+                       <div class="profile-gems"><span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span></div>
                     </div>
                 </div>
             </div>
@@ -162,7 +143,9 @@
         <div id="chat-screen" class="screen">
             <div class="chat-header">
                 <div id="chat-title" class="title"></div>
-                <div id="chat-settings-btn" class="settings-btn">⚙️</div>
+                <div id="chat-settings-btn" class="chat-header-btn">
+                    <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                </div>
             </div>
             <div class="chat-messages" id="chat-messages-container"></div>
             <div class="chat-input-area">
@@ -314,8 +297,8 @@
             agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
             models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
 
-            agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 16, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
-            modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+            agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+            modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
             
             document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
             document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
