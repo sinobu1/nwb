@@ -45,6 +45,8 @@ class AppConfig:
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
     FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
 
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://nwb-production.up.railway.app/") 
+    
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
