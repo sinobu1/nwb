@@ -6,6 +6,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com/"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
   <title>AI Assistant</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
@@ -383,34 +384,78 @@
   </nav>
 
   <script>
-    // Initialize Swiper
-    const swiper = new Swiper(".mySwiper", {
-      slidesPerView: 1.2,
-      spaceBetween: 12,
-      centeredSlides: false,
-      pagination: {
-        el: ".swiper-pagination",
-        clickable: true,
-      },
-      breakpoints: {
-        640: {
-          slidesPerView: 2.2,
-          spaceBetween: 16,
-        },
-        768: {
-          slidesPerView: 3.2,
-          spaceBetween: 20,
-        },
-      },
-    });
-    
-    // Add click event to tool cards
-    document.querySelectorAll('.tool-card').forEach(card => {
-      card.addEventListener('click', function() {
-        const toolName = this.querySelector('h3').textContent;
-        alert(`Opening ${toolName} tool...`);
+  // Initialize Swiper
+  const swiper = new Swiper(".mySwiper", {
+    // ... (ваша конфигурация Swiper)
+  });
+
+  // >>> НАЧАЛО ИЗМЕНЕНИЙ
+
+  // 1. Инициализируем Telegram Web App
+  const tg = window.Telegram.WebApp;
+  tg.ready(); // Сообщаем Telegram, что приложение готово
+
+  // 2. Функция для отправки данных в бот
+  function sendDataToBot(action, target) {
+    const data = { action, target };
+    // Используем метод sendData для отправки JSON-строки в бот
+    tg.sendData(JSON.stringify(data));
+    // опционально: можно показать уведомление
+    tg.HapticFeedback.notificationOccurred('success');
+    // опционально: можно закрыть Mini App после действия
+    // tg.close(); 
+  }
+
+  // 3. Назначаем обработчики кликов на карточки
+  // Мы сопоставляем классы карточек с ключами агентов из вашего config.py
+
+  // Пример: Карточка "Партнер программиста"
+  const codeGenCard = document.querySelector('.tool-card.code-gen');
+  if (codeGenCard) {
+    codeGenCard.addEventListener('click', function() {
+      // 'programming_partner' - это ключ из словаря AI_MODES в config.py
+      sendDataToBot('set_agent', 'programming_partner');
+      // Можно также показать всплывающее уведомление
+      tg.showPopup({
+          title: 'Агент изменен',
+          message: 'Активирован "Партнер программиста". Теперь вы можете закрыть это окно и писать запросы в чат.',
+          buttons: [{type: 'ok', text: 'Понятно'}]
       });
     });
-  </script>
+  }
+
+  // Пример: Карточка "Генератор идей"
+  // Для "Text Generation" в вашем HTML, предположим, это будет генератор идей
+  const textGenCard = document.querySelector('.tool-card.text-gen');
+  if (textGenCard) {
+    textGenCard.addEventListener('click', function() {
+      // 'idea_generator' - это ключ из AI_MODES
+      sendDataToBot('set_agent', 'idea_generator');
+      tg.showPopup({
+          title: 'Агент изменен',
+          message: 'Активирован "Генератор идей".'
+      });
+    });
+  }
+
+  // Добавьте здесь обработчики для других карточек по аналогии.
+  // Например, для .chatbot можно установить 'universal_ai_basic'
+  const chatbotCard = document.querySelector('.tool-card.chatbot');
+  if (chatbotCard) {
+      chatbotCard.addEventListener('click', () => sendDataToBot('set_agent', 'universal_ai_basic'));
+  }
+
+  // Старый код для alert можно удалить или закомментировать
+  /*
+  document.querySelectorAll('.tool-card').forEach(card => {
+    card.addEventListener('click', function() {
+      const toolName = this.querySelector('h3').textContent;
+      alert(`Opening ${toolName} tool...`);
+    });
+  });
+  */
+
+  // <<< КОНЕЦ ИЗМЕНЕНИЙ
+</script>
 </body>
 </html>
