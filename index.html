@@ -18,7 +18,7 @@
       --text-secondary: #A0A0A0;
       --text-accent: #00FFC2;
       --border-color: #3A3A3C;
-      --gold-highlight: #FFD700; /* Добавили золотой цвет */
+      --gold-highlight: #FFD700;
       --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
     }
     
@@ -41,24 +41,24 @@
     h2 { font-size: 1.25rem; font-weight: 700; }
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Карусель и карточки <<< */
+    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Стили карусели и карточек <<< */
     .swiper-container-wrapper {
-        margin-top: 1.5rem; /* Увеличили верхний отступ для заголовков "Агенты" и "Модели" */
+        margin-top: 1.5rem; 
         position: relative;
-       margin-bottom: 2rem; /* Добавили отступ снизу */
+        margin-bottom: 2rem; 
     }
     .swiper-container-wrapper h2 {
-        margin-bottom: 1rem; /* Добавили отступ от заголовка до карточек */
+        margin-bottom: 1rem; /* Отступ от заголовка ("Агенты") до карточек */
     }
     .swiper {
         padding: 0 1.5rem;
         margin-left: -1.5rem;
         margin-right: -1.5rem;
-        overflow: visible;
+        overflow: visible; /* Оставляем, чтобы тени не обрезались */
     }
     .swiper-slide {
-      width: 180px;  /* ЧУТЬ ПОШИРЕ карточки */
-      height: 160px; /* ЧУТЬ МЕНЬШЕ в длину (высоту) */
+      width: 180px;  /* Карточки пошире */
+      height: 160px; /* Карточки пониже */
     }
     .swiper-pagination {
         position: absolute;
@@ -72,28 +72,36 @@
     .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
     
     .tg-card {
-      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
-      border-radius: 20px; overflow: hidden;
+      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+      border-radius: 20px;
+      overflow: hidden;
       cursor: pointer;
       height: 100%;
-      border: 2px solid transparent; /* Добавили прозрачную рамку для плавности */
+      border: 2px solid transparent; /* Резервируем место под рамку, чтобы избежать "прыжка" */
       box-shadow: 0 4px 20px rgba(0,0,0,0.25);
     }
     .tg-card:hover { 
       transform: translateY(-6px); 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px rgba(255, 215, 0, 0.6); /* Тень + золотое свечение */
-      border-color: var(--gold-highlight); /* ЗОЛОТОЕ ВЫДЕЛЕНИЕ рамкой */
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px rgba(255, 215, 0, 0.5); /* Золотое свечение */
+      border-color: var(--gold-highlight); /* Золотая рамка */
     }
-    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
-
+    
+    /* ИСПРАВЛЕНИЕ: Упрощенный и более надежный flex-макет для карточки */
     .carousel-card {
-      height: 100%; display: flex; flex-direction: column; justify-content: space-between;
-      padding: 1rem; text-align: left;
+      height: 100%; 
+      display: flex; 
+      flex-direction: column; 
+      padding: 1rem; 
+      text-align: left;
     }
-    .card-icon { font-size: 1.75rem; }
+    .card-icon { 
+      font-size: 1.75rem; 
+      margin-bottom: auto; /* Главный фикс! Прижимает иконку к верху, а остальной контент к низу */
+    }
     .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
     .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
-    
+    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
+
     .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
     .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
     .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
@@ -221,10 +229,19 @@
 
     function populateCarousel(containerId, items, action) {
       const wrapper = document.getElementById(containerId);
+      if (!wrapper) return;
       items.forEach(item => {
         const slide = document.createElement('div');
         slide.className = 'swiper-slide';
-        slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
+        // Внутренняя структура карточки
+        slide.innerHTML = `
+          <div class="tg-card carousel-card ${item.palette}">
+            <div class="card-icon">${item.icon}</div>
+            <div>
+              <h3 class="card-title">${item.name}</h3>
+              <p class="card-description mt-1">${item.desc}</p>
+            </div>
+          </div>`;
         slide.addEventListener('click', () => {
             sendDataToBot(action, item.key);
             tg.showPopup({
@@ -250,32 +267,28 @@
         }
     }
 
-    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Исправленная загрузка профиля <<<
+    // Загрузка данных профиля (остается без изменений, эта логика верна)
     function displayProfileData() {
-        // Данные могут быть в `tg.initDataUnsafe.user`
         const user = tg.initDataUnsafe?.user;
-        
-        // Или могут прийти через событие `viewportChanged` после `tg.expand()`
         if (user && user.id) {
             document.getElementById('profile-avatar-img').src = user.photo_url || '';
-            // Если фото нет, можно скрыть элемент или поставить заглушку
-            document.getElementById('profile-avatar-img').onerror = function() { this.style.display='none'; };
-            
+            document.getElementById('profile-avatar-img').onerror = function() { 
+                this.style.backgroundColor = '#333'; // Показываем фон, если фото не загрузилось
+                this.src = ''; // Очищаем src, чтобы убрать иконку битого изображения
+            };
             document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
             document.getElementById('profile-id').textContent = `ID: ${user.id}`;
         } else {
-            // Если данных все еще нет, показываем сообщение
             document.getElementById('profile-name').textContent = 'Данные не получены';
             document.getElementById('profile-id').textContent = 'Попробуйте перезайти';
-            console.warn("Telegram user data is not available.");
+            console.warn("Telegram user data is not available on demand.");
         }
     }
-    // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
     
-    // Инициализация
+    // Инициализация приложения
     function init() {
         tg.ready();
-        tg.expand(); // Важно для получения данных о пользователе
+        tg.expand();
 
         populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
         populateCarousel('models-swiper-wrapper', models, 'set_model');
@@ -285,23 +298,25 @@
           spaceBetween: 16,
           pagination: { el: ".swiper-pagination", clickable: true },
         };
+        // Инициализируем обе карусели
         new Swiper("#agents-swiper", swiperOptions);
         new Swiper("#models-swiper", swiperOptions);
         
         tabHome.addEventListener('click', () => showPage('home'));
         tabProfile.addEventListener('click', () => {
             showPage('profile');
-            // Данные должны быть уже доступны после `tg.ready()`
             displayProfileData(); 
         });
         
         showPage('home');
-        // Попробуем отобразить данные профиля сразу при загрузке, 
-        // если пользователь перейдет на вкладку.
-        displayProfileData(); 
+        // Пытаемся загрузить данные профиля один раз при старте
+        // на случай, если они уже доступны
+        if (tg.initDataUnsafe?.user) {
+            displayProfileData();
+        }
     }
 
-    init();
+    document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
