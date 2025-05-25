@@ -296,6 +296,27 @@ document.addEventListener('DOMContentLoaded', () => {
         switchScreen(mainScreen);
         tg.BackButton.hide();
     }
+
+    function fetchUpdates() {
+    const userId = tg.initDataUnsafe?.user?.id;
+    if (!userId) return;
+
+    // Обращаемся к нашему новому API-эндпоинту
+    fetch(`https://nwb-production.up.railway.app/api/get_updates/${userId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                if (typingIndicator) typingIndicator.remove();
+                
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.sender, msg.text);
+                });
+            }
+        })
+        .catch(error => console.error("Polling error:", error));
+}
+
     
     function switchScreen(screenToShow) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); screenToShow.classList.add('active'); }
     function showTab(tabId) { document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active')); document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); document.getElementById(`${tabId}-content`).classList.add('active'); document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active'); }
