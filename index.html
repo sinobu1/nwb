@@ -136,12 +136,47 @@
     </div>
   </div>
 
-  <script>
+ <script>
     // Проверяем, что мы внутри Telegram
     if (window.Telegram && window.Telegram.WebApp) {
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+
+        // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+
+        // 1. Прячем главную кнопку при старте
+        tg.MainButton.hide();
+
+        // 2. Устанавливаем обработчик на клик главной кнопки
+        tg.MainButton.onClick(function() {
+            // Когда кнопка нажата, она отправляет данные, которые мы в нее записали
+            if (this.dataToSend) {
+                tg.sendData(this.dataToSend);
+            }
+            // После отправки снова прячем кнопку
+            this.hide();
+        });
+
+        // 3. Изменяем функцию отправки команды
+        // Теперь она не отправляет данные, а настраивает и показывает главную кнопку
+        function setupMainButton(command, details, buttonText) {
+            try {
+                const dataToSend = JSON.stringify({ command, details });
+                
+                // Записываем данные для отправки в саму кнопку (в кастомное свойство)
+                tg.MainButton.dataToSend = dataToSend;
+                
+                // Устанавливаем текст кнопки и показываем ее
+                tg.MainButton.setText(buttonText).show();
+
+            } catch (error) {
+                console.error("Failed to setup Main Button:", error);
+                tg.showAlert("Ошибка подготовки данных: " + error.message);
+            }
+        }
+        
+        // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         const styleMap = {
             'default': 'var(--gradient-blue)',
@@ -167,11 +202,12 @@
                 slide.className = 'swiper-slide';
                 const backgroundStyle = styleMap[item.id] || styleMap['default'];
                 slide.innerHTML = `<div class="tool-card" style="background: ${backgroundStyle};" data-id="${item.id}" data-carousel-type="${carouselType}"><h3>${item.name}</h3></div>`;
+                // --- ИЗМЕНЕНИЕ: ВЫЗЫВАЕМ setupMainButton ВМЕСТО sendCommandToBot ---
                 slide.querySelector('.tool-card').addEventListener('click', function() {
-                    document.querySelectorAll(`.tool-card[data-carousel-type="${carouselType}"]`).forEach(card => card.classList.remove('selected'));
-                    document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
+                    document.querySelectorAll(`.tool-card, .image-tool-card`).forEach(card => card.classList.remove('selected'));
                     this.classList.add('selected');
-                    sendCommandToBot(command, { [detailKey]: item.id });
+                    const buttonText = `Выбрать: ${item.name}`;
+                    setupMainButton(command, { [detailKey]: item.id }, buttonText);
                 });
                 wrapper.appendChild(slide);
             });
@@ -179,7 +215,7 @@
             if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
         }
 
-        function renderFeaturedCarousel(containerId, data, type) { // type can be 'agent' or 'model'
+        function renderFeaturedCarousel(containerId, data, type) {
             const wrapper = document.getElementById(containerId);
             if (!wrapper) { console.error(`Wrapper ${containerId} not found`); return; }
             wrapper.innerHTML = ''; 
@@ -192,11 +228,12 @@
                 const command = type === 'agent' ? 'set_agent_from_app' : 'set_model_from_app';
                 const detailKey = type === 'agent' ? 'agent_id' : 'model_id';
                 slide.innerHTML = `<div class="image-tool-card" style="background-image: url('${item.image_url}');" data-id="${item.id}" data-carousel-type="featured"><h3>${item.name}</h3></div>`;
+                // --- ИЗМЕНЕНИЕ: ВЫЗЫВАЕМ setupMainButton ВМЕСТО sendCommandToBot ---
                 slide.querySelector('.image-tool-card').addEventListener('click', function() {
-                    document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
-                    document.querySelectorAll('.tool-card').forEach(card => card.classList.remove('selected'));
+                    document.querySelectorAll(`.tool-card, .image-tool-card`).forEach(card => card.classList.remove('selected'));
                     this.classList.add('selected');
-                    sendCommandToBot(command, { [detailKey]: item.id });
+                    const buttonText = `Выбрать: ${item.name}`;
+                    setupMainButton(command, { [detailKey]: item.id }, buttonText);
                 });
                 wrapper.appendChild(slide);
             });
@@ -204,33 +241,18 @@
             if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
         }
 
-        // РАБОЧАЯ ВЕРСИЯ ФУНКЦИИ ОТПРАВКИ
+        // Старая функция sendCommandToBot теперь используется для кнопок меню, которые должны работать мгновенно
         function sendCommandToBot(command, details = {}) {
             try {
-                // Убираем поле user, оно не используется на бэкенде и может вызывать проблемы
                 const dataToSend = JSON.stringify({ command, details });
-                
-                // Для отладки: выводим в консоль то, что пытаемся отправить.
-                // Это поможет проверить, вызывается ли функция вообще.
-                console.log("Sending data to bot:", dataToSend);
-                
-                // Явно указываем полный путь к объекту Telegram
                 window.Telegram.WebApp.sendData(dataToSend);
-
             } catch (error) {
-                // В случае ошибки, выводим ее в консоль для отладки
                 console.error("Failed to send data to bot:", error);
-                // Попытка отправить информацию об ошибке боту для диагностики
-                window.Telegram.WebApp.sendData(JSON.stringify({
-                    command: 'error_from_app',
-                    details: { 
-                        message: error.message,
-                        stack: error.stack 
-                    }
-                }));
+                window.Telegram.WebApp.showAlert("Ошибка отправки данных: " + error.message);
             }
         }
-
+        
+        // ... (остальной код скрипта, который не изменился, остается здесь)
         function initializeApp(params) {
             renderFeaturedCarousel('featured-wrapper', params.agents_data || [], 'agent');
             renderCarousel('agents', 'agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id', true);
@@ -268,6 +290,8 @@
                 profileView.style.display = 'block'; navProfile.classList.add('active');
                 navIndicator.style.transform = 'translateX(calc(100% + 5px))';
             }
+             // Прячем кнопку при смене вью
+            tg.MainButton.hide();
         }
         navHome.addEventListener('click', () => showView('home'));
         navProfile.addEventListener('click', () => showView('profile'));
@@ -299,40 +323,14 @@
             tg.MainButton.setText("Закрыть").show().onClick(() => tg.close());
         }
     } else {
-        // Этот блок выполнится, если приложение открыто НЕ в Telegram
         document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>Ошибка</h1><p>Это веб-приложение предназначено для запуска только внутри Telegram.</p></div>';
     }
 
-    function setAgent(agentId) {
-    const data = {
-        command: 'set_agent_from_app',
-        details: { agent_id: agentId }
-    };
-    Telegram.WebApp.sendData(JSON.stringify(data));
-}
-
-function setModel(modelId) {
-    const data = {
-        command: 'set_model_from_app',
-        details: { model_id: modelId }
-    };
-    Telegram.WebApp.sendData(JSON.stringify(data));
-}
-
-// Пример привязки к кнопкам
-document.querySelectorAll('.agent-button').forEach(button => {
-    button.addEventListener('click', () => {
-        const agentId = button.dataset.agentId; // ID агента из data-атрибута
-        setAgent(agentId);
-    });
-});
-
-document.querySelectorAll('.model-button').forEach(button => {
-    button.addEventListener('click', () => {
-        const modelId = button.dataset.modelId; // ID модели из data-атрибута
-        setModel(modelId);
-    });
-});
+    // Эти функции больше не нужны, так как логика встроена в renderCarousel
+    // function setAgent(agentId) { ... }
+    // function setModel(modelId) { ... }
+    // document.querySelectorAll('.agent-button').forEach(button => { ... });
+    // document.querySelectorAll('.model-button').forEach(button => { ... });
   </script>
 </body>
 </html>
