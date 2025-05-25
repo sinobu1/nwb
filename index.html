@@ -26,16 +26,16 @@
         html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior-y: contain; }
         .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         
-        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.2s ease-out, visibility 0.2s ease-out; }
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.2s ease-out, visibility 0.2s ease-out; background-color: var(--bg-main); }
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
-        #main-screen { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #main-screen { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; /* Важно для корректной работы flex-grow */ }
         #main-content-area {
-            flex-grow: 1;
+            flex-grow: 1; /* Занимает все доступное пространство над таб-баром */
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
-            padding: 3rem 1rem 1rem 1rem; /* Отступ сверху для заголовков, боковые и нижний */
+            padding: 3rem 1rem 1rem 1rem; /* Верхний отступ для заголовков страниц, боковые и небольшой нижний */
         }
         #main-content-area::-webkit-scrollbar, .chat-messages::-webkit-scrollbar { width: 6px; }
         #main-content-area::-webkit-scrollbar-track, .chat-messages::-webkit-scrollbar-track { background: transparent; }
@@ -55,7 +55,7 @@
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s; }
         .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; }
-        .swiper { /* Слайдер будет растягиваться на всю ширину main-content-area с учетом его padding */ }
+        .swiper { /* Слайдер будет внутри #main-content-area с его padding */ }
         .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
         
         .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
@@ -80,19 +80,34 @@
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
         .chat-header-btn:hover { background-color: var(--bg-card); }
         .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-        .chat-input-area { flex-shrink: 0; padding: 0.75rem 1rem 1.75rem 1rem; /* Увеличен нижний padding */ border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.75rem; }
-        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 24px; /* Увеличено скругление */ padding: 0.75rem 1.25rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; max-height: 150px; }
-        #send-btn { width: 38px; height: 38px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; margin-bottom: 2px; /* Для лучшего верт. выравнивания с многострочным полем */ }
+        .chat-input-area { flex-shrink: 0; padding: 0.75rem 1rem 1.75rem 1rem; border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.75rem; }
+        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 24px; padding: 0.75rem 1.25rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; max-height: 150px; }
+        #send-btn { width: 38px; height: 38px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; margin-bottom: 2px; }
         
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
         
-        .ios-tab-bar { flex-shrink: 0; padding: 0 1.25rem 1.25rem 1.25rem; }
-        .ios-tab-bar-inner { max-width: 400px; margin: 0 auto; display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); }
+        .ios-tab-bar {
+            flex-shrink: 0; /* Не сжиматься */
+            /* padding для внешних отступов от краев экрана убраны, т.к. .ios-tab-bar-inner будет центрирован */
+        }
+        .ios-tab-bar-inner {
+            max-width: 400px; /* Максимальная ширина самого блока с кнопками */
+            margin: 0 auto 1.25rem auto; /* Центрирование и нижний отступ */
+            display: flex;
+            background: rgba(20,20,20,0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 0.5rem; /* Внутренние отступы для кнопок */
+            border: 1px solid rgba(255,255,255,0.1);
+        }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
         .tab-item.active { color: var(--gold-highlight); }
+        .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
+        .tab-item span { font-size: 0.625rem; font-weight: 500; }
         
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
         .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
@@ -223,7 +238,7 @@
             if (text) {
                 addMessageToChat('user', text);
                 chatInput.value = '';
-                chatInput.style.height = 'auto';
+                chatInput.style.height = 'auto'; // Сбрасываем высоту для пересчета
                 setTimeout(() => { addMessageToChat('bot', `Это симуляция ответа...`); }, 1000);
             }
         }
@@ -231,7 +246,7 @@
         function updateChatTitle() {
             const agent = agents.find(a => a.key === selectedAgentKey);
             const model = models.find(m => m.key === selectedModelKey);
-            chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary);">&bull;</span> ${model?.name || ''}`;
+            chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
         }
 
         function openSettingsModal() { settingsModal.style.display = 'flex'; }
@@ -255,12 +270,12 @@
         
         function populateToolsList() {
             const list = document.getElementById('tools-list');
-            if (!list) return; // Добавлена проверка
+            if (!list) return;
             list.innerHTML = '';
             tools.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'full-screen-card';
-                card.innerHTML = `<div class="icon">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`;
+                card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`;
                 list.appendChild(card);
             });
         }
@@ -294,7 +309,7 @@
             
             populateCarousel('agents-swiper-wrapper', agents, 'agent');
             populateCarousel('models-swiper-wrapper', models, 'model');
-            populateToolsList(); // Вызов функции для Инструментов
+            populateToolsList();
             displayProfileData();
             
             agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
