@@ -156,10 +156,10 @@
             background-color: #333;
             background-size: cover;
             background-position: center;
-            display: flex; /* For centering text fallback */
+            display: flex; 
             align-items: center;
             justify-content: center;
-            font-size: 1.8rem; /* For initial/question mark */
+            font-size: 1.8rem; 
             font-weight: 500;
             color: var(--text-primary);
         }
@@ -195,11 +195,12 @@
             display: flex;
             align-items: center; 
             gap: 0.35rem; 
+            position: relative; /* For z-index context */
+            z-index: 50; /* Ensure input area is above messages */
         }
         .chat-input-wrapper {
             flex-grow: 1; 
             position: relative;
-            /* max-width: calc(100% - 80px); Removed max-width to allow natural flex growth */
         }
         #chat-input {
             width: 100%;
@@ -214,6 +215,8 @@
             min-height: 34px; 
             max-height: 90px; 
             overflow-y: auto;
+            position: relative; /* For z-index */
+            z-index: 1; /* Below buttons */
         }
         #chat-input:focus { outline: none; box-shadow: 0 0 0 1.5px var(--gold-highlight); }
         #send-btn {
@@ -228,6 +231,9 @@
             cursor: pointer;
             flex-shrink: 0;
             transition: opacity 0.2s, transform 0.15s ease;
+            position: relative; /* For z-index */
+            z-index: 2; /* Above textarea */
+            pointer-events: auto; /* Explicitly set */
         }
         #send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: scale(1); }
         #send-btn:not(:disabled):active { transform: scale(0.92); }
@@ -238,6 +244,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative; /* For z-index */
+            z-index: 2; /* Above textarea */
+            pointer-events: auto; /* Explicitly set */
         }
         #attach-btn svg { width: 18px; height: 18px; } 
 
@@ -282,7 +291,7 @@
         .loading-indicator { text-align: center; padding: 1rem; color: var(--text-secondary); }
         .generated-image-container { margin-top: 1rem; text-align: center; }
         .generated-image-container img { max-width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background-color: var(--bg-card); }
-        .generated-image-container button { /* Style for the save button */
+        .generated-image-container button { 
             margin-top: 0.75rem;
             background-color: var(--bg-select);
             color: var(--text-primary);
@@ -290,7 +299,6 @@
         .summarizer-output { margin-top: 1rem; padding: 1rem; background-color: var(--bg-card); border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; color: var(--text-primary); font-size: 0.9rem; }
         .error-message { color: var(--error-red); text-align: center; margin-top: 1rem; }
 
-        /* WebKit Scrollbar Styles */
         ::-webkit-scrollbar {
             width: 6px; 
             height: 6px;
@@ -300,14 +308,13 @@
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb {
-            background-color: #2a2a2a; /* Darker thumb */
+            background-color: #2a2a2a; 
             border-radius: 10px;
             border: 1px solid var(--bg-main); 
         }
         ::-webkit-scrollbar-thumb:hover {
-            background-color: #4a4a4a; /* Lighter thumb on hover */
+            background-color: #4a4a4a; 
         }
-        /* Firefox Scrollbar Styles */
         * {
            scrollbar-width: thin;
            scrollbar-color: #2a2a2a var(--bg-main);
@@ -465,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const API_KEY = ""; 
 
-    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
+    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "�", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
     const models = [ 
         { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
         { key: "gemini-pro-vision", name: "Gemini Pro Vision", icon: "👁️‍🗨️", desc: "Анализ изображений", palette: "palette-2" },
@@ -805,7 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
         imageErrorMessage.style.display = 'none';
         imageLoadingIndicator.style.display = 'block';
         generateImageBtn.disabled = true;
-        generatedImageContainer.innerHTML = ''; // Clear previous image and save button
+        generatedImageContainer.innerHTML = ''; 
 
         const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1} };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
@@ -854,12 +861,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.alt = "Сгенерированное изображение: " + prompt.substring(0, 50);
                 generatedImageContainer.appendChild(imgElement);
 
-                // Add a save button
                 const saveBtn = document.createElement('button');
                 saveBtn.textContent = 'Сохранить изображение';
-                saveBtn.className = 'feature-submit-btn'; // Reuse existing button style
+                saveBtn.className = 'feature-submit-btn'; 
                 saveBtn.style.marginTop = '0.75rem';
-                saveBtn.style.backgroundColor = 'var(--bg-select)'; // Different color for save
+                saveBtn.style.backgroundColor = 'var(--bg-select)'; 
                 saveBtn.style.color = 'var(--text-primary)';
 
                 saveBtn.onclick = () => {
@@ -978,8 +984,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const user = tg.initDataUnsafe?.user;
             const avatarImg = document.getElementById('profile-avatar-img');
-            avatarImg.innerHTML = ''; // Clear previous content (like '?')
-            avatarImg.style.backgroundImage = ''; // Clear previous background image
+            avatarImg.innerHTML = ''; 
+            avatarImg.style.backgroundImage = ''; 
 
             if (user && user.id) {
                 if (user.photo_url) {
@@ -992,7 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('profile-id').textContent = `ID: ${user.id}`;
             } else {
                  avatarImg.style.backgroundColor = '#444';
-                 avatarImg.innerHTML = '?'; // Fallback if no user data at all
+                 avatarImg.innerHTML = '?'; 
                  document.getElementById('profile-name').textContent = 'Нет данных';
                  document.getElementById('profile-id').textContent = 'ID: Н/Д';
             }
