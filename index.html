@@ -189,17 +189,16 @@
 
         .chat-input-area {
             flex-shrink: 0;
-            padding: 0.5rem; /* Adjusted padding */
+            padding: 0.5rem; 
             border-top: 1px solid var(--border-color);
             background-color: var(--bg-main);
             display: flex;
-            flex-direction: column; /* Changed to column for stacking */
-            gap: 0.5rem; /* Gap between input and button */
+            flex-direction: column; 
+            gap: 0.5rem; 
             position: relative; 
             z-index: 50; 
         }
-        /* Removed .chat-input-wrapper as it's no longer needed for this layout */
-        #chat-prompt-input { /* New ID for chat text input */
+        #chat-prompt-input { 
             width: 100%;
             background-color: var(--bg-card);
             border-radius: 12px;
@@ -207,15 +206,14 @@
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             font-size: 0.9rem;
-            min-height: 44px; /* Match feature input */
+            min-height: 44px; 
         }
         #chat-prompt-input:focus {
             outline: none;
             border-color: var(--gold-highlight);
             box-shadow: 0 0 0 1px var(--gold-highlight);
         }
-        #chat-send-message-btn { /* New ID for chat send button */
-            /* Styles copied from .feature-submit-btn */
+        #chat-send-message-btn { 
             display: block;
             width: 100%;
             padding: 0.75rem;
@@ -474,7 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarizerScreen = document.getElementById('summarizer-screen');
 
     const chatMessagesContainer = document.getElementById('chat-messages-container');
-    // Updated chat input elements
     const chatPromptInput = document.getElementById('chat-prompt-input'); 
     const chatSendMessageBtn = document.getElementById('chat-send-message-btn'); 
 
@@ -539,7 +536,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveChatToLocalStorage() {
-        try { localStorage.setItem('apiChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); }
+        try { 
+            setTimeout(() => { // Defer localStorage write
+                localStorage.setItem('apiChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); 
+            }, 0);
+        }
         catch (e) { console.error("Error saving API chat history to localStorage:", e); }
     }
 
@@ -638,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!(role === 'user' && text === systemPromptText) && !(role === 'model' && text === "Понял. Я готов помочь.")) {
                  currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }], timestamp: now.toISOString() });
-                 saveChatToLocalStorage();
+                 saveChatToLocalStorage(); // This will now be deferred
             }
         }
         lastMessageInfo = { sender: sender, date: currentDate };
@@ -716,12 +717,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     async function handleSendMessage() {
-        const text = chatPromptInput.value.trim(); // Use new input ID
+        const text = chatPromptInput.value.trim(); 
         if (!text) return;
 
         addMessageToChat('user', text);
-        chatPromptInput.value = ''; // Clear new input
-        chatSendMessageBtn.disabled = true; // Disable new button
+        chatPromptInput.value = ''; 
+        chatSendMessageBtn.disabled = true; 
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
@@ -734,7 +735,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessageToChat('bot', botResponseText);
     }
 
-    // Simplified input handler for the new text input
     function handleChatInput() {
         chatSendMessageBtn.disabled = this.value.trim().length === 0;
     }
@@ -1041,7 +1041,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
         
-        // Event listeners for new chat input
         chatSendMessageBtn.addEventListener('click', handleSendMessage);
         chatPromptInput.addEventListener('keydown', (e) => { 
             if (e.key === 'Enter' && !chatSendMessageBtn.disabled) { 
@@ -1051,8 +1050,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         chatPromptInput.addEventListener('input', handleChatInput);
 
-
-        // attachBtn?.addEventListener('click', () => tg.showAlert?.('Прикрепление файлов пока не поддерживается.')); // Removed as attach button is removed from chat
         chatBackButton?.addEventListener('click', closeChat);
         chatSettingsBtn?.addEventListener('click', openSettingsModal);
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
@@ -1070,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; });
 
-        handleChatInput.call(chatPromptInput); // Initial state for new send button
+        handleChatInput.call(chatPromptInput); 
         showTab('home');
         if (tg.BackButton) tg.BackButton.hide();
     }
