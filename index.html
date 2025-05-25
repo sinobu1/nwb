@@ -559,74 +559,109 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeSettingsModal() { if(settingsModal) settingsModal.style.display = 'none'; }
 
     function init() {
-        tg.ready(() => { // Используем коллбэк tg.ready для гарантии доступности initData
+        console.log("init() called"); // ДЕБАГ
+        tg.ready(() => {
+            console.log("tg.ready() callback started"); // ДЕБАГ
             tg.expand();
             telegramUserId = tg.initDataUnsafe?.user?.id;
             console.log("Telegram User ID:", telegramUserId);
+
             if (!telegramUserId) {
                 console.error("FATAL: Telegram User ID could not be determined on init. App might not work correctly.");
-                // Можно показать пользователю постоянное сообщение об ошибке здесь
-                if (chatMessagesContainer) { // Убедимся, что контейнер существует
+                if (chatMessagesContainer) {
                     const errorDiv = document.createElement('div');
                     errorDiv.style.padding = '1rem';
                     errorDiv.style.textAlign = 'center';
                     errorDiv.style.color = 'red';
                     errorDiv.textContent = 'Не удалось инициализировать приложение: пользователь не определен. Пожалуйста, попробуйте перезапустить Mini App из Telegram.';
                     const mainArea = document.getElementById('main-content-area');
-                    if(mainArea) mainArea.prepend(errorDiv); // Показываем наверху
+                    if(mainArea) mainArea.prepend(errorDiv);
                 }
             }
 
-            // Остальная инициализация, которая зависит от telegramUserId или общих элементов
-            if(sendBtn) sendBtn.addEventListener('click', handleSendMessage); // Перенесли сюда, т.к. sendBtn определен глобально
+            console.log("Attaching sendBtn listener..."); // ДЕБАГ
+            if(sendBtn) sendBtn.addEventListener('click', handleSendMessage);
+            else console.warn("sendBtn not found"); // ДЕБАГ
 
+            console.log("Populating carousels..."); // ДЕБАГ
             populateCarousel('agents-swiper-wrapper', agents, 'agent');
             populateCarousel('models-swiper-wrapper', models, 'model');
+            
+            console.log("Populating tools list and display profile..."); // ДЕБАГ
             populateToolsList();
             displayProfileData();
             
-            agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-            models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+            console.log("Populating select dropdowns..."); // ДЕБАГ
+            if (agentSelect) agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
+            else console.warn("agentSelect not found"); // ДЕБАГ
+            if (modelSelect) models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+            else console.warn("modelSelect not found"); // ДЕБАГ
             
+            console.log("Initializing Swipers..."); // ДЕБАГ
             if (document.getElementById("agents-swiper")) {
-                agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
-            }
+                try {
+                    agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+                    console.log("Agents Swiper initialized"); // ДЕБАГ
+                } catch (e) { console.error("Error initializing Agents Swiper:", e); }
+            } else console.warn("agents-swiper element not found for Swiper"); // ДЕБАГ
+
             if (document.getElementById("models-swiper")) {
-                modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
-            }
+                try {
+                    modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+                    console.log("Models Swiper initialized"); // ДЕБАГ
+                } catch(e) { console.error("Error initializing Models Swiper:", e); }
+            } else console.warn("models-swiper element not found for Swiper"); // ДЕБАГ
             
-            document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+            console.log("Attaching tab item listeners..."); // ДЕБАГ
+            const tabItems = document.querySelectorAll('.tab-item');
+            if (tabItems.length > 0) {
+                tabItems.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+            } else console.warn("No .tab-item elements found"); // ДЕБАГ
             
+            console.log("Attaching swiper nav listeners..."); // ДЕБАГ
             const agentsNavPrev = document.getElementById('agents-nav-prev');
             if(agentsNavPrev && agentsSwiper) agentsNavPrev.addEventListener('click', () => agentsSwiper.slidePrev());
+            else if (!agentsNavPrev) console.warn("agents-nav-prev not found"); // ДЕБАГ
+            
             const agentsNavNext = document.getElementById('agents-nav-next');
             if(agentsNavNext && agentsSwiper) agentsNavNext.addEventListener('click', () => agentsSwiper.slideNext());
+            else if(!agentsNavNext) console.warn("agents-nav-next not found"); // ДЕБАГ
             
             const modelsNavPrev = document.getElementById('models-nav-prev');
             if(modelsNavPrev && modelsSwiper) modelsNavPrev.addEventListener('click', () => modelsSwiper.slidePrev());
+            else if(!modelsNavPrev) console.warn("models-nav-prev not found"); // ДЕБАГ
+
             const modelsNavNext = document.getElementById('models-nav-next');
             if(modelsNavNext && modelsSwiper) modelsNavNext.addEventListener('click', () => modelsSwiper.slideNext());
+            else if(!modelsNavNext) console.warn("models-nav-next not found"); // ДЕБАГ
 
+            console.log("Attaching chat input listeners..."); // ДЕБАГ
             if(chatInput) {
                 chatInput.addEventListener('keydown', (e) => { 
                     if (e.key === 'Enter' && !e.shiftKey) { 
                         e.preventDefault(); 
-                        if (sendBtn && sendBtn.classList.contains('active')) { // Отправка только если кнопка активна
+                        if (sendBtn && sendBtn.classList.contains('active')) {
                             handleSendMessage(); 
                         }
                     } 
                 });
                 chatInput.addEventListener('input', handleInput);
-                handleInput.call(chatInput); // Инициализация состояния кнопки отправки
-            }
+                handleInput.call(chatInput); 
+            } else console.warn("chatInput not found"); // ДЕБАГ
             
+            console.log("Attaching settings modal listeners..."); // ДЕБАГ
             const chatSettingsBtn = document.getElementById('chat-settings-btn');
             if(chatSettingsBtn) chatSettingsBtn.addEventListener('click', openSettingsModal);
+            else console.warn("chat-settings-btn not found"); // ДЕБАГ
             
             const modalCloseBtn = document.querySelector('.modal-close-btn');
             if(modalCloseBtn) modalCloseBtn.addEventListener('click', closeSettingsModal);
+            else console.warn(".modal-close-btn not found"); // ДЕБАГ
+
             if(settingsModal) settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
+            else console.warn("settingsModal not found"); // ДЕБАГ
             
+            console.log("Attaching select change listeners..."); // ДЕБАГ
             if(agentSelect) agentSelect.addEventListener('change', (e) => { 
                 selectedAgentKey = e.target.value; 
                 updateChatTitle(); 
@@ -637,21 +672,26 @@ document.addEventListener('DOMContentLoaded', () => {
                      if(agent) addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
                 }
             });
+            else console.warn("agentSelect not found"); // ДЕБАГ
+
             if(modelSelect) modelSelect.addEventListener('change', (e) => { 
                 selectedModelKey = e.target.value; 
                 updateChatTitle();
                 tg.sendData(JSON.stringify({ action: 'set_model', target: selectedModelKey }));
             });
+            else console.warn("modelSelect not found"); // ДЕБАГ
             
+            console.log("Showing 'home' tab..."); // ДЕБАГ
             showTab('home');
+            console.log("tg.ready() callback finished"); // ДЕБАГ
         });
         
         tg.MainButton.hide(); 
         tg.BackButton.onClick(closeChat);
+        console.log("init() finished"); // ДЕБАГ
     }
 
     init();
-});
 </script>
 </body>
 </html>
