@@ -3,21 +3,27 @@ import asyncio
 import uvicorn
 from fastapi import FastAPI, Request, Response, status
 from telegram import Update
-from telegram.ext import Application
 
-# Импортируем конфигурацию, логгер и сервисы
+# --- ИСПРАВЛЕНИЕ: ИМПОРТИРУЕМ ХЕНДЛЕРЫ И FILTERS ЗДЕСЬ ---
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    PreCheckoutQueryHandler,
+    filters,
+)
+# --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
 from config import CONFIG, logger, BotConstants, firestore_service
 
-# Импортируем всю логику и обработчики из нового файла bot_logic.py
-# (Предполагается, что вы перенесли содержимое handlers.py в bot_logic.py)
+# Импортируем нашу логику из соседнего файла
 try:
     import bot_logic
 except ImportError:
-    # Фоллбэк, если пользователь еще не переименовал файл
+    logger.error("Не удалось импортировать bot_logic.py. Убедитесь, что вы переименовали handlers.py в bot_logic.py")
     import handlers as bot_logic
 
 # 1. Инициализация FastAPI
-# Мы добавляем документацию для наших новых API эндпоинтов
 app = FastAPI(
     title="Telegram Bot API Server",
     description="Сервер для обработки вебхуков Telegram и API для Mini App.",
@@ -25,51 +31,50 @@ app = FastAPI(
 )
 
 # 2. Инициализация Telegram-бота
-# Убираем таймауты, т.к. вебхуки работают иначе
 ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
 
 # 3. Регистрация всех ваших обработчиков из bot_logic.py
-# Убедитесь, что все ваши хендлеры перечислены здесь.
+# --- ИСПРАВЛЕНИЕ: УБРАН ПРЕФИКС bot_logic. У КЛАССОВ ХЕНДЛЕРОВ ---
 # Группа 0: Команды
-ptb_app.add_handler(bot_logic.CommandHandler("start", bot_logic.start), group=0)
-ptb_app.add_handler(bot_logic.CommandHandler("menu", bot_logic.open_menu_command), group=0)
-ptb_app.add_handler(bot_logic.CommandHandler("usage", bot_logic.usage_command), group=0)
-ptb_app.add_handler(bot_logic.CommandHandler("gems", bot_logic.gems_info_command), group=0)
-ptb_app.add_handler(bot_logic.CommandHandler("bonus", bot_logic.get_news_bonus_info_command), group=0)
-ptb_app.add_handler(bot_logic.CommandHandler("help", bot_logic.help_command), group=0)
+ptb_app.add_handler(CommandHandler("start", bot_logic.start), group=0)
+ptb_app.add_handler(CommandHandler("menu", bot_logic.open_menu_command), group=0)
+ptb_app.add_handler(CommandHandler("usage", bot_logic.usage_command), group=0)
+ptb_app.add_handler(CommandHandler("gems", bot_logic.gems_info_command), group=0)
+ptb_app.add_handler(CommandHandler("bonus", bot_logic.get_news_bonus_info_command), group=0)
+ptb_app.add_handler(CommandHandler("help", bot_logic.help_command), group=0)
 
 # Группа 1: Обработчики кнопок, фото и данных от Mini App
-ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.PHOTO, bot_logic.photo_handler), group=1)
-# Важно: menu_button_handler должен идти перед web_app_data_handler, если вы используете текстовые кнопки
-ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.menu_button_handler), group=1)
-ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.StatusUpdate.WEB_APP_DATA, bot_logic.web_app_data_handler), group=1)
+ptb_app.add_handler(MessageHandler(filters.PHOTO, bot_logic.photo_handler), group=1)
+ptb_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot_logic.menu_button_handler), group=1)
+ptb_app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, bot_logic.web_app_data_handler), group=1)
 
 # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
-ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.handle_text), group=2)
+ptb_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot_logic.handle_text), group=2)
 
 # Обработчики платежей
-ptb_app.add_handler(bot_logic.PreCheckoutQueryHandler(bot_logic.precheckout_callback))
-ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.SUCCESSFUL_PAYMENT, bot_logic.successful_payment_callback))
+ptb_app.add_handler(PreCheckoutQueryHandler(bot_logic.precheckout_callback))
+ptb_app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, bot_logic.successful_payment_callback))
 
 # Глобальный обработчик ошибок
 ptb_app.add_error_handler(bot_logic.error_handler)
-
+# --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
 @app.on_event("startup")
 async def on_startup():
     """Действия при старте сервера: установка вебхука."""
-    # Проверка Firestore
     if not firestore_service._db:
         logger.critical("Firestore (db) was NOT initialized successfully! Server will not work correctly.")
         return
         
     webhook_url = f"{CONFIG.WEBHOOK_URL}/telegram"
     try:
+        # Используем простой секрет для дополнительной безопасности
+        secret = CONFIG.TELEGRAM_TOKEN.split(":")[-1]
         await ptb_app.bot.set_webhook(
             url=webhook_url,
             allowed_updates=Update.ALL_TYPES,
-            secret_token=CONFIG.TELEGRAM_TOKEN.split(":")[-1] # Используем часть токена как простой секрет
+            secret_token=secret
         )
         logger.info(f"Webhook has been set to {webhook_url}")
     except Exception as e:
@@ -90,8 +95,8 @@ async def on_shutdown():
 @app.post("/telegram")
 async def telegram_webhook(request: Request):
     """Принимает обновления от Telegram и передает их в обработчик."""
-    # Проверяем секретный заголовок для безопасности
-    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != CONFIG.TELEGRAM_TOKEN.split(":")[-1]:
+    secret = CONFIG.TELEGRAM_TOKEN.split(":")[-1]
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != secret:
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
         
     update_data = await request.json()
@@ -111,7 +116,6 @@ async def get_app_updates(user_id: int):
         if doc and doc.exists:
             pending_messages = doc.to_dict().get('messages', [])
             if pending_messages:
-                # Сразу удаляем, чтобы не отправить повторно
                 await firestore_service._execute_firestore_op(messages_ref.delete)
                 return {"status": "ok", "messages": pending_messages}
         
@@ -123,9 +127,9 @@ async def get_app_updates(user_id: int):
 
 if __name__ == "__main__":
     # Запускаем веб-сервер uvicorn
-    # Он будет слушать на порту 8000 и принимать внешние подключения
     uvicorn.run(
-        app,
+        "main:app",
         host="0.0.0.0",
-        port=8000
+        port=8000,
+        reload=True # Добавляем reload для удобства разработки
     )
