@@ -279,12 +279,11 @@
         }
     }
 
-    function sendCommandToBot(command, details = {}) {
-        // --- НАША НОВАЯ СТРОКА ДЛЯ ОТЛАДКИ ---
-        alert('Sending to bot: ' + JSON.stringify({ command, details }));
-        
-        tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
-    }
+    // ПРАВИЛЬНЫЙ ВАРИАНТ
+function sendCommandToBot(command, details = {}) {
+    // Убедитесь, что эта строка существует и не закомментирована
+    tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
+}
 
   </script>
 </body>
