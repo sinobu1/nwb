@@ -605,84 +605,97 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # НОВЫЙ, РАСШИРЕННЫЙ ОБРАБОТЧИК ДАННЫХ ОТ MINI APP
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает все данные, полученные от Mini App."""
-    if not update.message or not update.message.web_app_data:
+    """Обрабатывает все данные, полученные от Mini App, включая опрос."""
+    if not update.message or not (update.message.web_app_data or update.message.text.startswith('__FETCH_UPDATES__')):
         return
 
     user_id = update.effective_user.id
-    web_app_data = update.message.web_app_data
-    logger.info(f"Получены данные от Mini App для пользователя {user_id}: {web_app_data.data}")
+    
+    # Определяем, это обычный запрос от WebApp или запрос на опрос
+    is_fetch_request = update.message.text and update.message.text == '__FETCH_UPDATES__'
+    
+    if is_fetch_request:
+        # --- Обработка запроса на получение обновлений (Polling) ---
+        try:
+            # Ищем сообщения для этого пользователя в "почтовом ящике"
+            messages_ref = firestore_service._db.collection(BotConstants.FS_APP_MESSAGES_COLLECTION).document(str(user_id))
+            doc = await firestore_service._execute_firestore_op(messages_ref.get)
+            
+            if doc and doc.exists:
+                data = doc.to_dict()
+                pending_messages = data.get('messages', [])
+                
+                if pending_messages:
+                    # Отправляем сообщения обратно в Mini App в виде JSON-строки
+                    # Приложение сможет прочитать этот ответ
+                    await update.message.reply_text(json.dumps({"status": "ok", "messages": pending_messages}))
+                    # Очищаем "почтовый ящик"
+                    await firestore_service._execute_firestore_op(messages_ref.delete)
+                else:
+                    await update.message.reply_text(json.dumps({"status": "ok", "messages": []}))
+            else:
+                 await update.message.reply_text(json.dumps({"status": "ok", "messages": []}))
+            
+            # Удаляем триггер-сообщение "__FETCH_UPDATES__"
+            try:
+                await context.bot.delete_message(chat_id=user_id, message_id=update.message.message_id)
+            except Exception:
+                pass # Ничего страшного, если не удалилось
 
+        except Exception as e:
+            logger.error(f"Error during fetch_app_updates for user {user_id}: {e}", exc_info=True)
+            await update.message.reply_text(json.dumps({"status": "error", "message": str(e)}))
+        return
+
+    # --- Обработка стандартных данных от WebApp (sendData) ---
     try:
-        data = json.loads(web_app_data.data)
+        data = json.loads(update.message.web_app_data.data)
         action = data.get("action")
+        logger.info(f"Received action '{action}' from Mini App for user {user_id}")
 
-        if not action:
-            logger.warning(f"Некорректные данные от Mini App (нет action): {data}")
-            return
-
-        # --- Обработка смены АГЕНТА из Mini App ---
-        if action == "set_agent":
+        if action == "set_agent" or action == "set_model":
+            # (Логика сохранения настроек остается той же)
             target = data.get("target")
-            if target and target in AI_MODES:
+            if action == "set_agent" and target in AI_MODES:
                 await firestore_service.set_user_data(user_id, {'current_ai_mode': target})
-                logger.info(f"User {user_id} set agent to '{target}' via Mini App.")
-            else:
-                logger.warning(f"User {user_id} tried to set invalid agent '{target}' from Mini App.")
-
-        # --- Обработка смены МОДЕЛИ из Mini App ---
-        elif action == "set_model":
-            target = data.get("target")
-            if target and target in AVAILABLE_TEXT_MODELS:
+            elif action == "set_model" and target in AVAILABLE_TEXT_MODELS:
                 model_info = AVAILABLE_TEXT_MODELS[target]
-                update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
-                await firestore_service.set_user_data(user_id, update_payload)
-                logger.info(f"User {user_id} set model to '{target}' via Mini App.")
-            else:
-                logger.warning(f"User {user_id} tried to set invalid model '{target}' from Mini App.")
-
-        # --- Обработка СООБЩЕНИЯ ИЗ ЧАТА Mini App ---
+                await firestore_service.set_user_data(user_id, {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")})
+            
         elif action == "app_chat_message":
+            # --- Обработка нового сообщения из чата Mini App ---
             payload = data.get("payload", {})
             user_message_text = payload.get("text")
             agent_key = payload.get("agentKey")
             model_key = payload.get("modelKey")
-
-            if not all([user_message_text, agent_key, model_key]):
-                logger.error(f"Incomplete chat data from Mini App for user {user_id}: {payload}")
-                return
-
-            logger.info(f"User {user_id} sent message from Mini App. Agent: {agent_key}, Model: {model_key}")
             
+            # (Проверяем лимиты и права доступа)
             user_data_cache = await firestore_service.get_user_data(user_id)
             bot_data_cache = await firestore_service.get_bot_data()
-            
-            can_proceed, limit_message, usage_type, gem_cost = await check_and_log_request_attempt(
-                user_id, model_key, user_data_cache, bot_data_cache, agent_key
-            )
-            
+            can_proceed, limit_message, usage_type, gem_cost = await check_and_log_request_attempt(user_id, model_key, user_data_cache, bot_data_cache, agent_key)
+
             if not can_proceed:
-                await context.bot.send_message(chat_id=user_id, text=f"Запрос из Mini App не выполнен: {limit_message}", parse_mode=ParseMode.HTML)
+                # Если нельзя, сохраняем сообщение об ошибке в "почтовый ящик" для Mini App
+                error_for_app = [{"sender": "bot", "text": limit_message}]
+                messages_ref = firestore_service._db.collection(BotConstants.FS_APP_MESSAGES_COLLECTION).document(str(user_id))
+                await firestore_service._execute_firestore_op(messages_ref.set, {"messages": error_for_app})
                 return
 
-            await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-
+            # Получаем ответ от ИИ
             ai_service = get_ai_service(model_key)
             system_prompt = AI_MODES.get(agent_key, {}).get("prompt", AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
-            
-            ai_response_text = "Ошибка обработки запроса."
-            try:
-                ai_response_text = await ai_service.generate_response(system_prompt, user_message_text, image_data=None)
-            except Exception as e:
-                logger.error(f"AI service error from Mini App request for user {user_id}: {e}", exc_info=True)
-                ai_response_text = "Произошла ошибка при обращении к ИИ."
-            
-            await increment_request_count(user_id, model_key, usage_type, agent_key, gem_cost)
-
+            ai_response_text = await ai_service.generate_response(system_prompt, user_message_text, image_data=None)
             final_reply, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-            await context.bot.send_message(chat_id=user_id, text=final_reply, disable_web_page_preview=True)
 
-    except json.JSONDecodeError:
-        logger.error(f"Ошибка декодирования JSON от Mini App: {web_app_data.data}")
+            # Формируем сообщение для сохранения
+            bot_message_for_app = {"sender": "bot", "text": final_reply}
+            
+            # Сохраняем ответ в "почтовый ящик" для Mini App
+            messages_ref = firestore_service._db.collection(BotConstants.FS_APP_MESSAGES_COLLECTION).document(str(user_id))
+            await firestore_service._execute_firestore_op(messages_ref.set, {"messages": [bot_message_for_app]})
+
+            # Обновляем счетчики и баланс
+            await increment_request_count(user_id, model_key, usage_type, agent_key, gem_cost)
+            
     except Exception as e:
-        logger.error(f"Критическая ошибка в web_app_data_handler: {e}", exc_info=True)
+        logger.error(f"Critical error in web_app_data_handler: {e}", exc_info=True)
