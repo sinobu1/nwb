@@ -1,13 +1,290 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Самый простой тест</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com/"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+  <title>AI Assistant</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
+  <style>
+    :root {
+      --tg-primary: #0088cc;
+      --tg-secondary: #0e1621;
+      --tg-text-primary: #e1e3e6;
+      --tg-card-bg: #17212b;
+      --gradient-purple: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+      --gradient-green: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+      --gradient-pink: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
+      --gradient-orange: linear-gradient(45deg, #f83600 0%, #f9d423 100%);
+      --gradient-blue: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+      --gradient-violet: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--tg-theme-bg-color, var(--tg-secondary));
+      color: var(--tg-theme-text-color, var(--tg-text-primary));
+      overscroll-behavior: none;
+      padding-bottom: 80px; /* Место для нижнего меню + отступ */
+    }
+    #app-container {
+        max-width: 720px; /* Ограничение максимальной ширины */
+        margin: 0 auto;
+    }
+    .content-card {
+        background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg));
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    .tool-card {
+        cursor: pointer; height: 120px; display: flex; align-items: flex-end; padding: 1rem; color: white; position: relative; overflow: hidden; border-radius: 12px;
+        transition: transform 0.2s ease-in-out, outline 0.2s ease-in-out;
+    }
+    .tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, rgba(0,0,0,0.6)); z-index: 1; }
+    .tool-card h3 { position: relative; z-index: 2; font-weight: 600; }
+    .tool-card.selected {
+        outline: 3px solid var(--tg-theme-button-color, var(--tg-primary));
+        outline-offset: -3px;
+        transform: scale(0.95);
+    }
+    .image-tool-card {
+        cursor: pointer; height: 180px; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; color: white; position: relative; overflow: hidden; border-radius: 12px;
+        background-size: cover; background-position: center;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+        transition: transform 0.2s ease-in-out, outline 0.2s ease-in-out;
+    }
+    .image-tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent 50%, rgba(0,0,0,0.8) 100%); z-index: 1; }
+    .image-tool-card h3 { position: relative; z-index: 2; font-weight: 600; font-size: 1.1rem; }
+    .image-tool-card.selected {
+        outline: 3px solid var(--tg-theme-button-color, var(--tg-primary));
+        outline-offset: -3px;
+        transform: scale(0.97); /* Для картинок можно чуть меньше сжатие */
+    }
+    .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .menu-button { cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.5rem; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 10px; font-size: 0.65rem; font-weight: 500; transition: background-color 0.2s; aspect-ratio: 1 / 0.9; color: var(--tg-theme-text-color, #e1e3e6); }
+    .menu-button:hover { background-color: var(--tg-theme-hint-color, rgba(255,255,255,0.1)); }
+    .menu-button svg { width: 20px; height: 20px; margin-bottom: 0.25rem; stroke: var(--tg-theme-button-text-color, var(--tg-primary)); }
+    /* Стили для iOS-навигации */
+    .bottom-nav-container { position: fixed; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; padding: 0 1rem; z-index: 100; }
+    .bottom-nav { position: relative; display: flex; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 20px; padding: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .nav-item { position: relative; z-index: 2; flex: 1; padding: 10px 25px; color: var(--tg-theme-hint-color, #bdc3c7); font-size: 14px; font-weight: 500; border: none; background: none; cursor: pointer; transition: color 0.3s ease; }
+    .nav-item.active { color: var(--tg-theme-text-color, white); }
+    .nav-active-indicator { position: absolute; z-index: 1; top: 5px; bottom: 5px; width: calc(50% - 5px); background-color: var(--tg-theme-button-color, var(--tg-primary)); border-radius: 15px; transition: transform 0.3s ease-in-out; }
+    /* Стили для профиля */
+    .profile-card { padding: 24px; text-align: center; }
+    .profile-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 16px; object-fit: cover; border: 2px solid var(--tg-theme-button-color, var(--tg-primary)); }
+    .profile-name { font-size: 1.25rem; font-weight: 600; }
+    .profile-info { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; color: var(--tg-theme-hint-color, #7f8b97); }
+    .profile-info span { color: var(--tg-theme-text-color, #e1e3e6); font-weight: 500; }
+    .swiper-pagination-bullet { background: var(--tg-text-secondary) !important; opacity: 0.5 !important; }
+    .swiper-pagination-bullet-active { background: var(--tg-primary) !important; opacity: 1 !important; }
+  </style>
 </head>
-<body>
-    <button onclick="alert('Hello World!');" style="font-size: 40px; margin: 50px;">
-        Нажми на меня
-    </button>
+<body class="pb-24">
+ <div id="app-container">
+  <div id="home-view">
+    <main class="p-4 space-y-5">
+      <div id="featured-carousel-container">
+        <h2 class="text-base font-semibold mb-3">🔥 Топовые Режимы</h2>
+        <div class="swiper" id="featured-swiper">
+          <div class="swiper-wrapper" id="featured-wrapper">
+            </div>
+        </div>
+      </div>
+      <div id="agents-carousel-container">
+        <h2 class="text-base font-semibold mb-3">Выберите Агента</h2>
+        <div class="swiper" id="agents-swiper">
+          <div class="swiper-wrapper" id="agents-wrapper"></div>
+        </div>
+      </div>
+      <div id="models-carousel-container">
+        <h2 class="text-base font-semibold mb-3">Выберите Модель</h2>
+        <div class="swiper" id="models-swiper">
+          <div class="swiper-wrapper" id="models-wrapper"></div>
+        </div>
+      </div>
+      <div class="content-card">
+        <h2 class="text-base font-semibold mb-3">Управление ботом</h2>
+        <div class="menu-grid">
+          <button id="btn-limits" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg><span>Лимиты</span></button>
+          <button id="btn-bonus" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4H5z" /></svg><span>Бонус</span></button>
+          <button id="btn-gems" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg><span>Гемы</span></button>
+          <button id="btn-help" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Помощь</span></button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="profile-view" style="display: none;">
+      <main class="p-4"><div class="content-card profile-card">
+          <img id="profile-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="User Avatar" class="profile-avatar"> <h2 id="profile-name" class="profile-name">Загрузка...</h2>
+          <div class="profile-info">
+              <p>Баланс: <span id="profile-gems">0.0</span> 💎</p>
+              <p>User ID: <span id="profile-id">0</span></p>
+          </div>
+      </div></main>
+  </div>
+  
+  <div class="bottom-nav-container">
+    <div class="bottom-nav">
+      <div id="nav-indicator" class="nav-active-indicator"></div>
+      <button id="nav-home" class="nav-item active">Дом</button>
+      <button id="nav-profile" class="nav-item">Профиль</button>
+    </div>
+  </div>
+
+  <script>
+    // Проверяем, что мы внутри Telegram
+    if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const styleMap = {
+            'default': 'var(--gradient-blue)',
+            'photo_dietitian_analyzer': 'var(--gradient-purple)',
+            'idea_generator': 'var(--gradient-green)',
+            'universal_ai_basic': 'var(--gradient-pink)',
+            'career_coach': 'var(--gradient-orange)',
+            'programming_partner': 'var(--gradient-violet)',
+            'google_gemini_2_0_flash': 'var(--gradient-blue)',
+            'google_gemini_2_5_flash_preview': 'var(--gradient-purple)',
+            'custom_api_grok_3': 'var(--gradient-orange)',
+        };
+        
+        function renderCarousel(carouselType, containerId, data, command, detailKey, excludeFeatured = false) {
+            const wrapper = document.getElementById(containerId);
+            if (!wrapper) { console.error(`Wrapper ${containerId} not found`); return; }
+            wrapper.innerHTML = '';
+            let itemCount = 0;
+            data.forEach((item) => {
+                if (excludeFeatured && item.image_url) return;
+                itemCount++;
+                const slide = document.createElement('div');
+                slide.className = 'swiper-slide';
+                const backgroundStyle = styleMap[item.id] || styleMap['default'];
+                slide.innerHTML = `<div class="tool-card" style="background: ${backgroundStyle};" data-id="${item.id}" data-carousel-type="${carouselType}"><h3>${item.name}</h3></div>`;
+                slide.querySelector('.tool-card').addEventListener('click', function() {
+                    document.querySelectorAll(`.tool-card[data-carousel-type="${carouselType}"]`).forEach(card => card.classList.remove('selected'));
+                    document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
+                    this.classList.add('selected');
+                    sendCommandToBot(command, { [detailKey]: item.id });
+                });
+                wrapper.appendChild(slide);
+            });
+            const containerElement = document.getElementById(carouselType + '-carousel-container');
+            if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
+        }
+
+        function renderFeaturedCarousel(containerId, data, type) { // type can be 'agent' or 'model'
+            const wrapper = document.getElementById(containerId);
+            if (!wrapper) { console.error(`Wrapper ${containerId} not found`); return; }
+            wrapper.innerHTML = ''; 
+            const featuredItems = data.filter(item => item.image_url);
+            let itemCount = 0;
+            featuredItems.forEach((item) => {
+                itemCount++;
+                const slide = document.createElement('div');
+                slide.className = 'swiper-slide';
+                const command = type === 'agent' ? 'set_agent_from_app' : 'set_model_from_app';
+                const detailKey = type === 'agent' ? 'agent_id' : 'model_id';
+                slide.innerHTML = `<div class="image-tool-card" style="background-image: url('${item.image_url}');" data-id="${item.id}" data-carousel-type="featured"><h3>${item.name}</h3></div>`;
+                slide.querySelector('.image-tool-card').addEventListener('click', function() {
+                    document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
+                    document.querySelectorAll('.tool-card').forEach(card => card.classList.remove('selected'));
+                    this.classList.add('selected');
+                    sendCommandToBot(command, { [detailKey]: item.id });
+                });
+                wrapper.appendChild(slide);
+            });
+            const containerElement = document.getElementById('featured-carousel-container');
+            if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
+        }
+
+        // РАБОЧАЯ ВЕРСИЯ ФУНКЦИИ ОТПРАВКИ
+        function sendCommandToBot(command, details = {}) {
+            try {
+                tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
+            } catch (error) {
+                // В случае ошибки, выводим ее в консоль для отладки
+                console.error("Failed to send data to bot:", error);
+            }
+        }
+
+        function initializeApp(params) {
+            renderFeaturedCarousel('featured-wrapper', params.agents_data || [], 'agent');
+            renderCarousel('agents', 'agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id', true);
+            renderCarousel('models', 'models-wrapper', params.models_data || [], 'set_model_from_app', 'model_id', true);
+            
+            if(document.getElementById('featured-wrapper').children.length > 0) new Swiper("#featured-swiper", { slidesPerView: 1.8, spaceBetween: 12, centeredSlides: true });
+            if(document.getElementById('agents-wrapper').children.length > 0) new Swiper("#agents-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
+            if(document.getElementById('models-wrapper').children.length > 0) new Swiper("#models-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
+            
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                document.getElementById('profile-id').textContent = user.id;
+                if (user.photo_url) {
+                    document.getElementById('profile-avatar').src = user.photo_url;
+                } else {
+                    document.getElementById('profile-avatar').style.display = 'none';
+                }
+            }
+            document.getElementById('profile-gems').textContent = parseFloat(params.gem_balance || 0).toFixed(1);
+            showView('home');
+        }
+        
+        const homeView = document.getElementById('home-view'), profileView = document.getElementById('profile-view');
+        const navHome = document.getElementById('nav-home'), navProfile = document.getElementById('nav-profile');
+        const navIndicator = document.getElementById('nav-indicator');
+
+        function showView(viewId) {
+            homeView.style.display = 'none'; profileView.style.display = 'none';
+            navHome.classList.remove('active'); navProfile.classList.remove('active');
+            if (viewId === 'home') {
+                homeView.style.display = 'block'; navHome.classList.add('active');
+                navIndicator.style.transform = 'translateX(0%)';
+            } else if (viewId === 'profile') {
+                profileView.style.display = 'block'; navProfile.classList.add('active');
+                navIndicator.style.transform = 'translateX(calc(100% + 5px))';
+            }
+        }
+        navHome.addEventListener('click', () => showView('home'));
+        navProfile.addEventListener('click', () => showView('profile'));
+
+        document.getElementById('btn-limits').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'limits_submenu' }));
+        document.getElementById('btn-bonus').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'bonus_submenu' }));
+        document.getElementById('btn-gems').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'gems_submenu' }));
+        document.getElementById('btn-help').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'help_submenu' }));
+
+        try {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const agentsDataString = decodeURIComponent(hashParams.get('agents_data') || '[]');
+            const modelsDataString = decodeURIComponent(hashParams.get('models_data') || '[]');
+
+            if (agentsDataString === '[]' && modelsDataString === '[]' && !hashParams.has('gem_balance')) {
+                document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h2>Ошибка загрузки данных</h2><p>Пожалуйста, откройте приложение через команду /app в боте.</p></div>`;
+                 tg.MainButton.setText("Закрыть").show().onClick(() => tg.close());
+            } else {
+                const appData = {
+                    gem_balance: hashParams.get('gem_balance'),
+                    agents_data: JSON.parse(agentsDataString),
+                    models_data: JSON.parse(modelsDataString)
+                };
+                initializeApp(appData);
+            }
+        } catch(e) {
+            console.error("Failed to initialize app with data from URL:", e);
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center;">Ошибка инициализации. Пожалуйста, попробуйте снова через бота.</div>';
+            tg.MainButton.setText("Закрыть").show().onClick(() => tg.close());
+        }
+    } else {
+        // Этот блок выполнится, если приложение открыто НЕ в Telegram
+        document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>Ошибка</h1><p>Это веб-приложение предназначено для запуска только внутри Telegram.</p></div>';
+    }
+  </script>
 </body>
 </html>
