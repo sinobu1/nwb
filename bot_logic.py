@@ -10,6 +10,7 @@ from telegram.constants import ParseMode, ChatAction
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, PreCheckoutQueryHandler, filters # Добавил импорты сюда для полноты
 import json
 
+
 from config import (
     firestore_service, CONFIG, BotConstants, AVAILABLE_TEXT_MODELS,
     AI_MODES, MENU_STRUCTURE, auto_delete_message_decorator,
@@ -539,29 +540,28 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # ОБНОВЛЕННЫЙ WEB_APP_DATA_HANDLER С ЛОГИРОВАНИЕМ
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает данные от Mini App, сохраняя ответы для опроса."""
     if not update.message or not update.message.web_app_data:
         return
 
     user_id = update.effective_user.id
     data_str = update.message.web_app_data.data
-    logger.info(f"Raw WebApp data for user {user_id}: {data_str}")
+    logger.info(f"Raw WebApp data for user {user_id} (likely settings or save action): {data_str}")
     
     try:
         data = json.loads(data_str)
     except json.JSONDecodeError:
         logger.error(f"JSONDecodeError for WebApp data: {data_str}")
-        # Можно отправить сообщение пользователю или просто выйти
         return
 
     action = data.get("action")
     logger.info(f"WebApp action '{action}' for user {user_id}")
 
-    # Удаляем сервисное сообщение от Telegram
-    try:
-        await context.bot.delete_message(chat_id=user_id, message_id=update.message.message_id)
-    except Exception:
-        pass # Ничего страшного, если не удалось
+    # Удаляем сервисное сообщение от Telegram, если оно есть
+    if update.message.web_app_data:
+        try:
+            await context.bot.delete_message(chat_id=user_id, message_id=update.message.message_id)
+        except Exception:
+            pass # Ничего страшного
 
     if action == "set_agent" or action == "set_model":
         target = data.get("target")
@@ -572,51 +572,30 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             model_info = AVAILABLE_TEXT_MODELS[target]
             await firestore_service.set_user_data(user_id, {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")})
             logger.info(f"User {user_id} set model to '{target}' via Mini App.")
-
-    elif action == "app_chat_message":
+    
+    elif action == "save_chat_to_telegram":
         payload = data.get("payload", {})
-        user_message_text = payload.get("text")
-        agent_key = payload.get("agentKey")
-        model_key = payload.get("modelKey")
-
-        if not all([user_message_text, agent_key, model_key]):
-            logger.error(f"Incomplete chat data from Mini App for user {user_id}: {payload}")
-            return
-
-        logger.info(f"User {user_id} sent message from Mini App. Agent: {agent_key}, Model: {model_key}, Text: '{user_message_text}'")
-
-        # Отправляем копию сообщения пользователя в основной чат
-        await context.bot.send_message(chat_id=user_id, text=f"(Из MiniApp): {user_message_text}")
-
-        user_data_cache = await firestore_service.get_user_data(user_id)
-        bot_data_cache = await firestore_service.get_bot_data()
-        can_proceed, limit_message, usage_type, gem_cost = await check_and_log_request_attempt(user_id, model_key, user_data_cache, bot_data_cache, agent_key)
-
-        ai_response_text = "Ошибка обработки запроса." # Изначальное значение
-
-        if not can_proceed:
-            ai_response_text = limit_message # Используем сообщение о лимите как ответ
-            logger.warning(f"Request from MiniApp for user {user_id} denied: {limit_message}")
-        else:
-            try:
-                await context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING)
-                ai_service = get_ai_service(model_key)
-                system_prompt = AI_MODES.get(agent_key, {}).get("prompt", AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
-                ai_response_text = await ai_service.generate_response(system_prompt, user_message_text, image_data=None)
-                
-                # >>> ДОБАВЛЕНО ЛОГИРОВАНИЕ СЫРОГО ОТВЕТА <<<
-                logger.info(f"Raw AI response (from MiniApp): '{ai_response_text}'")
-                # >>> КОНЕЦ ДОБАВЛЕНИЯ <<<
-
-                await increment_request_count(user_id, model_key, usage_type, agent_key, gem_cost)
-            except Exception as e:
-                logger.error(f"AI service error from Mini App request for user {user_id}: {e}", exc_info=True)
-                ai_response_text = "Произошла ошибка при обращении к ИИ."
+        user_query = payload.get("user_query", "N/A")
+        ai_response = payload.get("ai_response", "N/A")
         
-        final_reply, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
+        logger.info(f"User {user_id} requested to save chat. Q: '{user_query[:50]}...', A: '{ai_response[:50]}...'")
         
-        # Отправляем ответ в основной чат
-        await context.bot.send_message(chat_id=user_id, text=final_reply, disable_web_page_preview=True)
+        saved_message_text = (
+            f"📌 **Диалог из Mini App сохранен:**\n\n"
+            f"👤 **Ваш запрос:**\n`{user_query}`\n\n"
+            f"💡 **Ответ ИИ:**\n`{ai_response}`"
+        )
+        try:
+            await context.bot.send_message(chat_id=user_id, text=saved_message_text, parse_mode=ParseMode.MARKDOWN_V2)
+        except Exception as e:
+            logger.error(f"Failed to send saved chat to user {user_id}: {e}")
+            # Отправляем как обычный текст в случае ошибки форматирования
+            await context.bot.send_message(chat_id=user_id, text=f"Диалог из Mini App:\nЗапрос: {user_query}\nОтвет: {ai_response}")
+            
+    # Старая логика 'app_chat_message' здесь больше не нужна,
+    # так как она переехала в новый эндпоинт /api/process_app_message
+    else:
+        logger.warning(f"Unknown WebApp action '{action}' for user {user_id}")
 
         # И сохраняем его для Mini App
         bot_message_for_app = [{"sender": "bot", "text": final_reply, "timestamp": datetime.now(timezone.utc).isoformat()}]
