@@ -596,7 +596,9 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 await firestore_service.set_user_data(user.id, {'current_ai_mode': agent_id})
                 agent_name = AI_MODES[agent_id].get('name', 'N/A')
                 response_text = f"✅ Агент изменен на: <b>{agent_name}</b>"
+                # ОТСУТСТВУЮЩАЯ СТРОКА: Отправка сообщения пользователю
                 await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
 
         # Команда на смену Модели
         elif command == 'set_model_from_app':
@@ -604,12 +606,13 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             model_info = AVAILABLE_TEXT_MODELS.get(model_id_key)
             if model_info:
                 update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
-                # Добавляем совместимость с логикой из menu_button_handler
                 if model_id_key in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_db.get('current_ai_mode') == "gemini_pro_custom_mode":
                     update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
                 await firestore_service.set_user_data(user.id, update_payload)
                 response_text = f"✅ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>"
+                # ОТСУТСТВУЮЩАЯ СТРОКА: Отправка сообщения пользователю
                 await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
 
         # Команда на показ одного из меню бота
         elif command == 'show_menu_from_app':
