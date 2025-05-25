@@ -30,10 +30,7 @@
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
         #main-screen { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-        #main-content-area {
-            flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
-            padding: 3rem 1rem 1rem 1rem; 
-        }
+        #main-content-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3rem 1rem 1rem 1rem; }
         #main-content-area::-webkit-scrollbar, .chat-messages::-webkit-scrollbar { width: 6px; }
         #main-content-area::-webkit-scrollbar-track, .chat-messages::-webkit-scrollbar-track { background: transparent; }
         #main-content-area::-webkit-scrollbar-thumb, .chat-messages::-webkit-scrollbar-thumb { background-color: #333; border-radius: 3px; }
@@ -56,8 +53,7 @@
         .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; }
         .card-icon { font-size: 1.75rem; }
-        .card-title { font-size: 1rem; font-weight: 700; color: #FFFFFF; } /* Белый цвет для заголовка */
-        /* ИЗМЕНЕНИЕ 1: Текст описания на карточках сделан белым и чуть прозрачным для лучшей читаемости */
+        .card-title { font-size: 1rem; font-weight: 700; color: #FFFFFF; }
         .card-description { font-size: 0.875rem; color: #FFFFFF; opacity: 0.85; margin-top: 0.25rem; }
         
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
@@ -70,43 +66,45 @@
         .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
         .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; }
         
-        #chat-screen { background-color: var(--bg-main); }
+        /* ИЗМЕНЕНИЕ 1: Экран чата теперь Flex-контейнер для "прилипания" поля ввода к низу */
+        #chat-screen { background-color: var(--bg-main); display: flex; flex-direction: column; }
         .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
         .chat-header .title { font-weight: 600; text-align: center; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
         .chat-header-btn:hover { background-color: var(--bg-card); }
+        /* Поле для сообщений теперь растягивается на всю доступную высоту */
         .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         
-        /* ИЗМЕНЕНИЕ 2: Панель ввода поднята и выровнена */
+        /* ИЗМЕНЕНИЕ 2: Полностью переработана панель ввода */
         .chat-input-area { 
             flex-shrink: 0; 
-            padding: 0.75rem 1rem; /* Убрали лишний отступ снизу */
-            margin-bottom: 0.5rem; /* Добавили отступ снизу, чтобы поднять панель */
+            padding: 0.5rem 0.75rem;
             border-top: 1px solid var(--border-color); 
             background-color: var(--bg-main); 
             display: flex; 
-            align-items: flex-end; /* Выравнивание элементов по нижнему краю */
-            gap: 0.75rem; 
+            align-items: flex-end;
+            gap: 0.5rem; 
         }
+        /* Текстовое поле теперь корректно растягивается, не перекрывая кнопки */
         #chat-input { 
-            width: 100%; background-color: var(--bg-card); border-radius: 24px; 
-            padding: 0.8rem 1.25rem; border: none; color: var(--text-primary); 
+            flex-grow: 1; /* Главное исправление! */
+            background-color: var(--bg-card); border-radius: 20px; 
+            padding: 0.75rem 1rem; border: none; color: var(--text-primary); 
             font-size: 1rem; resize: none; 
             line-height: 1.4;
-            min-height: calc(0.8rem * 2 + 1.4em); /* Высота одной строки */
-            max-height: 110px; /* Ограничение высоты, ~5 строк */
+            min-height: calc(0.75rem * 2 + 1.4em);
+            max-height: 120px;
             overflow-y: auto;
         }
 
-        /* ИЗМЕНЕНИЕ 3: Стили для кнопок в панели ввода */
         .chat-action-btn {
-            width: 42px; height: 42px;
+            width: 40px; height: 40px;
             background-color: var(--bg-card);
             color: var(--text-secondary);
             border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; flex-shrink: 0;
-            transition: background-color 0.2s, color 0.2s;
+            cursor: pointer; flex-shrink: 0; /* Не сжиматься */
+            transition: transform 0.15s ease, opacity 0.2s ease;
         }
         .chat-action-btn:hover {
              background-color: #333;
@@ -114,8 +112,15 @@
         #send-btn { 
             background-color: var(--gold-highlight); 
             color: black;
+            transform: scale(0); /* Изначально скрыта */
+            opacity: 0;
         }
-        
+        #send-btn.visible {
+            transform: scale(1); /* Плавное появление */
+            opacity: 1;
+        }
+        .hidden { display: none !important; }
+
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
@@ -135,7 +140,6 @@
 </head>
 <body>
     <div class="app-wrapper">
-        
         <div id="main-screen" class="screen active">
             <div id="main-content-area">
                 <div id="home-content" class="content-pane active">
@@ -175,32 +179,27 @@
             <div class="chat-header">
                 <div id="chat-title" class="title"></div>
                 <div id="chat-settings-btn" class="chat-header-btn">
-                    <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17.47.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                    <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17-.47.41l.36-2.54c.59-.24 1.13-.57-1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
                 </div>
             </div>
             <div class="chat-messages" id="chat-messages-container"></div>
             <div class="chat-input-area">
                 <div id="hide-keyboard-btn" class="chat-action-btn">
-                    <svg fill="currentColor" width="24" height="24" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41z"/></svg>
+                    <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M7.14,17.28L8.55,18.7L12,15.25L15.45,18.7L16.86,17.28L13.41,13.84L17.32,9.94L15.91,8.53L12,12.43L8.09,8.53L6.68,9.94L10.59,13.84L7.14,17.28Z" /></svg>
                 </div>
-                <textarea id="chat-input" placeholder="Введите сообщение..." rows="1"></textarea>
+                <textarea id="chat-input" placeholder="Сообщение..." rows="1"></textarea>
                 <div id="send-btn" class="chat-action-btn">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.49999 20.5C4.33332 21.3333 5.66666 21.1667 6.33332 20.5L21.3333 13C22.1667 12.5 22.1667 11.5 21.3333 11L6.33332 3.5C5.66666 2.83333 4.33332 2.66667 3.49999 3.5C2.66666 4.33333 2.83332 5.66667 3.49999 6.33333L16.1667 12L3.49999 17.6667C2.83332 18.3333 2.66666 19.6667 3.49999 20.5Z" fill="black"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3.49999 20.5C4.33332 21.3333 5.66666 21.1667 6.33332 20.5L21.3333 13C22.1667 12.5 22.1667 11.5 21.3333 11L6.33332 3.5C5.66666 2.83333 4.33332 2.66667 3.49999 3.5C2.66666 4.33333 2.83332 5.66667 3.49999 6.33333L16.1667 12L3.49999 17.6667C2.83332 18.3333 2.66666 19.6667 3.49999 20.5Z" fill="black"/></svg>
                 </div>
             </div>
         </div>
 
         <div id="settings-modal">
-            <div class="modal-content">
-                <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn">✕</div></div>
-                <div><label>АГЕНТ</label><select id="agent-select" class="custom-select"></select></div>
-                <div style="margin-top: 1rem;"><label>МОДЕЛЬ</label><select id="model-select" class="custom-select"></select></div>
             </div>
-        </div>
     </div>
     
 <script>
-    // ИЗМЕНЕНИЕ 5: Полностью обновленный и исправленный скрипт
+    // ИЗМЕНЕНИЕ 3: Полностью переработанный скрипт
     document.addEventListener('DOMContentLoaded', () => {
         const tg = window.Telegram.WebApp;
 
@@ -220,10 +219,10 @@
         const chatMessagesContainer = document.getElementById('chat-messages-container');
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
+        const hideKeyboardBtn = document.getElementById('hide-keyboard-btn');
         const settingsModal = document.getElementById('settings-modal');
         const agentSelect = document.getElementById('agent-select');
         const modelSelect = document.getElementById('model-select');
-        const hideKeyboardBtn = document.getElementById('hide-keyboard-btn');
 
         // --- СТИЛИ ДЛЯ СООБЩЕНИЙ ЧАТА ---
         const styleSheet = document.createElement("style");
@@ -278,8 +277,7 @@
 
             addMessageToChat('user', text);
             chatInput.value = '';
-            // Сбрасываем высоту поля ввода после отправки
-            chatInput.style.height = 'auto';
+            handleInput(); // Вызываем для сброса высоты и скрытия кнопки
             
             const typingIndicatorId = 'typing-indicator';
             addMessageToChat('bot typing', 'Печатает', typingIndicatorId);
@@ -287,16 +285,23 @@
             setTimeout(() => {
                 const typingIndicator = document.getElementById(typingIndicatorId);
                 if (typingIndicator) {
-                    typingIndicator.textContent = 'Это симуляция ответа...';
+                    typingIndicator.textContent = 'Это симуляция очень длинного ответа, чтобы проверить, как работает прокрутка и перенос строк в сообщении от бота.';
                     typingIndicator.classList.remove('typing');
                 }
                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
             }, 1500);
         }
         
+        // Главная функция оптимизации
         function handleInput() {
-            chatInput.style.height = 'auto';
-            chatInput.style.height = `${chatInput.scrollHeight}px`;
+            // 1. Динамическое изменение высоты
+            this.style.height = 'auto';
+            this.style.height = `${this.scrollHeight}px`;
+
+            // 2. Появление/скрытие кнопки отправки
+            const hasText = this.value.trim().length > 0;
+            sendBtn.classList.toggle('visible', hasText);
+            hideKeyboardBtn.classList.toggle('hidden', hasText);
         }
 
         function updateChatTitle() {
@@ -304,30 +309,14 @@
             const model = models.find(m => m.key === selectedModelKey);
             chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
         }
-
+        
+        // --- ЗАПОЛНЕНИЕ ИНТЕРФЕЙСА (без изменений) ---
+        function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
+        function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
+        function displayProfileData() { try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64'; document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
+        function updateNavArrows(swiper, prefix) { const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
         function openSettingsModal() { settingsModal.style.display = 'flex'; }
         function closeSettingsModal() { settingsModal.style.display = 'none'; }
-        
-        // --- ФУНКЦИИ ЗАПОЛНЕНИЯ ИНТЕРФЕЙСА (без изменений) ---
-        function populateCarousel(containerId, items, type) {
-            const wrapper = document.getElementById(containerId);
-            if (!wrapper) return;
-            wrapper.innerHTML = '';
-            items.forEach(item => {
-                const slide = document.createElement('div');
-                slide.className = 'swiper-slide';
-                slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
-                slide.addEventListener('click', () => {
-                    if (type === 'agent') selectedAgentKey = item.key;
-                    if (type === 'model') selectedModelKey = item.key;
-                    openChat();
-                });
-                wrapper.appendChild(slide);
-            });
-        }
-        function populateToolsList() { /* ... без изменений ... */ const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
-        function displayProfileData() { /* ... без изменений ... */ try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64'; document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
-        function updateNavArrows(swiper, prefix) { /* ... без изменений ... */ const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
         
         // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
         function init() {
@@ -352,17 +341,16 @@
             document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
             document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
 
-            // Новые обработчики событий
+            // ОБНОВЛЕННЫЕ ОБРАБОТЧИКИ
             sendBtn.addEventListener('click', handleSendMessage);
             chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
             chatInput.addEventListener('input', handleInput);
-            // Кнопка скрытия клавиатуры
             hideKeyboardBtn.addEventListener('click', () => {
-                chatInput.blur(); // Убирает фокус с поля ввода, что скрывает клавиатуру
+                chatInput.blur();
             });
 
             document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
-            document.querySelector('.modal-close-btn').addEventListener('click', closeSettingsModal);
+            document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
             settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
             agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; updateChatTitle(); });
             modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; updateChatTitle(); });
