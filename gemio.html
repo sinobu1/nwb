@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <!-- Telegram Web App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <link rel="preconnect" href="https://fonts.gstatic.com/"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
   <title>AI Assistant</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script> </head>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
@@ -384,8 +383,8 @@
     </a>
   </nav>
 
-  <script>
-    // Initialize Swiper
+   <script>
+    // Инициализация Swiper (карусели)
     const swiper = new Swiper(".mySwiper", {
       slidesPerView: 1.2,
       spaceBetween: 12,
@@ -394,25 +393,56 @@
         el: ".swiper-pagination",
         clickable: true,
       },
-      breakpoints: {
-        640: {
-          slidesPerView: 2.2,
-          spaceBetween: 16,
-        },
-        768: {
-          slidesPerView: 3.2,
-          spaceBetween: 20,
-        },
-      },
     });
+
+    // Получаем объект для работы с Telegram
+    const tg = window.Telegram.WebApp;
+
+    // Функция, которая будет вызываться при клике на карточку
+    function handleToolClick(event) {
+        // Находим ближайший родительский элемент с атрибутом data-tool
+        const toolCard = event.target.closest('.tool-card');
+        if (!toolCard) return;
+
+        const toolName = toolCard.dataset.tool;
+        if (toolName) {
+            // Формируем данные для отправки в бот.
+            // Лучше всего использовать формат JSON.
+            const dataToSend = {
+                command: 'select_tool_from_app',
+                tool: toolName,
+                user_id: tg.initDataUnsafe?.user?.id 
+            };
+            
+            // Отправляем данные в бот.
+            // Эта команда закроет Mini App и отправит данные.
+            tg.sendData(JSON.stringify(dataToSend));
+        }
+    }
+
+    // Назначаем обработчик кликов на всю карусель
+    const swiperWrapper = document.querySelector('.swiper-wrapper');
+    if (swiperWrapper) {
+        swiperWrapper.addEventListener('click', handleToolClick);
+    }
     
-    // Add click event to tool cards
-    document.querySelectorAll('.tool-card').forEach(card => {
-      card.addEventListener('click', function() {
-        const toolName = this.querySelector('h3').textContent;
-        alert(`Opening ${toolName} tool...`);
-      });
+    // --- Инициализация приложения ---
+    
+    // Сообщаем Telegram, что приложение готово к отображению
+    tg.ready();
+    
+    // Расширяем приложение на всю высоту экрана
+    tg.expand();
+    
+    // Настраиваем главную кнопку внизу экрана
+    tg.MainButton.setText('Закрыть');
+    tg.MainButton.show();
+    
+    // При нажатии на главную кнопку просто закрываем приложение
+    tg.MainButton.onClick(function() {
+        tg.close();
     });
+
   </script>
 </body>
 </html>
