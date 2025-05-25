@@ -12,10 +12,10 @@ from config import CONFIG, logger, firestore_service, genai # genai импорт
 # Импортируем все наши обработчики из handlers.py
 from handlers import (
     start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command, # Используем gems_info_command
+    gems_info_command, get_news_bonus_info_command, help_command,
     menu_button_handler, handle_text, precheckout_callback,
     successful_payment_callback, error_handler,
-    photo_handler # Добавлен обработчик фото
+    photo_handler, web_app_data_handler # <<< ДОБАВЬТЕ web_app_data_handler
 )
 
 async def main():
@@ -57,6 +57,8 @@ async def main():
     # Но т.к. фото - это отдельный тип, порядок здесь не так критичен, как для текстовых.
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
+
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
     
     # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
