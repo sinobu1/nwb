@@ -54,10 +54,10 @@ async def main():
     app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
-    
-    # Группа 1: Обработчики сообщений
-    # Обработчик данных от Web App
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
+    # Группа 1: Обработчики сообщений
+   
+    
     # Обработчик фото
     app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
     # Обработчик кнопок из ReplyKeyboard
