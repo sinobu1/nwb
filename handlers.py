@@ -1,8 +1,8 @@
 # handlers.py
 import traceback
-import asyncio 
-import io 
-import mimetypes 
+import asyncio
+import io
+import mimetypes
 import json
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -22,7 +22,7 @@ from config import (
     increment_request_count, logger, show_menu,
     get_user_gem_balance, update_user_gem_balance, get_daily_usage_for_model,
     get_agent_lifetime_uses_left, decrement_agent_lifetime_uses,
-    genai 
+    genai
 )
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
@@ -31,15 +31,15 @@ from config import (
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_first_name = update.effective_user.first_name
-    
+
     user_data_loc = await firestore_service.get_user_data(user_id)
-    updates_to_user_data = {} 
+    updates_to_user_data = {}
 
     if 'current_ai_mode' not in user_data_loc:
         updates_to_user_data['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
     if 'current_menu' not in user_data_loc:
         updates_to_user_data['current_menu'] = BotConstants.MENU_MAIN
-        
+
     default_model_config = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]
     if 'selected_model_id' not in user_data_loc:
         updates_to_user_data['selected_model_id'] = default_model_config["id"]
@@ -47,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         updates_to_user_data['selected_api_type'] = default_model_config.get("api_type")
 
     if 'gem_balance' not in user_data_loc:
-        updates_to_user_data['gem_balance'] = CONFIG.GEMS_FOR_NEW_USER 
+        updates_to_user_data['gem_balance'] = CONFIG.GEMS_FOR_NEW_USER
 
     for agent_key, agent_config_val in AI_MODES.items():
         if initial_uses := agent_config_val.get('initial_lifetime_free_uses'):
@@ -61,10 +61,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     current_model_key_val = await get_current_model_key(user_id, user_data_loc)
     mode_details_res = await get_current_mode_details(user_id, user_data_loc)
-    
+
     model_name_display = "Не выбрана"
     active_agent_cfg_for_start = mode_details_res
-    
+
     if active_agent_cfg_for_start and active_agent_cfg_for_start.get("forced_model_key"):
         forced_model_details = AVAILABLE_TEXT_MODELS.get(active_agent_cfg_for_start.get("forced_model_key"))
         if forced_model_details:
@@ -89,10 +89,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN),
         disable_web_page_preview=True
     )
-    
+
     if user_data_loc.get('current_menu') != BotConstants.MENU_MAIN:
          await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
-    
+
     logger.info(f"User {user_id} ({user_first_name}) started or restarted the bot.")
 
 @auto_delete_message_decorator()
@@ -114,7 +114,7 @@ async def get_news_bonus_info_command(update: Update, context: ContextTypes.DEFA
 @auto_delete_message_decorator()
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_help(update, update.effective_user.id, context)
-    
+
 @auto_delete_message_decorator()
 async def open_mini_app_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -125,12 +125,12 @@ async def open_mini_app_command(update: Update, context: ContextTypes.DEFAULT_TY
     gem_balance = user_data_db.get('gem_balance', 0.0)
 
     agents_for_app = [
-        {"id": key, "name": mode["name"], "image_url": mode.get("image_url")} 
+        {"id": key, "name": mode["name"], "image_url": mode.get("image_url")}
         for key, mode in AI_MODES.items()
     ]
-    
+
     models_for_app = [
-        {"id": key, "name": model["name"], "image_url": model.get("image_url")} 
+        {"id": key, "name": model["name"], "image_url": model.get("image_url")}
         for key, model in AVAILABLE_TEXT_MODELS.items()
     ]
 
@@ -140,23 +140,23 @@ async def open_mini_app_command(update: Update, context: ContextTypes.DEFAULT_TY
         "agents_data": json.dumps(agents_for_app, ensure_ascii=False),
         "models_data": json.dumps(models_for_app, ensure_ascii=False)
     }
-    
+
     url_hash = urllib.parse.urlencode(params)
     final_app_url = f"{CONFIG.MINI_APP_URL}#{url_hash}"
 
     keyboard = [[
         InlineKeyboardButton(
-            "🚀 Запустить GemiO", 
+            "🚀 Запустить GemiO",
             web_app=WebAppInfo(url=final_app_url)
         )
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     await update.message.reply_text(
         'Нажмите на кнопку ниже, чтобы открыть приложение:',
         reply_markup=reply_markup
     )
-    
+
 async def show_limits(update: Update, user_id: int, context: ContextTypes.DEFAULT_TYPE):
     user_data_loc = await firestore_service.get_user_data(user_id)
     bot_data_loc = await firestore_service.get_bot_data()
@@ -196,27 +196,24 @@ async def show_limits(update: Update, user_id: int, context: ContextTypes.DEFAUL
             parts.append(f"✅ У вас <b>{bonus_left_val}</b> бонусных генераций для {bonus_model_name_display}.")
         else: parts.append(f"ℹ️ Бонус с канала новостей для {bonus_model_name_display} был использован.")
     parts.append("\n💎 Пополнить баланс: /gems или через меню «💎 Гемы».")
-        
+
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_LIMITS_SUBMENU)
-    
-    # Пробуем отправить в ЛС, если не получается - в текущий чат
+    keyboard = generate_menu_keyboard(current_menu_for_reply)
+
     try:
         await context.bot.send_message(
-            chat_id=user_id, 
-            text="\n".join(parts), 
-            parse_mode=ParseMode.HTML, 
-            reply_markup=generate_menu_keyboard(current_menu_for_reply), # Клавиатура для ЛС
+            chat_id=user_id,
+            text="\n".join(parts),
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
             disable_web_page_preview=True
         )
-        if update.message and update.message.chat_id != user_id: # Если команда была из чата
-            await update.message.reply_text("Отправил информацию о лимитах вам в личные сообщения.", reply_markup=generate_menu_keyboard(current_menu_for_reply)) # Клавиатура для чата
-    except telegram.error.TelegramError:
-        if update.message:
-            await update.message.reply_text("\n".join(parts), parse_mode=ParseMode.HTML, 
-                                        reply_markup=generate_menu_keyboard(current_menu_for_reply),
-                                        disable_web_page_preview=True)
-        else: # Если нет update.message, например, вызвано из web_app_data_handler
-            logger.warning(f"Could not send limits to user {user_id} directly or via update.")
+        if update and update.message and update.message.chat_id != user_id:
+            await update.message.reply_text("Отправил информацию о лимитах вам в личные сообщения.", reply_markup=keyboard)
+    except telegram.error.TelegramError as e:
+        logger.warning(f"Could not send limits to user {user_id} directly. Error: {e}")
+        # Не пытаемся ответить на сообщение, если отправка в ЛС не удалась, так как это может быть web_app_data
+        # и ответ на него нежелателен. Пользователь увидит сообщение в ЛС.
 
 
 async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextTypes.DEFAULT_TYPE):
@@ -224,26 +221,27 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
     parent_menu_key = user_data_loc.get('current_menu', BotConstants.MENU_BONUS_SUBMENU)
     current_menu_config = MENU_STRUCTURE.get(parent_menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     reply_menu_key = current_menu_config.get("parent", BotConstants.MENU_MAIN) if current_menu_config.get("is_submenu") else parent_menu_key
+    keyboard = generate_menu_keyboard(reply_menu_key)
 
     bonus_model_config = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
     if not bonus_model_config:
-        await context.bot.send_message(user_id, "Ошибка: Бонусная модель не настроена.", reply_markup=generate_menu_keyboard(reply_menu_key))
+        await context.bot.send_message(user_id, "Ошибка: Бонусная модель не настроена.", reply_markup=keyboard)
         return
     bonus_model_name = bonus_model_config['name']
 
     if user_data_loc.get('claimed_news_bonus', False):
         uses_left = user_data_loc.get('news_bonus_uses_left', 0)
         reply_text = f"Вы уже активировали бонус. " + (f"У вас осталось: <b>{uses_left}</b> бонусных генераций для {bonus_model_name}." if uses_left > 0 else f"Бонусные генерации для {bonus_model_name} использованы.")
-        await context.bot.send_message(user_id, reply_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_key))
+        await context.bot.send_message(user_id, reply_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
         return
     try:
-        member_status = await context.bot.get_chat_member(chat_id=CONFIG.NEWS_CHANNEL_USERNAME, user_id=user_id) # Используем context.bot
+        member_status = await context.bot.get_chat_member(chat_id=CONFIG.NEWS_CHANNEL_USERNAME, user_id=user_id)
         if member_status.status in ['member', 'administrator', 'creator']:
             await firestore_service.set_user_data(user_id, {'claimed_news_bonus': True, 'news_bonus_uses_left': CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS})
             success_text = (f'🎉 Спасибо за подписку на <a href="{CONFIG.NEWS_CHANNEL_LINK}">{CONFIG.NEWS_CHANNEL_USERNAME}</a>! '
                             f"Вам начислен бонус: <b>{CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS}</b> генераций для модели {bonus_model_name}.")
-            await context.bot.send_message(user_id, success_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_key), disable_web_page_preview=True)
-            await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_key}) 
+            await context.bot.send_message(user_id, success_text, parse_mode=ParseMode.HTML, reply_markup=keyboard, disable_web_page_preview=True)
+            await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_key})
         else:
             fail_text = (f'Сначала подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">{CONFIG.NEWS_CHANNEL_USERNAME}</a>, '
                          f'а затем вернитесь и нажмите кнопку еще раз.')
@@ -251,10 +249,10 @@ async def claim_news_bonus_logic(update: Update, user_id: int, context: ContextT
             await context.bot.send_message(user_id, fail_text, parse_mode=ParseMode.HTML, reply_markup=inline_keyboard, disable_web_page_preview=True)
     except telegram.error.TelegramError as e:
         logger.error(f"Bonus claim TelegramError for user {user_id}: {e}", exc_info=True)
-        await context.bot.send_message(user_id, "Ошибка при проверке подписки. Попробуйте позже.", reply_markup=generate_menu_keyboard(reply_menu_key))
-    except Exception as e: # Общий Exception
+        await context.bot.send_message(user_id, "Ошибка при проверке подписки. Попробуйте позже.", reply_markup=keyboard)
+    except Exception as e:
         logger.error(f"Unexpected error during news bonus claim for user {user_id}: {e}", exc_info=True)
-        await context.bot.send_message(user_id, "Произошла непредвиденная ошибка при получении бонуса.", reply_markup=generate_menu_keyboard(reply_menu_key))
+        await context.bot.send_message(user_id, "Произошла непредвиденная ошибка при получении бонуса.", reply_markup=keyboard)
 
 
 async def show_help(update: Update, user_id: int, context: ContextTypes.DEFAULT_TYPE):
@@ -263,7 +261,7 @@ async def show_help(update: Update, user_id: int, context: ContextTypes.DEFAULT_
         "<b>❓ Справка по использованию бота</b>\n\n"
         "1.  <b>Запросы к ИИ</b>: Просто напишите ваш вопрос или задачу в чат.\n"
         "2.  <b>Веб-приложение</b>: Откройте основной интерфейс командой /app для удобного выбора агентов и моделей.\n"
-        "3.  <b>Меню-клавиатура</b>: Используйте кнопки для доступа ко всем функциям (/menu).\n" # Добавил /menu
+        "3.  <b>Меню-клавиатура</b>: Используйте кнопки для доступа ко всем функциям (/menu).\n"
         "4.  <b>Основные команды</b>:\n"
         "    ▫️ /start - Перезапуск бота.\n"
         "    ▫️ /app - Открыть веб-интерфейс.\n"
@@ -274,21 +272,19 @@ async def show_help(update: Update, user_id: int, context: ContextTypes.DEFAULT_
         "    ▫️ /help - Показать эту справку."
     )
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_HELP_SUBMENU)
+    keyboard = generate_menu_keyboard(current_menu_for_reply)
     try:
         await context.bot.send_message(
-            chat_id=user_id, 
-            text=help_text, 
-            parse_mode=ParseMode.HTML, 
-            reply_markup=generate_menu_keyboard(current_menu_for_reply), # Клавиатура для ЛС
+            chat_id=user_id,
+            text=help_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
             disable_web_page_preview=True
             )
-        if update.message and update.message.chat_id != user_id: # Если команда была из чата
-            await update.message.reply_text("Отправил справку вам в личные сообщения.", reply_markup=generate_menu_keyboard(current_menu_for_reply))
-    except telegram.error.TelegramError:
-        if update.message:
-            await update.message.reply_text(help_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_for_reply), disable_web_page_preview=True)
-        else:
-             logger.warning(f"Could not send help to user {user_id} directly or via update.")
+        if update and update.message and update.message.chat_id != user_id:
+            await update.message.reply_text("Отправил справку вам в личные сообщения.", reply_markup=keyboard)
+    except telegram.error.TelegramError as e:
+        logger.warning(f"Could not send help to user {user_id} directly. Error: {e}")
 
 
 async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, package_key: str):
@@ -309,18 +305,17 @@ async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAUL
         return
     try:
         current_menu = (await firestore_service.get_user_data(user_id)).get('current_menu', BotConstants.MENU_GEMS_SUBMENU)
-        # Сначала отправляем информационное сообщение, затем счет
         await update.message.reply_text(
-            f"Вы выбрали пакет «{title}». Сумма к оплате: {price_units/100.0:.2f} {currency}. Готовлю счет...", 
-            reply_markup=generate_menu_keyboard(current_menu) # Возвращаем текущее меню
+            f"Вы выбрали пакет «{title}». Сумма к оплате: {price_units/100.0:.2f} {currency}. Готовлю счет...",
+            reply_markup=generate_menu_keyboard(current_menu)
         )
         await context.bot.send_invoice(
-            chat_id=user_id, 
-            title=title, 
-            description=description, 
-            payload=payload, 
-            provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN, 
-            currency=currency, 
+            chat_id=user_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN,
+            currency=currency,
             prices=prices
         )
         logger.info(f"Invoice for '{package_key}' sent to user {user_id}.")
@@ -354,7 +349,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             if item["text"] == button_text:
                 action_item_found, effective_menu_key_of_action = item, menu_key_search; break
         if action_item_found: break
-    
+
     if not action_item_found:
         logger.error(f"Button '{button_text}' no action found. DB current_menu: '{current_menu_key_from_db}'")
         await show_menu(update, user_id, BotConstants.MENU_MAIN, context_param=context); return
@@ -375,7 +370,6 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
             update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
         await firestore_service.set_user_data(user_id, update_payload)
-        # user_data_loc.update(update_payload) # Не нужно, т.к. user_data_loc здесь локальная копия
         bot_data = await firestore_service.get_bot_data()
         free_uses = await get_daily_usage_for_model(user_id, action_target, bot_data)
         free_limit = model_info.get('free_daily_limit',0); gem_cost = model_info.get('gem_cost',0.0)
@@ -388,7 +382,7 @@ async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif action_type == BotConstants.CALLBACK_ACTION_SHOW_GEMS_STORE: await show_menu(update, user_id, BotConstants.MENU_GEMS_SUBMENU, context_param=context)
     elif action_type == BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE: await send_gem_purchase_invoice(update, context, action_target)
     elif action_type == BotConstants.CALLBACK_ACTION_SHOW_HELP: await show_help(update, user_id, context)
-    else: 
+    else:
         logger.warning(f"Unknown action_type '{action_type}' for button '{button_text}'")
         await show_menu(update, user_id, BotConstants.MENU_MAIN, context_param=context)
 
@@ -403,13 +397,13 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not billing_model_key or billing_model_key not in AVAILABLE_TEXT_MODELS:
             logger.error(f"Agent {current_ai_mode_key} invalid forced_model_key: {billing_model_key}")
             await update.message.reply_text("Ошибка конфигурации модели для этого агента."); return
-        
+
         bot_data_cache = await firestore_service.get_bot_data()
         can_proceed, check_message, _, _ = await check_and_log_request_attempt(
             user_id, billing_model_key, user_data, bot_data_cache, current_ai_mode_key
         )
         if not can_proceed: await update.message.reply_text(check_message, parse_mode=ParseMode.HTML); return
-        
+
         photo_file = update.message.photo[-1]
         context.user_data['dietitian_pending_photo_id'] = photo_file.file_id
         context.user_data['dietitian_state'] = 'awaiting_weight'
@@ -421,7 +415,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text or is_menu_button_text(update.message.text.strip()):
         return
-        
+
     user_id = update.effective_user.id
     user_message_text = update.message.text.strip()
     user_data_cache = await firestore_service.get_user_data(user_id)
@@ -433,7 +427,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if current_dietitian_state == 'analysis_complete_awaiting_feedback':
             logger.info(f"User {user_id} (photo_dietitian_analyzer) sent follow-up: '{user_message_text}'")
-            
+
             positive_feedback_keywords = ["да", "спасибо", "хорошо", "понял", "все так", "отлично", "супер", "именно", "верно"]
             is_simple_ack = any(keyword in user_message_text.lower() for keyword in positive_feedback_keywords) and len(user_message_text.split()) <= 5
 
@@ -444,8 +438,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             else:
                 logger.info(f"Treating dietitian follow-up '{user_message_text}' as a new text query to the same agent.")
-                context.user_data.pop('dietitian_state', None) 
-            
+                context.user_data.pop('dietitian_state', None)
+
             if is_simple_ack:
                  context.user_data.pop('dietitian_state', None)
                  return
@@ -469,10 +463,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not can_proceed:
                 await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML)
                 return
-            
+
             logger.info(f"User {user_id} (agent {current_ai_mode_key}) provided weight: '{user_message_text}' for photo {photo_file_id}. Billing Model: {billing_model_key}. Usage: {usage_type}. Vision Model: {native_vision_model_id}")
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-            
+
             ai_response_text = "Ошибка при обработке изображения."
             try:
                 if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY or not CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"):
@@ -480,22 +474,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 actual_photo_file = await context.bot.get_file(photo_file_id)
                 file_bytes = await actual_photo_file.download_as_bytearray()
-                
+
                 mime_type, _ = mimetypes.guess_type(actual_photo_file.file_path or "image.jpg")
                 if not mime_type: mime_type = "image/jpeg"
-                
+
                 image_part = {"mime_type": mime_type, "data": bytes(file_bytes)}
                 logger.info(f"Preparing image for Vision API. Determined/guessed MIME type: {mime_type}")
-                
-                vision_system_instruction = active_agent_config["prompt"] 
+
+                vision_system_instruction = active_agent_config["prompt"]
                 text_prompt_with_weight = f"Проанализируй предоставленное ФОТО. Пользователь указал вес порции: {user_message_text}."
-                
-                model_vision = genai.GenerativeModel(native_vision_model_id) # Используем native_vision_model_id
+
+                model_vision = genai.GenerativeModel(native_vision_model_id)
                 logger.debug(f"Sending to Google Vision API. Model: {native_vision_model_id}. System context (part): {vision_system_instruction[:150]} User text: {text_prompt_with_weight}")
-                
+
                 response_vision = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: model_vision.generate_content([vision_system_instruction, image_part, text_prompt_with_weight]) 
+                    lambda: model_vision.generate_content([vision_system_instruction, image_part, text_prompt_with_weight])
                 )
                 ai_response_text = response_vision.text
                 logger.info(f"Successfully received response from Google Vision API for user {user_id}")
@@ -506,16 +500,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error with Google Gemini Vision API for user {user_id}: {e}", exc_info=True)
                 ai_response_text = "К сожалению, не удалось проанализировать изображение. Попробуйте позже."
-            
+
             await increment_request_count(user_id, billing_model_key, usage_type, current_ai_mode_key, gem_cost_for_request)
-            
+
             final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-            current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU) 
+            current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU)
             await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu_reply))
-            
+
             context.user_data['dietitian_state'] = 'analysis_complete_awaiting_feedback'
             context.user_data.pop('dietitian_pending_photo_id', None)
-            return 
+            return
 
     final_model_key_for_request = ""
     if active_agent_config and active_agent_config.get("forced_model_key"):
@@ -528,10 +522,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     can_proceed, limit_or_gem_message, usage_type, gem_cost_for_request = await check_and_log_request_attempt(
         user_id, final_model_key_for_request, user_data_cache, bot_data_cache_for_check, current_ai_mode_key
     )
-        
+
     if not can_proceed:
-        await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML, 
-                                        reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)), 
+        await update.message.reply_text(limit_or_gem_message, parse_mode=ParseMode.HTML,
+                                        reply_markup=generate_menu_keyboard(user_data_cache.get('current_menu', BotConstants.MENU_MAIN)),
                                         disable_web_page_preview=True)
         return
 
@@ -550,27 +544,27 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
+
     system_prompt_to_use = active_agent_config["prompt"] if active_agent_config else AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"]
-    
+
     ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
     try:
-        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text, image_data=None) 
+        ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text, image_data=None)
     except Exception as e:
         model_name_for_error = AVAILABLE_TEXT_MODELS.get(final_model_key_for_request, {}).get('name', final_model_key_for_request)
         logger.error(f"Unhandled exception in AI service for model {model_name_for_error}: {e}", exc_info=True)
         ai_response_text = f"Произошла внутренняя ошибка при обработке вашего запроса моделью {model_name_for_error}."
-    
+
     await increment_request_count(user_id, final_model_key_for_request, usage_type, current_ai_mode_key, gem_cost_for_request)
 
     final_reply_text, was_truncated = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
     if was_truncated:
         logger.info(f"AI response for user {user_id} was truncated.")
-    
+
     current_menu = user_data_cache.get('current_menu', BotConstants.MENU_MAIN)
     await update.message.reply_text(
-        final_reply_text, 
-        reply_markup=generate_menu_keyboard(current_menu), 
+        final_reply_text,
+        reply_markup=generate_menu_keyboard(current_menu),
         disable_web_page_preview=True
     )
     logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
@@ -579,17 +573,21 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     """
     Обрабатывает ВСЕ команды, полученные от веб-приложения (Mini App).
     """
+    if not update.message or not update.message.web_app_data:
+        return
+
     user = update.effective_user
-    data_str = update.effective_message.web_app_data.data # web_app_data находится в message
+    data_str = update.message.web_app_data.data
     logger.info(f"Получены данные от Mini App от пользователя {user.id}: {data_str}")
 
     try:
         data = json.loads(data_str)
         command = data.get('command')
         details = data.get('details', {})
-        
-        user_data_db = await firestore_service.get_user_data(user.id) # Назовем user_data_db чтобы не путать с user из TG
+
+        user_data_db = await firestore_service.get_user_data(user.id)
         current_menu = user_data_db.get('current_menu', BotConstants.MENU_MAIN)
+        keyboard = generate_menu_keyboard(current_menu)
 
         # Команда на смену Агента
         if command == 'set_agent_from_app':
@@ -598,40 +596,52 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 await firestore_service.set_user_data(user.id, {'current_ai_mode': agent_id})
                 agent_name = AI_MODES[agent_id].get('name', 'N/A')
                 response_text = f"✅ Агент изменен на: <b>{agent_name}</b>"
-                # Отправляем ответ в чат, откуда пришел запрос web_app_data (т.е. пользователю)
-                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu))
+                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
         # Команда на смену Модели
         elif command == 'set_model_from_app':
-            model_id_key = details.get('model_id') # Это ключ из AVAILABLE_TEXT_MODELS
+            model_id_key = details.get('model_id')
             model_info = AVAILABLE_TEXT_MODELS.get(model_id_key)
             if model_info:
                 update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
+                # Добавляем совместимость с логикой из menu_button_handler
+                if model_id_key in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_db.get('current_ai_mode') == "gemini_pro_custom_mode":
+                    update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
                 await firestore_service.set_user_data(user.id, update_payload)
                 response_text = f"✅ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>"
-                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu))
+                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
         # Команда на показ одного из меню бота
         elif command == 'show_menu_from_app':
-            menu_key_target = details.get('menu')
-            if menu_key_target == BotConstants.MENU_LIMITS_SUBMENU: await show_limits(update, user.id, context)
-            elif menu_key_target == BotConstants.MENU_BONUS_SUBMENU: await claim_news_bonus_logic(update, user.id, context)
-            elif menu_key_target == BotConstants.MENU_HELP_SUBMENU: await show_help(update, user.id, context)
-            # Для остальных меню (Агенты, Модели, Гемы) используем show_menu
-            elif menu_key_target in [BotConstants.MENU_AI_MODES_SUBMENU, BotConstants.MENU_MODELS_SUBMENU, BotConstants.MENU_GEMS_SUBMENU, BotConstants.MENU_MAIN]:
-                 await show_menu(update, user.id, menu_key_target, context_param=context)
+            menu_target = details.get('menu') # Например, 'limits_submenu'
+            submenu_map = {
+                'limits_submenu': BotConstants.MENU_LIMITS_SUBMENU,
+                'bonus_submenu': BotConstants.MENU_BONUS_SUBMENU,
+                'gems_submenu': BotConstants.MENU_GEMS_SUBMENU,
+                'help_submenu': BotConstants.MENU_HELP_SUBMENU,
+            }
+            if menu_target in submenu_map:
+                # Специальные обработчики для Лимитов, Бонуса и Помощи
+                if menu_target == 'limits_submenu':
+                    await show_limits(None, user.id, context) # Передаем None, чтобы избежать reply
+                elif menu_target == 'bonus_submenu':
+                    await claim_news_bonus_logic(None, user.id, context)
+                elif menu_target == 'help_submenu':
+                    await show_help(None, user.id, context)
+                # Для Гемов и других просто показываем меню
+                elif menu_target == 'gems_submenu':
+                     await show_menu(None, user.id, submenu_map[menu_target], context_param=context)
             else:
-                logger.warning(f"Unknown menu_key '{menu_key_target}' from Mini App for user {user.id}")
+                logger.warning(f"Unknown menu_key '{menu_target}' from Mini App for user {user.id}")
                 await context.bot.send_message(user.id, "Неизвестное действие из веб-приложения.")
         else:
             logger.warning(f"Unknown command '{command}' from Mini App for user {user.id}")
             await context.bot.send_message(user.id, "Неизвестная команда от веб-приложения.")
 
 
-    except (json.JSONDecodeError, KeyError, AttributeError) as e: # Добавлен AttributeError, т.к. update.effective_message может быть None
-        logger.error(f"Ошибка обработки данных от Mini App для пользователя {user.id if user else 'Unknown'}: {e}", exc_info=True)
-        if user: # Отправляем сообщение только если есть user
-            await context.bot.send_message(user.id, "Произошла ошибка при обработке вашего выбора из веб-приложения.")
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Ошибка обработки данных от Mini App для пользователя {user.id}: {e}", exc_info=True)
+        await context.bot.send_message(user.id, "Произошла ошибка при обработке вашего выбора из веб-приложения.")
 
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -649,7 +659,7 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                     if query.from_user.id == user_id_in_payload:
                         await query.answer(ok=True); logger.info(f"PreCheckout OK: {query.invoice_payload}"); return
                     else: logger.error(f"PreCheckout User ID mismatch: Payload {user_id_in_payload}, Query {query.from_user.id}")
-                except (ValueError, IndexError): logger.error(f"PreCheckout Error parsing payload: {query.invoice_payload}")    
+                except (ValueError, IndexError): logger.error(f"PreCheckout Error parsing payload: {query.invoice_payload}")
             else: logger.warning(f"PreCheckout Unknown gem package: {query.invoice_payload}")
         else: logger.warning(f"PreCheckout Invalid payload structure: {query.invoice_payload}")
     else: logger.warning(f"PreCheckout Invalid payload type: {query.invoice_payload}")
@@ -664,7 +674,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     if invoice_payload and invoice_payload.startswith("gems_"):
         try:
             payload_parts = invoice_payload.split('_')
-            user_part_index = -1; 
+            user_part_index = -1;
             for i, part in enumerate(payload_parts):
                 if part == "user": user_part_index = i; break
             if user_part_index == -1 or user_part_index <= 1 or len(payload_parts) <= user_part_index + 1:
@@ -686,7 +696,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             confirmation_msg = (f"🎉 Оплата успешна! Начислено <b>{gems_to_add:.1f} гемов</b>.\n"
                                f"Новый баланс: <b>{new_balance:.1f} гемов</b>.")
             user_data = await firestore_service.get_user_data(user_id)
-            await update.message.reply_text(confirmation_msg, parse_mode=ParseMode.HTML, 
+            await update.message.reply_text(confirmation_msg, parse_mode=ParseMode.HTML,
                                             reply_markup=generate_menu_keyboard(user_data.get('current_menu', BotConstants.MENU_GEMS_SUBMENU)))
             if CONFIG.ADMIN_ID:
                 admin_msg = (f"💎 Покупка гемов!\nUser: {user_id} ({update.effective_user.full_name or 'N/A'})\n"
@@ -701,7 +711,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
     tb_string = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
-    
+
     effective_chat_id = None
     user_id_for_data = None
     user_name_for_data = None
@@ -718,24 +728,24 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if effective_chat_id:
         user_data = {}
-        if user_id_for_data: 
+        if user_id_for_data:
             user_data = await firestore_service.get_user_data(user_id_for_data)
         try:
             await context.bot.send_message(chat_id=effective_chat_id,
                                            text="Произошла внутренняя ошибка. Разработчики уведомлены.",
                                            reply_markup=generate_menu_keyboard(user_data.get('current_menu', BotConstants.MENU_MAIN)))
-        except Exception as e: 
+        except Exception as e:
             logger.error(f"Failed to send error message to user {effective_chat_id}: {e}")
 
-    if CONFIG.ADMIN_ID and user_id_for_data: # Отправляем админу только если есть информация о пользователе
+    if CONFIG.ADMIN_ID and user_id_for_data:
         error_details = (f"🤖 Ошибка в боте:\nUser: {user_id_for_data} (@{user_name_for_data})\n"
                          f"Msg: {message_text_for_data}\n"
                          f"Error: {context.error}\n\nTraceback (short):\n```\n{tb_string[-1500:]}\n```")
-        try: 
+        try:
             await context.bot.send_message(CONFIG.ADMIN_ID, error_details, parse_mode=ParseMode.MARKDOWN_V2)
         except telegram.error.TelegramError as e_md:
             logger.error(f"Failed to send error to admin (MarkdownV2): {e_md}. Fallback.")
-            try: 
-                await context.bot.send_message(CONFIG.ADMIN_ID, f"PLAIN TEXT FALLBACK:\n{error_details.replace('```', '').replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '').replace('`', '')}") # Убираем символы Markdown
-            except Exception as e_plain: 
+            try:
+                await context.bot.send_message(CONFIG.ADMIN_ID, f"PLAIN TEXT FALLBACK:\n{error_details.replace('```', '').replace('*', '').replace('_', '').replace('[', '').replace(']', '').replace('(', '').replace(')', '').replace('`', '')}")
+            except Exception as e_plain:
                 logger.error(f"Failed to send plain text error to admin: {e_plain}")
