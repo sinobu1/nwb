@@ -2,7 +2,7 @@
 import telegram
 from telegram import (
     ReplyKeyboardMarkup, KeyboardButton, Update,
-    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
+    BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, WebAppInfo
 )
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import (
@@ -211,6 +211,9 @@ DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]["id"]
 MENU_STRUCTURE = {
     BotConstants.MENU_MAIN: {
         "title": "📋 Главное меню", "items": [
+            # >>> НАЧАЛО ИЗМЕНЕНИЙ
+            {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://your-mini-app-url.com/gemio.html"},
+            # <<< КОНЕЦ ИЗМЕНЕНИЙ
             {"text": "🤖 Агенты ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_AI_MODES_SUBMENU},
             {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU},
             {"text": "📊 Лимиты", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_LIMITS_SUBMENU},
@@ -711,22 +714,35 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     keyboard_rows: List[List[KeyboardButton]] = []
     items = menu_config.get("items", []) # Безопасное получение items
+    # >>> НАЧАЛО ИЗМЕНЕНИЙ: функция полностью заменяется
+    def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
+        text = item_config["text"]
+        web_app_url = item_config.get("web_app_url")
+        if web_app_url:
+        return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
+        return KeyboardButton(text)
+
     group_by_two_keys = [
         BotConstants.MENU_MAIN, 
         BotConstants.MENU_MODELS_SUBMENU, 
         BotConstants.MENU_GEMS_SUBMENU,
         BotConstants.MENU_AI_MODES_SUBMENU
     ]
+
     if menu_key in group_by_two_keys:
         for i in range(0, len(items), 2):
-            keyboard_rows.append([KeyboardButton(items[j]["text"]) for j in range(i, min(i + 2, len(items)))])
+            row = [create_button(items[j]) for j in range(i, min(i + 2, len(items)))]
+            keyboard_rows.append(row)
     else:
-        for item in items: keyboard_rows.append([KeyboardButton(item["text"])])
-    if menu_config.get("is_submenu", False):
+        for item in items:
+            keyboard_rows.append([create_button(item)])
+    # <<< КОНЕЦ ИЗМЕНЕНИЙ
+     if menu_config.get("is_submenu", False):
         navigation_row = [KeyboardButton("🏠 Главное меню")]
-        if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
+     if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
         keyboard_rows.append(navigation_row)
-    return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
+
+     return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
 
 async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None):
     menu_cfg = MENU_STRUCTURE.get(menu_key)
