@@ -6,6 +6,12 @@ from telegram.ext import (
     ContextTypes, PreCheckoutQueryHandler
 )
 
+# --- ДОБАВЬТЕ ЭТОТ КЛАСС ---
+class WebAppDataFilter(BaseFilter):
+    """Фильтр для сообщений, содержащих данные от Web App"""
+    def filter(self, message: Message) -> bool:
+        return message.web_app_data is not None
+
 # Импортируем конфигурацию, логгер, сервисы и глобальные объекты из config.py
 from config import CONFIG, logger, firestore_service, genai # genai импортируется для настройки в main
 
@@ -55,8 +61,7 @@ async def main():
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
-    # ИСПОЛЬЗУЕМ БОЛЕЕ НАДЕЖНЫЙ ФИЛЬТР для перехвата данных из Mini App
-    app.add_handler(MessageHandler(filters.ViaWebApp(None), web_app_data_handler), group=0)
+    app.add_handler(MessageHandler(WebAppDataFilter(), web_app_data_handler), group=0)
     
     # Группа 1: Обработчики специфичного контента (фото, платежи)
     app.add_handler(PreCheckoutQueryHandler(precheckout_callback), group=1)
