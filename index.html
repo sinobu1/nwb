@@ -12,13 +12,13 @@
     <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
     <style>
         :root {
-            --bg-main: #101010;
-            --bg-card: #1E1E1E;
+            --bg-main: #000000; /* Changed to black */
+            --bg-card: #121212; /* Darker card background */
             --bg-select: #2C2C2E;
             --bg-user-msg: #3E3E42;
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
-            --border-color: #3A3A3C;
+            --border-color: #282828; /* Slightly darker border */
             --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
             --gold-highlight: #d8ab4e;
             --success-green: #4CAF50;
@@ -39,14 +39,14 @@
         }
         .app-wrapper {
             width: 100%;
-            max-width: 450px; /* Max width for the app */
+            max-width: 450px; 
             height: 100%;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            border-left: 1px solid var(--border-color); /* Optional border for app frame */
-            border-right: 1px solid var(--border-color); /* Optional border for app frame */
+            border-left: 1px solid var(--border-color); 
+            border-right: 1px solid var(--border-color); 
         }
         .screen {
             position: absolute;
@@ -62,7 +62,7 @@
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
         #main-screen, #image-generator-screen, #summarizer-screen { flex-grow: 1; }
-        #main-content-area, .feature-content-area { /* Common class for content areas */
+        #main-content-area, .feature-content-area { 
             flex-grow: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
@@ -70,25 +70,25 @@
         }
          .fixed-header {
             padding: 0.75rem 1rem;
-            background: rgba(20,20,20,0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background: rgba(18,18,18,0.85); /* Darker header for black theme */
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             display: flex;
-            align-items: center; /* Vertically center items */
-            gap: 0.5rem; /* Space between back button and title */
+            align-items: center; 
+            gap: 0.5rem; 
             border-bottom: 1px solid var(--border-color);
-            z-index: 25; /* Above screen content */
+            z-index: 25; 
             color: var(--text-primary);
-            position: sticky; /* Make header sticky for feature screens */
+            position: sticky; 
             top: 0;
         }
-        .fixed-header h1 { font-size: 1.25rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; }
+        .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } /* Slightly smaller title */
         .fixed-header .back-btn {
             color: var(--gold-highlight);
             cursor: pointer;
-            padding: 0.25rem; /* Clickable area */
+            padding: 0.25rem; 
         }
-         .main-screen-header { /* Specific for main screen's non-sticky header */
+         .main-screen-header { 
             padding: 1rem 1rem 0.5rem 1rem;
             background-color: var(--bg-main);
         }
@@ -102,7 +102,7 @@
         h2 { font-size: 1.25rem; font-weight: 700; }
 
 
-        .swiper-container-wrapper { margin-top: 0.75rem; } /* Further Reduced margin */
+        .swiper-container-wrapper { margin-top: 0.75rem; } 
         .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.25rem; }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s, transform 0.1s; color: var(--text-secondary); }
@@ -136,25 +136,38 @@
             width: calc(100% - 2rem);
             margin: 0 auto 1rem auto;
             display: flex;
-            /* Removed background and backdrop-filter for transparency */
             border-radius: 20px;
-            padding: 0.3rem; /* Adjusted padding for border visibility */
-            border: 1px solid var(--border-color); /* Frame only */
+            padding: 0.3rem; 
+            border: 1px solid var(--border-color); 
             z-index: 100;
         }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; padding: 0.25rem 0; }
         .tab-item.active { color: var(--gold-highlight); }
-        .tab-item svg { width: 24px; height: 24px; margin-bottom: 2px; } /* Slightly smaller icons */
+        .tab-item svg { width: 24px; height: 24px; margin-bottom: 2px; } 
         .tab-item span { font-size: 0.6rem; font-weight: 500; }
 
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1rem; }
         .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-        .profile-avatar { width: 60px; height: 60px; border-radius: 50%; margin-right: 1rem; background-color: #333; background-size: cover; background-position: center; }
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-right: 1rem;
+            background-color: #333;
+            background-size: cover;
+            background-position: center;
+            display: flex; /* For centering text fallback */
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem; /* For initial/question mark */
+            font-weight: 500;
+            color: var(--text-primary);
+        }
         .profile-info h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.2rem 0;}
         .profile-info p { font-size: 0.85rem; color: var(--text-secondary); margin:0;}
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; font-size: 0.9rem;}
 
-        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
+        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(18,18,18,0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
         .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
@@ -176,36 +189,36 @@
 
         .chat-input-area {
             flex-shrink: 0;
-            padding: 0.35rem 0.5rem; /* Slightly reduced padding */
+            padding: 0.35rem 0.5rem; 
             border-top: 1px solid var(--border-color);
             background-color: var(--bg-main);
             display: flex;
-            align-items: center; /* Vertically center items */
-            gap: 0.35rem; /* Slightly reduced gap */
+            align-items: center; 
+            gap: 0.35rem; 
         }
         .chat-input-wrapper {
-            flex-grow: 1; /* Allow input to take available space */
+            flex-grow: 1; 
             position: relative;
-            max-width: calc(100% - 80px); /* Max width considering buttons */
+            /* max-width: calc(100% - 80px); Removed max-width to allow natural flex growth */
         }
         #chat-input {
             width: 100%;
             background-color: var(--bg-card);
-            border-radius: 16px; /* Slightly less rounded */
-            padding: 0.45rem 0.8rem; /* Adjusted padding */
+            border-radius: 16px; 
+            padding: 0.45rem 0.8rem; 
             border: none;
             color: var(--text-primary);
-            font-size: 0.85rem; /* Slightly smaller font */
+            font-size: 0.85rem; 
             resize: none;
             line-height: 1.3;
-            min-height: 34px; /* Adjusted min-height to match button */
-            max-height: 90px; /* Adjusted max-height */
+            min-height: 34px; 
+            max-height: 90px; 
             overflow-y: auto;
         }
         #chat-input:focus { outline: none; box-shadow: 0 0 0 1.5px var(--gold-highlight); }
         #send-btn {
-            width: 34px; /* Matched to input field height */
-            height: 34px; /* Matched to input field height */
+            width: 34px; 
+            height: 34px; 
             background-color: var(--gold-highlight);
             color: black;
             border-radius: 50%;
@@ -218,15 +231,15 @@
         }
         #send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: scale(1); }
         #send-btn:not(:disabled):active { transform: scale(0.92); }
-        #send-btn svg { width: 16px; height: 16px; } /* Adjusted icon size */
+        #send-btn svg { width: 16px; height: 16px; } 
         #attach-btn {
-            width: 34px; /* Matched to input field height */
-            height: 34px; /* Matched to input field height */
+            width: 34px; 
+            height: 34px; 
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        #attach-btn svg { width: 18px; height: 18px; } /* Adjusted icon size */
+        #attach-btn svg { width: 18px; height: 18px; } 
 
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -269,8 +282,36 @@
         .loading-indicator { text-align: center; padding: 1rem; color: var(--text-secondary); }
         .generated-image-container { margin-top: 1rem; text-align: center; }
         .generated-image-container img { max-width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background-color: var(--bg-card); }
+        .generated-image-container button { /* Style for the save button */
+            margin-top: 0.75rem;
+            background-color: var(--bg-select);
+            color: var(--text-primary);
+        }
         .summarizer-output { margin-top: 1rem; padding: 1rem; background-color: var(--bg-card); border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; color: var(--text-primary); font-size: 0.9rem; }
         .error-message { color: var(--error-red); text-align: center; margin-top: 1rem; }
+
+        /* WebKit Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 6px; 
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main); 
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #2a2a2a; /* Darker thumb */
+            border-radius: 10px;
+            border: 1px solid var(--bg-main); 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: #4a4a4a; /* Lighter thumb on hover */
+        }
+        /* Firefox Scrollbar Styles */
+        * {
+           scrollbar-width: thin;
+           scrollbar-color: #2a2a2a var(--bg-main);
+        }
 
     </style>
 </head>
@@ -382,7 +423,8 @@
                 </div>
                 <button id="generate-image-btn" class="feature-submit-btn">Сгенерировать</button>
                 <div id="image-loading-indicator" class="loading-indicator" style="display: none;">Генерация изображения...</div>
-                <div id="generated-image-container" class="generated-image-container"></div>
+                <div id="generated-image-container" class="generated-image-container">
+                     </div>
                 <div id="image-error-message" class="error-message" style="display: none;"></div>
             </div>
         </div>
@@ -417,14 +459,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram?.WebApp || {};
-    let currentMiniAppChatHistory = []; // Stores history for API calls {role, parts}
-    let lastMessageInfo = { sender: null, date: null }; // For UI message grouping
+    let currentMiniAppChatHistory = []; 
+    let lastMessageInfo = { sender: null, date: null }; 
     let agentsSwiper, modelsSwiper;
 
-    const API_KEY = ""; // IMPORTANT: Leave empty for Canvas to inject.
+    const API_KEY = ""; 
 
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
-    const models = [ { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" } ];
+    const models = [ 
+        { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
+        { key: "gemini-pro-vision", name: "Gemini Pro Vision", icon: "👁️‍🗨️", desc: "Анализ изображений", palette: "palette-2" },
+        { key: "claude-3-opus", name: "Claude 3 Opus", icon: "📚", desc: "Мощный и вдумчивый", palette: "palette-4" },
+        { key: "llama-3-70b", name: "Llama 3 (70B)", icon: "🦙", desc: "Открытая модель", palette: "palette-3" }
+    ];
     const tools = [
         { key: "summarizer", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
         { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." },
@@ -758,7 +805,7 @@ document.addEventListener('DOMContentLoaded', () => {
         imageErrorMessage.style.display = 'none';
         imageLoadingIndicator.style.display = 'block';
         generateImageBtn.disabled = true;
-        generatedImageContainer.innerHTML = '';
+        generatedImageContainer.innerHTML = ''; // Clear previous image and save button
 
         const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1} };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
@@ -806,6 +853,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.src = imageUrl;
                 imgElement.alt = "Сгенерированное изображение: " + prompt.substring(0, 50);
                 generatedImageContainer.appendChild(imgElement);
+
+                // Add a save button
+                const saveBtn = document.createElement('button');
+                saveBtn.textContent = 'Сохранить изображение';
+                saveBtn.className = 'feature-submit-btn'; // Reuse existing button style
+                saveBtn.style.marginTop = '0.75rem';
+                saveBtn.style.backgroundColor = 'var(--bg-select)'; // Different color for save
+                saveBtn.style.color = 'var(--text-primary)';
+
+                saveBtn.onclick = () => {
+                    const link = document.createElement('a');
+                    link.href = imageUrl; 
+                    link.download = `generated_image_${Date.now()}.png`; 
+                    document.body.appendChild(link); 
+                    link.click();
+                    document.body.removeChild(link);
+                    if(tg.showAlert) tg.showAlert('Изображение инициировано к сохранению!');
+                };
+                generatedImageContainer.appendChild(saveBtn);
+
             } else if (result.error) { 
                  console.error("Imagen API Error (JSON payload):", result.error);
                 imageErrorMessage.textContent = `Ошибка API (ответ): ${result.error.message}`;
@@ -911,14 +978,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const user = tg.initDataUnsafe?.user;
             const avatarImg = document.getElementById('profile-avatar-img');
-            const nameEl = document.getElementById('profile-name');
-            const idEl = document.getElementById('profile-id');
+            avatarImg.innerHTML = ''; // Clear previous content (like '?')
+            avatarImg.style.backgroundImage = ''; // Clear previous background image
+
             if (user && user.id) {
-                if (user.photo_url) { avatarImg.style.backgroundImage = `url(${user.photo_url})`; }
-                else { avatarImg.style.backgroundColor = '#444'; avatarImg.innerHTML = (user.first_name || 'U').charAt(0); avatarImg.style.display = 'flex'; avatarImg.style.alignItems = 'center'; avatarImg.style.justifyContent = 'center'; avatarImg.style.fontSize = '1.8rem'; avatarImg.style.color = 'var(--text-primary)'; }
-                nameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-                idEl.textContent = `ID: ${user.id}`;
-            } else { avatarImg.style.backgroundColor = '#444'; avatarImg.innerHTML = '?'; nameEl.textContent = 'Нет данных'; idEl.textContent = 'ID: Н/Д'; }
+                if (user.photo_url) {
+                    avatarImg.style.backgroundImage = `url(${user.photo_url})`;
+                } else {
+                    avatarImg.style.backgroundColor = '#444';
+                    avatarImg.innerHTML = (user.first_name || 'U').charAt(0).toUpperCase();
+                }
+                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+            } else {
+                 avatarImg.style.backgroundColor = '#444';
+                 avatarImg.innerHTML = '?'; // Fallback if no user data at all
+                 document.getElementById('profile-name').textContent = 'Нет данных';
+                 document.getElementById('profile-id').textContent = 'ID: Н/Д';
+            }
         } catch (e) { console.error("Error displaying profile data:", e); }
     }
 
