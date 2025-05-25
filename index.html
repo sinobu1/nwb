@@ -6,7 +6,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com/"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
   <title>AI Assistant</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script> </head>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
@@ -16,426 +16,157 @@
       --tg-secondary: #0e1621;
       --tg-text-primary: #e1e3e6;
       --tg-text-secondary: #7f8b97;
-      --tg-bubble-out: #2b5278;
-      --tg-bubble-in: #182533;
       --tg-card-bg: #17212b;
-      --tg-input-bg: #17212b;
     }
     
+    /* Используем переменные цвета из Telegram для бесшовной интеграции */
     body {
       font-family: 'Inter', sans-serif;
-      background-color: var(--tg-secondary);
-      color: var(--tg-text-primary);
-    }
-    
-    .tg-header {
-      background-color: var(--tg-primary);
-      color: white;
-    }
-    
-    .tg-bubble-out {
-      background-color: var(--tg-bubble-out);
-      border-radius: 12px 12px 0 12px;
-    }
-    
-    .tg-bubble-in {
-      background-color: var(--tg-bubble-in);
-      border-radius: 12px 12px 12px 0;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-    
-    .tg-button {
-      background-color: var(--tg-primary);
-      color: white;
-      transition: all 0.2s ease;
-    }
-    
-    .tg-button:hover {
-      background-color: #0077b3;
-    }
-    
-    .tg-nav-item.active {
-      color: var(--tg-primary);
-    }
-    
-    .tg-card {
-      background-color: var(--tg-card-bg);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .tg-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    
-    .typing-indicator span {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      background-color: var(--tg-text-secondary);
-      border-radius: 50%;
-      margin: 0 2px;
-      animation: bounce 1.5s infinite ease-in-out;
-    }
-    
-    .typing-indicator span:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    
-    .typing-indicator span:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    
-    @keyframes bounce {
-      0%, 60%, 100% { transform: translateY(0); }
-      30% { transform: translateY(-5px); }
-    }
-    
-    .swiper-pagination-bullet {
-      background: var(--tg-text-secondary) !important;
-      opacity: 0.5 !important;
-    }
-    
-    .swiper-pagination-bullet-active {
-      background: var(--tg-primary) !important;
-      opacity: 1 !important;
+      background-color: var(--tg-theme-bg-color, var(--tg-secondary));
+      color: var(--tg-theme-text-color, var(--tg-text-primary));
+      padding-top: 1rem; /* Добавим отступ сверху вместо хедера */
     }
     
     .tool-card {
-      height: 150px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 16px;
-      color: white;
-      position: relative;
-      overflow: hidden;
+        cursor: pointer;
+    }
+
+    /* Стили для новых кнопок меню */
+    .menu-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem; /* 12px */
+    }
+
+    .menu-button {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem; /* 12px */
+        background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg));
+        border-radius: 12px;
+        font-size: 0.875rem; /* 14px */
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .menu-button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
     }
     
-    .tool-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.7));
-      z-index: 1;
+    .menu-button svg {
+        margin-right: 0.75rem;
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
     }
     
-    .tool-card-content {
-      position: relative;
-      z-index: 2;
-    }
-    
-    .tool-icon {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      width: 36px;
-      height: 36px;
-      background-color: rgba(255,255,255,0.2);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
-    }
-    
-    .image-gen {
-      background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    .text-gen {
-      background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
-    }
-    
-    .chatbot {
-      background: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
-    }
-    
-    .code-gen {
-      background: linear-gradient(45deg, #f83600 0%, #f9d423 100%);
-    }
-    
-    .documents {
-      background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
-    }
-    
-    .translation {
-      background: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
-    }
+    /* ... остальные стили ... */
+    .image-gen { background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); }
+    .text-gen { background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%); }
+    .chatbot { background: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%); }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
-  <!-- Header -->
-  <header class="tg-header sticky top-0 z-10 flex items-center p-4 justify-between">
-    <button class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="3" y1="12" x2="21" y2="12"></line>
-        <line x1="3" y1="6" x2="21" y2="6"></line>
-        <line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-    </button>
-    <h1 class="text-lg font-semibold">AI Assistant</h1>
-    <button class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-    </button>
-  </header>
 
-  <!-- Main Content -->
-  <main class="flex-1 p-4 space-y-4">
-    <!-- Welcome Message -->
-    <div class="tg-bubble-in p-4 max-w-[85%]">
-      <p class="text-sm">👋 Hello! I'm your AI assistant. Choose one of the tools below to get started or ask me anything!</p>
+  <main class="flex-1 p-4 space-y-6">
+    <div style="background-color: var(--tg-theme-secondary-bg-color, #182533);" class="p-4 rounded-xl max-w-[85%]">
+      <p class="text-sm">👋 Привет! Выберите инструмент из карусели или используйте меню управления ботом ниже.</p>
     </div>
 
-    <!-- AI Tools Carousel -->
     <div class="swiper mySwiper">
       <div class="swiper-wrapper">
-        <!-- Image Generation -->
         <div class="swiper-slide">
-          <div class="tg-card tool-card image-gen">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Image Generation</h3>
-              <p class="text-xs opacity-80 mt-1">Create visuals from text prompts</p>
-            </div>
+          <div class="tg-card tool-card text-gen" data-tool="idea_generator">
+            <div class="tool-card-content"><h3 class="font-medium">Генератор идей</h3></div>
           </div>
         </div>
-
-        <!-- Text Generation -->
         <div class="swiper-slide">
-          <div class="tg-card tool-card text-gen">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Text Generation</h3>
-              <p class="text-xs opacity-80 mt-1">Write anything you need</p>
-            </div>
+          <div class="tg-card tool-card chatbot" data-tool="universal_ai_basic">
+            <div class="tool-card-content"><h3 class="font-medium">Универсальный</h3></div>
           </div>
         </div>
-
-        <!-- Chatbot -->
         <div class="swiper-slide">
-          <div class="tg-card tool-card chatbot">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Chatbot</h3>
-              <p class="text-xs opacity-80 mt-1">Talk to me about anything</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Code Generation -->
-        <div class="swiper-slide">
-          <div class="tg-card tool-card code-gen">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="16 18 22 12 16 6"></polyline>
-                <polyline points="8 6 2 12 8 18"></polyline>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Code Generation</h3>
-              <p class="text-xs opacity-80 mt-1">Generate code snippets</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Documents -->
-        <div class="swiper-slide">
-          <div class="tg-card tool-card documents">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Documents</h3>
-              <p class="text-xs opacity-80 mt-1">Analyze and summarize</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Translation -->
-        <div class="swiper-slide">
-          <div class="tg-card tool-card translation">
-            <div class="tool-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
-                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
-                <path d="M2 2l7.586 7.586"></path>
-                <circle cx="11" cy="11" r="2"></circle>
-              </svg>
-            </div>
-            <div class="tool-card-content">
-              <h3 class="font-medium">Translation</h3>
-              <p class="text-xs opacity-80 mt-1">Translate between languages</p>
-            </div>
+          <div class="tg-card tool-card image-gen" data-tool="photo_dietitian_analyzer">
+            <div class="tool-card-content"><h3 class="font-medium">🥑 Диетолог</h3></div>
           </div>
         </div>
       </div>
       <div class="swiper-pagination"></div>
     </div>
 
-    <!-- Recent Chats -->
-    <h2 class="text-sm font-medium mt-6 mb-2">Recent Chats</h2>
-    <div class="space-y-2">
-      <div class="tg-bubble-in p-3 flex items-center">
-        <div class="w-10 h-10 rounded-full bg-blue-900/30 flex items-center justify-center mr-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
+    <div>
+        <h2 class="text-sm font-medium mb-3">Управление ботом</h2>
+        <div class="menu-grid">
+            <button id="btn-agents" class="menu-button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                <span>Агенты ИИ</span>
+            </button>
+            <button id="btn-models" class="menu-button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span>Модели ИИ</span>
+            </button>
+            <button id="btn-limits" class="menu-button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                <span>Лимиты</span>
+            </button>
+            <button id="btn-bonus" class="menu-button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4H5z" /></svg>
+                <span>Бонус</span>
+            </button>
+            <button id="btn-gems" class="menu-button">
+                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+                <span>Гемы</span>
+            </button>
+            <button id="btn-help" class="menu-button">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span>Помощь</span>
+            </button>
         </div>
-        <div class="flex-1">
-          <div class="flex justify-between items-center">
-            <h3 class="text-sm font-medium">Blog Post Draft</h3>
-            <span class="text-xs text-gray-400">10:30 AM</span>
-          </div>
-          <p class="text-xs text-gray-400 truncate">Can you help me draft a blog post about AI trends...</p>
-        </div>
-      </div>
-
-      <div class="tg-bubble-in p-3 flex items-center">
-        <div class="w-10 h-10 rounded-full bg-purple-900/30 flex items-center justify-center mr-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-          </svg>
-        </div>
-        <div class="flex-1">
-          <div class="flex justify-between items-center">
-            <h3 class="text-sm font-medium">Travel Recommendations</h3>
-            <span class="text-xs text-gray-400">Yesterday</span>
-          </div>
-          <p class="text-xs text-gray-400 truncate">What are some must-visit places in Japan...</p>
-        </div>
-      </div>
     </div>
   </main>
 
-  <!-- Input Area -->
-  <div class="sticky bottom-16 bg-[#17212b] border-t border-gray-700 p-3">
-    <div class="flex items-center">
-      <button class="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 mr-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-      </button>
-      <div class="flex-1 bg-[#242f3d] rounded-full px-4 py-2 flex items-center">
-        <input type="text" placeholder="Message" class="bg-transparent border-none w-full focus:outline-none text-sm text-white placeholder-gray-400">
-        <button class="text-gray-400 ml-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-        </button>
-      </div>
-      <button class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white ml-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation -->
-  <nav class="sticky bottom-0 bg-[#17212b] border-t border-gray-700 flex justify-around py-3">
-    <a href="#" class="flex flex-col items-center text-xs tg-nav-item active">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-      </svg>
-      <span class="mt-1">Home</span>
-    </a>
-    <a href="#" class="flex flex-col items-center text-xs tg-nav-item text-gray-400">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      <span class="mt-1">Profile</span>
-    </a>
-  </nav>
-
-   <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // --- 1. ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP ---
-    const tg = window.Telegram.WebApp;
-
-    // Сообщаем Telegram, что приложение готово и его можно показывать
-    tg.ready();
-    // Растягиваем приложение на весь экран
-    tg.expand();
-
-    // Настраиваем главную кнопку внизу экрана.
-    // Она будет просто закрывать приложение.
-    tg.MainButton.setText('Закрыть приложение');
-    tg.MainButton.show();
-    tg.MainButton.onClick(() => {
-        tg.close();
+  <script>
+    // Инициализация Swiper
+    const swiper = new Swiper(".mySwiper", {
+      slidesPerView: 1.5,
+      spaceBetween: 12,
+      pagination: { el: ".swiper-pagination", clickable: true },
     });
 
-    // --- 2. ФУНКЦИЯ ДЛЯ ОТПРАВКИ ДАННЫХ В БОТ ---
-    function sendToolSelection(toolId) {
-        if (!toolId) return;
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    // ГЛАВНАЯ КНОПКА УДАЛЕНА
 
-        // Формируем полезные данные для отправки.
-        // JSON - лучший формат.
+    // --- ОБНОВЛЕННЫЕ ФУНКЦИИ ОТПРАВКИ ДАННЫХ ---
+    function sendCommandToBot(command, details = {}) {
         const dataToSend = {
-            command: 'select_tool_from_app', // команда для нашего бота
-            tool_id: toolId,                   // ID выбранного инструмента
-            user: tg.initDataUnsafe?.user      // информация о пользователе
+            command: command,
+            details: details,
+            user: tg.initDataUnsafe?.user
         };
-
-        // Используем tg.sendData(), чтобы отправить JSON-строку в бот.
-        // Эта команда также закроет веб-приложение.
         tg.sendData(JSON.stringify(dataToSend));
     }
 
-    // --- 3. ДОБАВЛЯЕМ ОБРАБОТЧИКИ КЛИКОВ НА КАРТОЧКИ ---
-    // Находим все карточки по их ID
-    const imageGenCard = document.getElementById('image-gen-card');
-    const textGenCard = document.getElementById('text-gen-card');
-    const chatbotCard = document.getElementById('chatbot-card');
-    const codeGenCard = document.getElementById('code-gen-card');
-    const documentsCard = document.getElementById('documents-card');
-    const translationCard = document.getElementById('translation-card');
+    // --- ОБРАБОТЧИКИ КЛИКОВ НА КАРУСЕЛЬ (ВЫБОР АГЕНТА) ---
+    document.querySelectorAll('.tool-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const agentId = card.dataset.tool;
+            if (agentId) {
+                // Отправляем команду на смену агента
+                sendCommandToBot('set_agent_from_app', { agent_id: agentId });
+            }
+        });
+    });
 
-    // Навешиваем на каждую карточку обработчик, который вызовет нашу функцию
-    if (imageGenCard) imageGenCard.addEventListener('click', () => sendToolSelection('image_gen'));
-    if (textGenCard) textGenCard.addEventListener('click', () => sendToolSelection('text_gen'));
-    if (chatbotCard) chatbotCard.addEventListener('click', () => sendToolSelection('chatbot'));
-    if (codeGenCard) codeGenCard.addEventListener('click', () => sendToolSelection('code_gen'));
-    if (documentsCard) documentsCard.addEventListener('click', () => sendToolSelection('documents'));
-    if (translationCard) translationCard.addEventListener('click', () => sendToolSelection('translation'));
-    
-});
+    // --- ОБРАБОТЧИКИ КЛИКОВ НА КНОПКИ МЕНЮ ---
+    document.getElementById('btn-agents').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'ai_modes_submenu' }));
+    document.getElementById('btn-models').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'models_submenu' }));
+    document.getElementById('btn-limits').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'limits_submenu' }));
+    document.getElementById('btn-bonus').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'bonus_submenu' }));
+    document.getElementById('btn-gems').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'gems_submenu' }));
+    document.getElementById('btn-help').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'help_submenu' }));
   </script>
 </body>
 </html>
