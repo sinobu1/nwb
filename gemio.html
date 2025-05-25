@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com/"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+  <title>AI Assistant</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
+  <style>
+    :root {
+      --tg-primary: #0088cc;
+      --tg-secondary: #0e1621;
+      --tg-text-primary: #e1e3e6;
+      --tg-text-secondary: #7f8b97;
+      --tg-bubble-out: #2b5278;
+      --tg-bubble-in: #182533;
+      --tg-card-bg: #17212b;
+      --tg-input-bg: #17212b;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--tg-secondary);
+      color: var(--tg-text-primary);
+    }
+    
+    .tg-header {
+      background-color: var(--tg-primary);
+      color: white;
+    }
+    
+    .tg-bubble-out {
+      background-color: var(--tg-bubble-out);
+      border-radius: 12px 12px 0 12px;
+    }
+    
+    .tg-bubble-in {
+      background-color: var(--tg-bubble-in);
+      border-radius: 12px 12px 12px 0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .tg-button {
+      background-color: var(--tg-primary);
+      color: white;
+      transition: all 0.2s ease;
+    }
+    
+    .tg-button:hover {
+      background-color: #0077b3;
+    }
+    
+    .tg-nav-item.active {
+      color: var(--tg-primary);
+    }
+    
+    .tg-card {
+      background-color: var(--tg-card-bg);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .tg-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .typing-indicator span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: var(--tg-text-secondary);
+      border-radius: 50%;
+      margin: 0 2px;
+      animation: bounce 1.5s infinite ease-in-out;
+    }
+    
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+    
+    .swiper-pagination-bullet {
+      background: var(--tg-text-secondary) !important;
+      opacity: 0.5 !important;
+    }
+    
+    .swiper-pagination-bullet-active {
+      background: var(--tg-primary) !important;
+      opacity: 1 !important;
+    }
+    
+    .tool-card {
+      height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 16px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      z-index: 1;
+    }
+    
+    .tool-card-content {
+      position: relative;
+      z-index: 2;
+    }
+    
+    .tool-icon {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 36px;
+      height: 36px;
+      background-color: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    
+    .image-gen {
+      background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .text-gen {
+      background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .chatbot {
+      background: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
+    }
+    
+    .code-gen {
+      background: linear-gradient(45deg, #f83600 0%, #f9d423 100%);
+    }
+    
+    .documents {
+      background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .translation {
+      background: linear-gradient(45deg, #a18cd1 0%, #fbc2eb 100%);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="tg-header sticky top-0 z-10 flex items-center p-4 justify-between">
+    <button class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    <h1 class="text-lg font-semibold">AI Assistant</h1>
+    <button class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-4 space-y-4">
+    <!-- Welcome Message -->
+    <div class="tg-bubble-in p-4 max-w-[85%]">
+      <p class="text-sm">👋 Hello! I'm your AI assistant. Choose one of the tools below to get started or ask me anything!</p>
+    </div>
+
+    <!-- AI Tools Carousel -->
+    <div class="swiper mySwiper">
+      <div class="swiper-wrapper">
+        <!-- Image Generation -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card image-gen">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Image Generation</h3>
+              <p class="text-xs opacity-80 mt-1">Create visuals from text prompts</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Text Generation -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card text-gen">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Text Generation</h3>
+              <p class="text-xs opacity-80 mt-1">Write anything you need</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chatbot -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card chatbot">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Chatbot</h3>
+              <p class="text-xs opacity-80 mt-1">Talk to me about anything</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Code Generation -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card code-gen">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6"></polyline>
+                <polyline points="8 6 2 12 8 18"></polyline>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Code Generation</h3>
+              <p class="text-xs opacity-80 mt-1">Generate code snippets</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card documents">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Documents</h3>
+              <p class="text-xs opacity-80 mt-1">Analyze and summarize</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Translation -->
+        <div class="swiper-slide">
+          <div class="tg-card tool-card translation">
+            <div class="tool-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                <path d="M2 2l7.586 7.586"></path>
+                <circle cx="11" cy="11" r="2"></circle>
+              </svg>
+            </div>
+            <div class="tool-card-content">
+              <h3 class="font-medium">Translation</h3>
+              <p class="text-xs opacity-80 mt-1">Translate between languages</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="swiper-pagination"></div>
+    </div>
+
+    <!-- Recent Chats -->
+    <h2 class="text-sm font-medium mt-6 mb-2">Recent Chats</h2>
+    <div class="space-y-2">
+      <div class="tg-bubble-in p-3 flex items-center">
+        <div class="w-10 h-10 rounded-full bg-blue-900/30 flex items-center justify-center mr-3">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex justify-between items-center">
+            <h3 class="text-sm font-medium">Blog Post Draft</h3>
+            <span class="text-xs text-gray-400">10:30 AM</span>
+          </div>
+          <p class="text-xs text-gray-400 truncate">Can you help me draft a blog post about AI trends...</p>
+        </div>
+      </div>
+
+      <div class="tg-bubble-in p-3 flex items-center">
+        <div class="w-10 h-10 rounded-full bg-purple-900/30 flex items-center justify-center mr-3">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex justify-between items-center">
+            <h3 class="text-sm font-medium">Travel Recommendations</h3>
+            <span class="text-xs text-gray-400">Yesterday</span>
+          </div>
+          <p class="text-xs text-gray-400 truncate">What are some must-visit places in Japan...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Input Area -->
+  <div class="sticky bottom-16 bg-[#17212b] border-t border-gray-700 p-3">
+    <div class="flex items-center">
+      <button class="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 mr-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+      </button>
+      <div class="flex-1 bg-[#242f3d] rounded-full px-4 py-2 flex items-center">
+        <input type="text" placeholder="Message" class="bg-transparent border-none w-full focus:outline-none text-sm text-white placeholder-gray-400">
+        <button class="text-gray-400 ml-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+      </div>
+      <button class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white ml-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation -->
+  <nav class="sticky bottom-0 bg-[#17212b] border-t border-gray-700 flex justify-around py-3">
+    <a href="#" class="flex flex-col items-center text-xs tg-nav-item active">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--tg-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      </svg>
+      <span class="mt-1">Home</span>
+    </a>
+    <a href="#" class="flex flex-col items-center text-xs tg-nav-item text-gray-400">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span class="mt-1">Profile</span>
+    </a>
+  </nav>
+
+  <script>
+    // Initialize Swiper
+    const swiper = new Swiper(".mySwiper", {
+      slidesPerView: 1.2,
+      spaceBetween: 12,
+      centeredSlides: false,
+      pagination: {
+        el: ".swiper-pagination",
+        clickable: true,
+      },
+      breakpoints: {
+        640: {
+          slidesPerView: 2.2,
+          spaceBetween: 16,
+        },
+        768: {
+          slidesPerView: 3.2,
+          spaceBetween: 20,
+        },
+      },
+    });
+    
+    // Add click event to tool cards
+    document.querySelectorAll('.tool-card').forEach(card => {
+      card.addEventListener('click', function() {
+        const toolName = this.querySelector('h3').textContent;
+        alert(`Opening ${toolName} tool...`);
+      });
+    });
+  </script>
+</body>
+</html>
