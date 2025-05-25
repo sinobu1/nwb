@@ -327,7 +327,7 @@ async function submitMessageToBackend(userText, agentKey, modelKey) {
     }
 
     // ВАЖНО: Замените на ваш публичный URL сервера (из CONFIG.WEBHOOK_URL в Python)
-    const backendProcessUrl = `${CONFIG.WEBHOOK_URL.rstrip('/')}/api/process_app_message/${userId}`;
+    const backendProcessUrl = `${CONFIG.WEBHOOK_URL.rstrip('https://nwb-production.up.railway.app/')}/api/process_app_message/${userId}`;
     // Если CONFIG.WEBHOOK_URL недоступен в JS, впишите URL вручную:
     // const backendProcessUrl = `https://your-app-name.onrender.com/api/process_app_message/${userId}`;
 
