@@ -1,91 +1,131 @@
 # main.py
 import asyncio
-from telegram import BotCommand, Update
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
+import uvicorn
+from fastapi import FastAPI, Request, Response, status
+from telegram import Update
+from telegram.ext import Application
+
+# Импортируем конфигурацию, логгер и сервисы
+from config import CONFIG, logger, BotConstants, firestore_service
+
+# Импортируем всю логику и обработчики из нового файла bot_logic.py
+# (Предполагается, что вы перенесли содержимое handlers.py в bot_logic.py)
+try:
+    import bot_logic
+except ImportError:
+    # Фоллбэк, если пользователь еще не переименовал файл
+    import handlers as bot_logic
+
+# 1. Инициализация FastAPI
+# Мы добавляем документацию для наших новых API эндпоинтов
+app = FastAPI(
+    title="Telegram Bot API Server",
+    description="Сервер для обработки вебхуков Telegram и API для Mini App.",
+    version="1.0.0"
 )
 
-# Импортируем конфигурацию, логгер, сервисы и глобальные объекты из config.py
-from config import CONFIG, logger, firestore_service, genai # genai импортируется для настройки в main
+# 2. Инициализация Telegram-бота
+# Убираем таймауты, т.к. вебхуки работают иначе
+ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
-# Импортируем все наши обработчики из handlers.py
-from handlers import (
-    start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command,
-    menu_button_handler, handle_text, precheckout_callback,
-    successful_payment_callback, error_handler,
-    photo_handler, web_app_data_handler # <<< ДОБАВЬТЕ web_app_data_handler
-)
 
-async def main():
-    """Основная функция для запуска бота."""
-    
-    # Конфигурация Google Gemini API (используется для Vision агента Диетолога)
-    if CONFIG.GOOGLE_GEMINI_API_KEY and \
-       "YOUR_" not in CONFIG.GOOGLE_GEMINI_API_KEY and \
-       CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"): # Проверка ключа
-        try:
-            genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY)
-            logger.info("Google Gemini API (for Vision) successfully configured.")
-        except Exception as e:
-            logger.error(f"Failed to configure Google Gemini API (for Vision): {e}", exc_info=True)
-    else:
-        logger.warning("Google Gemini API key (for Vision) is not configured or is missing. Photo dietitian may not work as intended.")
+# 3. Регистрация всех ваших обработчиков из bot_logic.py
+# Убедитесь, что все ваши хендлеры перечислены здесь.
+# Группа 0: Команды
+ptb_app.add_handler(bot_logic.CommandHandler("start", bot_logic.start), group=0)
+ptb_app.add_handler(bot_logic.CommandHandler("menu", bot_logic.open_menu_command), group=0)
+ptb_app.add_handler(bot_logic.CommandHandler("usage", bot_logic.usage_command), group=0)
+ptb_app.add_handler(bot_logic.CommandHandler("gems", bot_logic.gems_info_command), group=0)
+ptb_app.add_handler(bot_logic.CommandHandler("bonus", bot_logic.get_news_bonus_info_command), group=0)
+ptb_app.add_handler(bot_logic.CommandHandler("help", bot_logic.help_command), group=0)
 
+# Группа 1: Обработчики кнопок, фото и данных от Mini App
+ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.PHOTO, bot_logic.photo_handler), group=1)
+# Важно: menu_button_handler должен идти перед web_app_data_handler, если вы используете текстовые кнопки
+ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.menu_button_handler), group=1)
+ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.StatusUpdate.WEB_APP_DATA, bot_logic.web_app_data_handler), group=1)
+
+# Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
+ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.handle_text), group=2)
+
+# Обработчики платежей
+ptb_app.add_handler(bot_logic.PreCheckoutQueryHandler(bot_logic.precheckout_callback))
+ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.SUCCESSFUL_PAYMENT, bot_logic.successful_payment_callback))
+
+# Глобальный обработчик ошибок
+ptb_app.add_error_handler(bot_logic.error_handler)
+
+
+@app.on_event("startup")
+async def on_startup():
+    """Действия при старте сервера: установка вебхука."""
     # Проверка Firestore
-    if not firestore_service._db: # Используем _db для проверки инициализации
-        logger.critical("Firestore (db) was NOT initialized successfully! Bot will not work correctly.")
+    if not firestore_service._db:
+        logger.critical("Firestore (db) was NOT initialized successfully! Server will not work correctly.")
         return
-
-    # Сборка приложения
-    app_builder = Application.builder().token(CONFIG.TELEGRAM_TOKEN)
-    app_builder.read_timeout(30).connect_timeout(30) # Настройка таймаутов
-    app = app_builder.build()
-
-    # Регистрация обработчиков с группами для правильного порядка срабатывания
-    # Группа 0: Команды
-    app.add_handler(CommandHandler("start", start), group=0)
-    app.add_handler(CommandHandler("menu", open_menu_command), group=0)
-    app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
-    app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
-    app.add_handler(CommandHandler("help", help_command), group=0)
-    
-    # Группа 1: Обработчики фото и кнопок меню (фото должно иметь приоритет или быть специфичным)
-    # Photo handler должен идти перед menu_button_handler, если кнопки - это текст, который может быть частью фото-диалога
-    # Но т.к. фото - это отдельный тип, порядок здесь не так критичен, как для текстовых.
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
-
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
-    
-    # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
-    
-    # Обработчики платежей
-    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    
-    # Глобальный обработчик ошибок
-    app.add_error_handler(error_handler)
-
-    # Установка команд бота
-    bot_commands = [
-        BotCommand("menu", "📋 Открыть главное меню"),
-        BotCommand("usage", "📊 Лимиты и баланс гемов"),
-        BotCommand("gems", "💎 Магазин Гемов"),
-        BotCommand("bonus", "🎁 Бонус канала"),
-        BotCommand("help", "❓ Помощь")
-    ]
+        
+    webhook_url = f"{CONFIG.WEBHOOK_URL}/telegram"
     try:
-        await app.bot.set_my_commands(bot_commands)
-        logger.info("Bot commands have been successfully set.")
+        await ptb_app.bot.set_webhook(
+            url=webhook_url,
+            allowed_updates=Update.ALL_TYPES,
+            secret_token=CONFIG.TELEGRAM_TOKEN.split(":")[-1] # Используем часть токена как простой секрет
+        )
+        logger.info(f"Webhook has been set to {webhook_url}")
     except Exception as e:
-        logger.error(f"Failed to set bot commands: {e}", exc_info=True)
+        logger.error(f"Failed to set webhook: {e}", exc_info=True)
 
-    logger.info("Bot polling is starting...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
 
-if __name__ == '__main__':
-    asyncio.run(main())
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Действия при остановке сервера: удаление вебхука."""
+    try:
+        await ptb_app.bot.delete_webhook()
+        logger.info("Webhook has been deleted.")
+    except Exception as e:
+        logger.error(f"Failed to delete webhook: {e}", exc_info=True)
+
+
+# Дверь №1: Эндпоинт для Telegram (Webhook)
+@app.post("/telegram")
+async def telegram_webhook(request: Request):
+    """Принимает обновления от Telegram и передает их в обработчик."""
+    # Проверяем секретный заголовок для безопасности
+    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != CONFIG.TELEGRAM_TOKEN.split(":")[-1]:
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+        
+    update_data = await request.json()
+    update = Update.de_json(update_data, ptb_app.bot)
+    await ptb_app.process_update(update)
+    return {"status": "ok"}
+
+
+# Дверь №2: Эндпоинт для Mini App (API для опроса)
+@app.get("/api/get_updates/{user_id}")
+async def get_app_updates(user_id: int):
+    """Отдает новые сообщения для Mini App из Firestore и очищает их."""
+    try:
+        messages_ref = firestore_service._db.collection(BotConstants.FS_APP_MESSAGES_COLLECTION).document(str(user_id))
+        doc = await firestore_service._execute_firestore_op(messages_ref.get)
+        
+        if doc and doc.exists:
+            pending_messages = doc.to_dict().get('messages', [])
+            if pending_messages:
+                # Сразу удаляем, чтобы не отправить повторно
+                await firestore_service._execute_firestore_op(messages_ref.delete)
+                return {"status": "ok", "messages": pending_messages}
+        
+        return {"status": "ok", "messages": []}
+    except Exception as e:
+        logger.error(f"API /get_updates error for user {user_id}: {e}", exc_info=True)
+        return {"status": "error", "messages": [], "error": str(e)}
+
+
+if __name__ == "__main__":
+    # Запускаем веб-сервер uvicorn
+    # Он будет слушать на порту 8000 и принимать внешние подключения
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000
+    )
