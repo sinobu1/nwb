@@ -607,8 +607,10 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             model_info = AVAILABLE_TEXT_MODELS.get(model_id_key)
             if model_info:
                 update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
+                # Эта логика для сброса агента, если выбрана несовместимая модель, у вас уже была и она правильная
                 if model_id_key in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_db.get('current_ai_mode') == "gemini_pro_custom_mode":
                     update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
+                
                 await firestore_service.set_user_data(user.id, update_payload)
                 response_text = f"✅ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>"
                 # --- ДОБАВЛЕНО: Отправка подтверждения пользователю ---
@@ -619,34 +621,28 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     reply_markup=keyboard
                 )
 
-        # Команда на показ одного из меню бота
+        # Команда на показ одного из меню/действий бота
         elif command == 'show_menu_from_app':
             menu_target = details.get('menu') # Например, 'limits_submenu'
-            submenu_map = {
-                'limits_submenu': BotConstants.MENU_LIMITS_SUBMENU,
-                'bonus_submenu': BotConstants.MENU_BONUS_SUBMENU,
-                'gems_submenu': BotConstants.MENU_GEMS_SUBMENU,
-                'help_submenu': BotConstants.MENU_HELP_SUBMENU,
-            }
-            if menu_target in submenu_map:
-                # --- ИСПРАВЛЕНО: Вызов конкретных функций вместо простого показа меню ---
-                if menu_target == 'limits_submenu':
-                    # Передаем None вместо update, чтобы избежать ответа на сообщение web_app_data
-                    await show_limits(None, user.id, context)
-                elif menu_target == 'bonus_submenu':
-                    await claim_news_bonus_logic(None, user.id, context)
-                elif menu_target == 'help_submenu':
-                    await show_help(None, user.id, context)
-                # Для Гемов просто показываем соответствующее меню
-                elif menu_target == 'gems_submenu':
-                     await show_menu(None, user.id, submenu_map[menu_target], context_param=context)
+            
+            # --- ИСПРАВЛЕНО: Теперь мы не просто показываем меню, а вызываем нужную функцию ---
+            if menu_target == 'limits_submenu':
+                # Передаем None вместо update, чтобы бот отправил новое сообщение, а не отвечал на служебное
+                await show_limits(None, user.id, context)
+            elif menu_target == 'bonus_submenu':
+                await claim_news_bonus_logic(None, user.id, context)
+            elif menu_target == 'help_submenu':
+                await show_help(None, user.id, context)
+            elif menu_target == 'gems_submenu':
+                # Для магазина гемов показ меню - это правильное поведение
+                await show_menu(None, user.id, BotConstants.MENU_GEMS_SUBMENU, context_param=context)
             else:
                 logger.warning(f"Unknown menu_key '{menu_target}' from Mini App for user {user.id}")
                 await context.bot.send_message(user.id, "Неизвестное действие из веб-приложения.")
+        
         else:
             logger.warning(f"Unknown command '{command}' from Mini App for user {user.id}")
             await context.bot.send_message(user.id, "Неизвестная команда от веб-приложения.")
-
 
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Ошибка обработки данных от Mini App для пользователя {user.id}: {e}", exc_info=True)
