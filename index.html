@@ -61,14 +61,14 @@
         .screen.active { z-index: 20; opacity: 1; visibility: visible; }
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
-        #main-screen, #image-generator-screen, #summarizer-screen { flex-grow: 1; }
+        #main-screen, #image-generator-screen, #summarizer-screen, #chat-screen { flex-grow: 1; } /* Ensure chat-screen also grows */
         #main-content-area, .feature-content-area { 
             flex-grow: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             padding: 1rem;
         }
-         .fixed-header {
+         .fixed-header { /* Used for feature screens and now potentially chat header if it were sticky */
             padding: 0.75rem 1rem;
             background: rgba(18,18,18,0.85); 
             backdrop-filter: blur(15px);
@@ -79,8 +79,8 @@
             border-bottom: 1px solid var(--border-color);
             z-index: 25; 
             color: var(--text-primary);
-            position: sticky; 
-            top: 0;
+            /* position: sticky; /* Removed for general fixed-header, apply specifically if needed */
+            /* top: 0; */
         }
         .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } 
         .fixed-header .back-btn {
@@ -167,39 +167,25 @@
         .profile-info p { font-size: 0.85rem; color: var(--text-secondary); margin:0;}
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; font-size: 0.9rem;}
 
-        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(18,18,18,0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
+        /* Chat Screen Specific Styles */
+        #chat-screen .chat-header { /* Chat header is not sticky by default, part of screen flow */
+            flex-shrink: 0;
+            /* position: sticky; top: 0; /* If chat header needs to be sticky */
+        }
         .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
         .chat-header-btn:hover { background-color: var(--bg-card); }
-        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; -webkit-overflow-scrolling: touch; }
-        .chat-message { padding: 0.5rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.65rem; will-change: transform, opacity; font-size: 0.9rem; }
-        @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
-        .message-bot { background-color: var(--bg-card); align-self: flex-start; color: var(--text-primary); }
-        .message-user { background-color: var(--bg-user-msg); align-self: flex-end; color: var(--text-primary); }
-        .message-bot.tailed { border-bottom-left-radius: 0.25rem; }
-        .message-user.tailed { border-bottom-right-radius: 0.25rem; }
-        .chat-message.grouped { margin-top: 0.25rem; }
-        .chat-message.no-tail { border-bottom-left-radius: 1.1rem; border-bottom-right-radius: 1.1rem; }
-        .message-bot.typing { color: var(--text-secondary); font-style: italic; }
-        .typing .message-content::after { content: '.'; animation: dots 1.2s steps(5, end) infinite; }
-        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
-        .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-secondary); float: right; margin-left: 0.5rem; margin-top: 0.2rem; line-height: 1; user-select: none; }
-        .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 1rem; width: fit-content; }
-
-        .chat-input-area {
+        
+        .chat-input-area { /* Now at the top, after header */
             flex-shrink: 0;
-            padding: 0.5rem; 
-            border-top: 1px solid var(--border-color);
+            padding: 0.75rem 1rem; /* Consistent padding */
+            border-bottom: 1px solid var(--border-color); /* Separator from messages */
             background-color: var(--bg-main);
             display: flex;
             flex-direction: column; 
-            gap: 0.5rem; 
-            position: sticky; /* Changed from relative */
-            bottom: 0; /* Added for sticky positioning */
-            width: 100%; /* Ensure full width for sticky */
-            z-index: 50; 
-            -webkit-transform: translateZ(0); /* May help iOS rendering */
+            gap: 0.75rem; 
+            z-index: 15; /* Above messages, below header if header is sticky */
         }
         #chat-prompt-input { 
             width: 100%;
@@ -234,6 +220,29 @@
             background-color: var(--text-secondary);
             cursor: not-allowed;
         }
+
+        .chat-messages { /* Takes remaining space and scrolls */
+            flex-grow: 1; 
+            overflow-y: auto; 
+            padding: 1rem; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 0.25rem; 
+            -webkit-overflow-scrolling: touch; 
+        }
+        .chat-message { padding: 0.5rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.65rem; will-change: transform, opacity; font-size: 0.9rem; }
+        @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
+        .message-bot { background-color: var(--bg-card); align-self: flex-start; color: var(--text-primary); }
+        .message-user { background-color: var(--bg-user-msg); align-self: flex-end; color: var(--text-primary); }
+        .message-bot.tailed { border-bottom-left-radius: 0.25rem; }
+        .message-user.tailed { border-bottom-right-radius: 0.25rem; }
+        .chat-message.grouped { margin-top: 0.25rem; }
+        .chat-message.no-tail { border-bottom-left-radius: 1.1rem; border-bottom-right-radius: 1.1rem; }
+        .message-bot.typing { color: var(--text-secondary); font-style: italic; }
+        .typing .message-content::after { content: '.'; animation: dots 1.2s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
+        .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-secondary); float: right; margin-left: 0.5rem; margin-top: 0.2rem; line-height: 1; user-select: none; }
+        .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 1rem; width: fit-content; }
 
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
@@ -380,8 +389,7 @@
         </div>
 
         <div id="chat-screen" class="screen">
-            <div class="chat-header">
-                 <div id="chat-back-btn" class="chat-header-btn">
+            <div class="chat-header fixed-header"> <div id="chat-back-btn" class="chat-header-btn">
                      <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                  </div>
                  <div id="chat-title" class="title">Чат</div>
@@ -389,14 +397,12 @@
                     <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"> <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                  </div>
             </div>
-            <div class="chat-messages" id="chat-messages-container"></div>
-            <div class="chat-input-area">
-                <div class="feature-input-area" style="width: 100%; margin-bottom: 0;">
+            <div class="chat-input-area"> <div class="feature-input-area" style="width: 100%; margin-bottom: 0;">
                     <input type="text" id="chat-prompt-input" placeholder="Сообщение...">
                 </div>
                 <button id="chat-send-message-btn" class="feature-submit-btn" style="width: 100%;" disabled>Отправить</button>
             </div>
-        </div>
+            <div class="chat-messages" id="chat-messages-container"></div> </div>
 
         <div id="image-generator-screen" class="screen">
             <div class="fixed-header">
@@ -540,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveChatToLocalStorage() {
         try { 
-            setTimeout(() => { // Defer localStorage write
+            setTimeout(() => { 
                 localStorage.setItem('apiChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); 
             }, 0);
         }
@@ -642,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!(role === 'user' && text === systemPromptText) && !(role === 'model' && text === "Понял. Я готов помочь.")) {
                  currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }], timestamp: now.toISOString() });
-                 saveChatToLocalStorage(); // This will now be deferred
+                 saveChatToLocalStorage(); 
             }
         }
         lastMessageInfo = { sender: sender, date: currentDate };
