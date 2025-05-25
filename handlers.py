@@ -570,9 +570,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Обрабатывает ВСЕ команды, полученные от веб-приложения (Mini App).
-    """
     if not update.message or not update.message.web_app_data:
         return
 
@@ -596,9 +593,12 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 await firestore_service.set_user_data(user.id, {'current_ai_mode': agent_id})
                 agent_name = AI_MODES[agent_id].get('name', 'N/A')
                 response_text = f"✅ Агент изменен на: <b>{agent_name}</b>"
-                # ОТСУТСТВУЮЩАЯ СТРОКА: Отправка сообщения пользователю
-                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=response_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
 
         # Команда на смену Модели
         elif command == 'set_model_from_app':
@@ -610,9 +610,12 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
                 await firestore_service.set_user_data(user.id, update_payload)
                 response_text = f"✅ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>"
-                # ОТСУТСТВУЮЩАЯ СТРОКА: Отправка сообщения пользователю
-                await context.bot.send_message(user.id, response_text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
-
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=response_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
 
         # Команда на показ одного из меню бота
         elif command == 'show_menu_from_app':
