@@ -69,7 +69,7 @@
         .full-screen-card .info h3 { font-size: 1.125rem; font-weight: 700; margin: 0; color: var(--text-primary); }
         .full-screen-card .info p { font-size: 0.9rem; color: var(--text-secondary); margin: 0.25rem 0 0 0; }
 
-        /* --- НОВЫЕ СТИЛИ ДЛЯ СТРАНИЦЫ ВЫБОРА --- */
+        /* Стили для страницы выбора */
         .selection-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1.5rem; }
         .selection-container { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; }
         .selection-container label { font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; }
@@ -154,7 +154,19 @@
                             <h1>Профиль</h1>
                             <p class="subtitle">Информация о вашем аккаунте</p>
                         </div>
-                        <div class="ios-card"> </div>
+                        <div class="ios-card">
+                            <div class="profile-header">
+                                <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
+                                <div class="profile-info">
+                                    <h2 id="profile-name"></h2>
+                                    <p id="profile-id"></p>
+                                </div>
+                            </div>
+                            <div class="profile-gems">
+                                <span class="label">💎 Баланс гемов</span>
+                                <span id="gem-balance" class="value">Недоступно</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -252,14 +264,16 @@
 
         function populateSelectionDropdowns() {
             agentSelect.innerHTML = '';
-            models.forEach(m => {
-                const option = new Option(`${m.icon} ${m.name}`, m.key);
-                modelSelect.appendChild(option);
-            });
-
+            modelSelect.innerHTML = ''; // Очистка перед заполнением
+            
             agents.forEach(a => {
                 const option = new Option(`${a.icon} ${a.name}`, a.key);
                 agentSelect.appendChild(option);
+            });
+            
+            models.forEach(m => {
+                const option = new Option(`${m.icon} ${m.name}`, m.key);
+                modelSelect.appendChild(option);
             });
             
             agentSelect.value = selectedAgentKey;
@@ -307,6 +321,25 @@
             });
         }
         
+        function displayProfileData() {
+            try {
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64';
+                    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+                    document.getElementById('profile-name').textContent = fullName || 'Пользователь';
+                    document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+                } else {
+                     throw new Error("User data not found");
+                }
+            } catch (e) {
+                console.error("Profile data error:", e);
+                // Fallback values
+                document.getElementById('profile-name').textContent = 'Нет данных';
+                document.getElementById('profile-id').textContent = 'ID: Н/Д';
+            }
+        }
+
         // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
         function init() {
             tg.ready();
@@ -317,6 +350,7 @@
             populateCarousel('agents-swiper-wrapper', agents, 'agent');
             populateCarousel('models-swiper-wrapper', models, 'model');
             populateToolsList();
+            displayProfileData();
             updateHomeSelectionVisuals();
 
             // Swiper
