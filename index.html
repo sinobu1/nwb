@@ -207,10 +207,27 @@
         // РАБОЧАЯ ВЕРСИЯ ФУНКЦИИ ОТПРАВКИ
         function sendCommandToBot(command, details = {}) {
             try {
-                tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
+                // Убираем поле user, оно не используется на бэкенде и может вызывать проблемы
+                const dataToSend = JSON.stringify({ command, details });
+                
+                // Для отладки: выводим в консоль то, что пытаемся отправить.
+                // Это поможет проверить, вызывается ли функция вообще.
+                console.log("Sending data to bot:", dataToSend);
+                
+                // Явно указываем полный путь к объекту Telegram
+                window.Telegram.WebApp.sendData(dataToSend);
+
             } catch (error) {
                 // В случае ошибки, выводим ее в консоль для отладки
                 console.error("Failed to send data to bot:", error);
+                // Попытка отправить информацию об ошибке боту для диагностики
+                window.Telegram.WebApp.sendData(JSON.stringify({
+                    command: 'error_from_app',
+                    details: { 
+                        message: error.message,
+                        stack: error.stack 
+                    }
+                }));
             }
         }
 
