@@ -53,6 +53,9 @@
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); } .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
         .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); } .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); } .palette-6 { background-color: #2D2D2D; }
+        
+        .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
+        .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; }
 
         #chat-screen { background-color: var(--bg-main); }
         .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
@@ -97,6 +100,11 @@
         .tab-item.active { color: var(--gold-highlight); }
         .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
         .tab-item span { font-size: 0.625rem; font-weight: 500; }
+        
+        .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
+        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
+        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
     </style>
 </head>
 <body>
@@ -117,11 +125,16 @@
                         <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                     </div>
                 </div>
-                 <div id="tools-content" class="content-pane">
+                <div id="tools-content" class="content-pane">
                     <h1>Инструменты</h1><p class="subtitle">Полезные функции на базе ИИ</p>
+                    <div id="tools-list" class="full-screen-card-list"></div>
                 </div>
                 <div id="profile-content" class="content-pane">
                     <h1>Профиль</h1><p class="subtitle">Информация о вашем аккаунте</p>
+                    <div class="ios-card">
+                       <div class="profile-header"><img id="profile-avatar-img" alt="Avatar" class="profile-avatar"><div class="profile-info"><h2 id="profile-name"></h2><p id="profile-id"></p></div></div>
+                       <div class="profile-gems"><span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span></div>
+                    </div>
                 </div>
             </div>
             <nav class="ios-tab-bar">
@@ -152,8 +165,6 @@
             </div>
         </div>
         
-        <div id="settings-modal" class="screen">
-             </div>
     </div>
     
 <script>
@@ -161,8 +172,9 @@
         const tg = window.Telegram.WebApp;
 
         // --- ДАННЫЕ ---
-        const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }];
-        const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }];
+        const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
+        const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
+        const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
         
         // --- ЭЛЕМЕНТЫ DOM ---
         const mainScreen = document.getElementById('main-screen');
@@ -173,6 +185,12 @@
         const rightActionButton = document.getElementById('right-action-btn');
         const tabItems = document.querySelectorAll('.tab-item');
         const contentPanes = document.querySelectorAll('.content-pane');
+        const agentsWrapper = document.getElementById('agents-swiper-wrapper');
+        const modelsWrapper = document.getElementById('models-swiper-wrapper');
+        const toolsList = document.getElementById('tools-list');
+        const profileName = document.getElementById('profile-name');
+        const profileId = document.getElementById('profile-id');
+        const profileAvatar = document.getElementById('profile-avatar-img');
 
         // --- СТИЛИ ДЛЯ СООБЩЕНИЙ ЧАТА ---
         const styleSheet = document.createElement("style");
@@ -221,6 +239,9 @@
             if (!text) return; 
 
             addMessageToChat('user', text);
+            // Симуляция ответа
+            setTimeout(() => addMessageToChat('bot', 'Это симуляция ответа...'), 1000);
+
             chatInput.value = '';
             handleInput.call(chatInput); 
         }
@@ -242,8 +263,7 @@
             }
             tg.BackButton.onClick(closeChat);
             
-            // --- Заполнение каруселей ---
-            const agentsWrapper = document.getElementById('agents-swiper-wrapper');
+            // --- Заполнение контентом ---
             agents.forEach(agent => {
                 const slide = document.createElement('div');
                 slide.className = 'swiper-slide';
@@ -251,17 +271,30 @@
                 slide.addEventListener('click', openChat);
                 agentsWrapper.appendChild(slide);
             });
-            const modelsWrapper = document.getElementById('models-swiper-wrapper');
-             models.forEach(model => {
+            models.forEach(model => {
                 const slide = document.createElement('div');
                 slide.className = 'swiper-slide';
                 slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${model.palette}"><div class="card-icon">${model.icon}</div><div><h3 class="card-title">${model.name}</h3><p class="card-description">${model.desc}</p></div></div></div>`;
                 slide.addEventListener('click', openChat);
                 modelsWrapper.appendChild(slide);
             });
+            tools.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'full-screen-card';
+                card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`;
+                toolsList.appendChild(card);
+            });
+            try {
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    profileAvatar.src = user.photo_url || '';
+                    profileName.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+                    profileId.textContent = `ID: ${user.id}`;
+                }
+            } catch(e) { /* fail silently */ }
             
-            new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12 });
-            new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12 });
+            new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, navigation: { nextEl: '#agents-nav-next', prevEl: '#agents-nav-prev' } });
+            new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, navigation: { nextEl: '#models-nav-next', prevEl: '#models-nav-prev' } });
             
             // --- Навигация таб-бара ---
             tabItems.forEach(tab => {
