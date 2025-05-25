@@ -17,7 +17,7 @@
       --text-primary: #FFFFFF;
       --text-secondary: #A0A0A0;
       --text-accent: #00FFC2;
-      --gold-accent: #ffd700; /* Золотой акцент для рамки */
+      --gold-accent: #ffd700; /* Золотой для рамки */
       --border-color: #3A3A3C;
       --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
     }
@@ -39,17 +39,19 @@
     h2 { font-size: 1.25rem; font-weight: 700; }
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-    .swiper-container-wrapper { margin-top: 2rem; position: relative; }
-    
-    /* ИСПРАВЛЕНИЕ ГОРИЗОНТАЛЬНОЙ ПРОКРУТКИ */
+    .swiper-container-wrapper {
+        margin-top: 2rem;
+        position: relative; /* Для позиционирования пагинации */
+        padding-bottom: 30px; /* Место для пагинации */
+    }
+    /* ИСПРАВЛЕНИЕ ГОРИЗОНТАЛЬНОЙ ПРОКРУТКИ: убран отрицательный margin */
     .swiper {
-      overflow: visible; /* Важно для теней, но не должно вызывать прокрутку */
-      /* Убраны отрицательные margin, padding теперь задается родительскому .scrollable-content */
+      overflow: visible; /* Важно для теней и чтобы слайды не обрезались */
     }
     
     .swiper-slide {
       width: 200px !important; /* Ширина карточки */
-      height: 160px !important; /* Общая высота слайда (карточка + небольшой запас) */
+      height: 160px !important; /* Общая высота слайда */
     }
     .carousel-card {
       height: 150px !important; /* Высота самой карточки */
@@ -60,7 +62,7 @@
     /* ИСПРАВЛЕНИЕ ПОЗИЦИИ ТОЧЕК ПАГИНАЦИИ */
     .swiper-pagination {
         position: absolute;
-        bottom: -30px !important; /* Гарантированно выносим за пределы слайдов */
+        bottom: 0px !important; /* Сдвигаем пагинацию вниз относительно swiper-container-wrapper */
         width: 100%;
         left: 0;
         pointer-events: none;
@@ -74,12 +76,12 @@
       border-radius: 20px; overflow: hidden;
       cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
       border: 1px solid transparent; /* Прозрачная рамка для плавности */
-      height: 100%; /* Чтобы карточка занимала всю высоту слайда */
+      height: 100%;
     }
     .tg-card:hover { 
       transform: translateY(-6px); 
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      border-color: var(--gold-accent); /* ЗОЛОТАЯ РАМКА ВОЗВРАЩЕНА */
+      border-color: var(--gold-accent); /* ЗОЛОТАЯ РАМКА */
     }
     
     .card-icon { font-size: 1.75rem; }
@@ -93,7 +95,6 @@
     .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
     .palette-6 { background-color: #2D2D2D; }
 
-    /* Tab Bar & Profile (без изменений, кроме выравнивания) */
     .ios-tab-bar {
       position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
       width: calc(100% - 2.5rem); max-width: 400px; display: flex;
@@ -180,8 +181,7 @@
 </div>
 
 <script>
-    // Обертываем весь скрипт в событие DOMContentLoaded, чтобы убедиться,
-    // что HTML полностью загружен перед тем, как скрипт начнет работу.
+    // Оборачиваем весь код в DOMContentLoaded для гарантии, что HTML загружен
     document.addEventListener("DOMContentLoaded", function() {
         const tg = window.Telegram.WebApp;
 
@@ -213,10 +213,7 @@
 
         function populateCarousel(containerId, items, action) {
           const wrapper = document.getElementById(containerId);
-          if (!wrapper) {
-              console.error("Не найден контейнер для карусели:", containerId);
-              return;
-          }
+          if (!wrapper) { console.error("Контейнер карусели не найден:", containerId); return; }
           items.forEach(item => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
@@ -243,17 +240,16 @@
             } else if (page === 'profile') {
                 profilePage.style.display = 'block';
                 tabProfile.classList.add('active');
-                // Данные профиля теперь загружаются только один раз, после готовности tg
             }
         }
         
         function displayProfileData() {
             const user = tg.initDataUnsafe?.user;
-            if (user && user.id) { // Добавили проверку на user.id для большей надежности
-                const nameEl = document.getElementById('profile-name');
-                const idEl = document.getElementById('profile-id');
-                const avatarEl = document.getElementById('profile-avatar-img');
+            const nameEl = document.getElementById('profile-name');
+            const idEl = document.getElementById('profile-id');
+            const avatarEl = document.getElementById('profile-avatar-img');
 
+            if (user && user.id) {
                 nameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
                 idEl.textContent = `ID: ${user.id}`;
                 if (user.photo_url) {
@@ -263,14 +259,18 @@
                     avatarEl.style.display = 'none'; 
                 }
             } else {
-                // Если данные так и не загрузились, можно оставить "Загрузка..." или вывести сообщение
-                 document.getElementById('profile-name').textContent = 'Данные не загружены';
-                 console.log("displayProfileData: Данные пользователя (user или user.id) отсутствуют.");
+                nameEl.textContent = 'Не удалось загрузить данные';
+                idEl.textContent = '';
+                avatarEl.style.display = 'none'; 
+                console.log("displayProfileData: Данные пользователя (user или user.id) отсутствуют при попытке отображения.");
             }
         }
         
-        // Инициализация приложения
-        function initApp() {
+        // Основная инициализация приложения
+        function mainInit() {
+            // Попытка отобразить данные пользователя (могут быть доступны сразу)
+            displayProfileData(); 
+            
             populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
             populateCarousel('models-swiper-wrapper', models, 'set_model');
 
@@ -286,15 +286,14 @@
             tabProfile.addEventListener('click', () => showPage('profile'));
             
             showPage('home');
-            
-            // Попытка отобразить данные пользователя
-            displayProfileData();
-            
             tg.expand();
         }
 
-        // Самое важное: запускаем initApp только ПОСЛЕ того, как Telegram API готово.
-        tg.ready(initApp);
+        // Ждем, пока Telegram API будет полностью готово
+        tg.ready(function() {
+            console.log("Telegram WebApp is ready. Running mainInit().");
+            mainInit(); // Запускаем основную инициализацию
+        });
     });
 </script>
 </body>
