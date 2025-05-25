@@ -181,15 +181,15 @@
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram.WebApp;
     let lastMessageInfo = { sender: null, date: null };
+    let pollingInterval = null; // Переменная для хранения интервала
 
+    // ... (константы agents, models, tools и переменные DOM остаются без изменений) ...
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
     const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
     const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
-
     let selectedAgentKey = agents[0].key;
     let selectedModelKey = models[0].key;
     let agentsSwiper, modelsSwiper;
-
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
     const chatTitle = document.getElementById('chat-title');
@@ -201,38 +201,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const sendMicContainer = document.getElementById('send-mic-btn-container');
 
+
     function formatTime(date) { return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
     function sendDataToBot(data) {
         if (!tg.sendData) {
             console.error("Telegram.WebApp.sendData is not available.");
-            // Можно показать пользователю уведомление, что функция не доступна
-            // tg.showAlert("Не удалось отправить данные. Пожалуйста, обновите Telegram.");
             return;
         }
         tg.sendData(JSON.stringify(data));
     }
+    
+    // Новая функция для запроса обновлений
+    function fetchUpdates() {
+        // Мы отправляем боту специальное текстовое сообщение, которое он обработает
+        // Это более надежный способ, чем sendData для получения ответа
+        tg.sendData("__FETCH_UPDATES__");
+    }
+
+    // Функция для запуска/остановки опроса
+    function startPolling() {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(fetchUpdates, 2500); // Опрос каждые 2.5 секунды
+    }
+    function stopPolling() {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
 
     function addMessageToChat(sender, text, options = {}) {
+        // Эта функция остается без изменений
         const { isTyping = false } = options;
         const now = new Date();
         const currentDate = now.toDateString();
-
         if (currentDate !== lastMessageInfo.date) {
             const divider = document.createElement('div');
             divider.className = 'chat-date-divider';
             divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
             chatMessagesContainer.appendChild(divider);
         }
-
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message message-${sender}`;
-        
         const contentSpan = document.createElement('span');
         contentSpan.className = 'message-content';
         contentSpan.textContent = text;
         msgDiv.appendChild(contentSpan);
-
         if (!isTyping) {
             const metaDiv = document.createElement('div');
             metaDiv.className = 'message-meta';
@@ -243,13 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             msgDiv.classList.add('typing');
         }
-        
         chatMessagesContainer.appendChild(msgDiv);
         lastMessageInfo = { sender: sender, date: currentDate };
-
-        requestAnimationFrame(() => {
-            chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-        });
+        requestAnimationFrame(() => { chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }); });
         return msgDiv;
     }
 
@@ -261,9 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInput.value = '';
         handleInput.call(chatInput); 
 
-        const typingIndicator = addMessageToChat('bot', 'Печатает', { isTyping: true });
+        // Удаляем старый индикатор печати, если он был
+        const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+        if(oldTypingIndicator) oldTypingIndicator.remove();
+        
+        // Добавляем новый
+        addMessageToChat('bot', 'Печатает', { isTyping: true });
 
-        // Отправляем данные боту для обработки
         sendDataToBot({
             action: 'app_chat_message',
             payload: {
@@ -272,18 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 modelKey: selectedModelKey
             }
         });
-        
-        // ВАЖНО: Мы не можем получить ответ напрямую здесь.
-        // Бот отправит ответ в основной чат.
-        // Этот таймер-заглушка нужен только для демонстрации.
-        // В реальном приложении этот индикатор должен удаляться другим способом
-        // (например, после получения какого-либо события от бота, если это возможно).
-        setTimeout(() => {
-             typingIndicator.remove();
-        }, 3000); // Убираем индикатор через 3 секунды
     }
 
     function updateChatTitle() {
+        // без изменений
         const agent = agents.find(a => a.key === selectedAgentKey);
         const model = models.find(m => m.key === selectedModelKey);
         chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
@@ -299,12 +304,18 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessageToChat('bot', `Здравствуйте! Я - ${agent.name}. Чем могу помочь?`);
         switchScreen(chatScreen);
         tg.BackButton.show();
+        startPolling(); // Запускаем опрос при открытии чата
     }
     
-    // Остальные функции (populateCarousel, showTab, и т.д.) остаются без изменений
+    function closeChat() {
+        stopPolling(); // Останавливаем опрос при закрытии чата
+        switchScreen(mainScreen);
+        tg.BackButton.hide();
+    }
+    
+    // ... (остальные вспомогательные функции без изменений) ...
     function switchScreen(screenToShow) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); screenToShow.classList.add('active'); }
     function showTab(tabId) { document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active')); document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); document.getElementById(`${tabId}-content`).classList.add('active'); document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active'); }
-    function closeChat() { switchScreen(mainScreen); tg.BackButton.hide(); }
     function handleInput() { chatInputShadow.textContent = this.value + ' '; this.style.height = 'auto'; this.style.height = `${this.scrollHeight}px`; sendMicContainer.classList.toggle('has-text', this.value.trim().length > 0); }
     function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
     function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
@@ -318,6 +329,25 @@ document.addEventListener('DOMContentLoaded', () => {
         tg.expand();
         tg.BackButton.onClick(closeChat);
         
+        // Слушаем ВСЕ события, которые могут содержать ответ от бота
+        tg.onEvent('message', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+                    // Убираем индикатор печати
+                    const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                    if (typingIndicator) typingIndicator.remove();
+                    
+                    // Добавляем новые сообщения
+                    data.messages.forEach(msg => {
+                        addMessageToChat(msg.sender, msg.text);
+                    });
+                }
+            } catch (e) {
+                // Это не JSON, который мы ждем, игнорируем
+            }
+        });
+
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
         populateCarousel('models-swiper-wrapper', models, 'model');
         populateToolsList();
@@ -334,15 +364,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
         document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
         document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
-
         sendMicContainer.addEventListener('click', handleSendMessage);
         chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
         chatInput.addEventListener('input', handleInput);
-        
         document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
-
         agentSelect.addEventListener('change', (e) => { 
             selectedAgentKey = e.target.value; 
             updateChatTitle(); 
