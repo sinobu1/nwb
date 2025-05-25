@@ -46,32 +46,30 @@ async def main():
     app = app_builder.build()
 
     # Регистрация обработчиков с группами для правильного порядка срабатывания
-    # ПРАВИЛЬНЫЙ БЛОК РЕГИСТРАЦИИ ОБРАБОТЧИКОВ
-
-    # Группа 0: Команды и самый важный обработчик для Web App
+    # Группа 0: Самые приоритетные обработчики - команды и данные из WebApp
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("app", open_mini_app_command), group=0)
     app.add_handler(CommandHandler("menu", open_menu_command), group=0)
     app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
+    app.add_handler(CommandHandler("gems", gems_info_command), group=0)
     app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
     app.add_handler(CommandHandler("help", help_command), group=0)
     
-    # --- ВОТ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
-    # Обработчик от Mini App теперь в group=0 и имеет высокий приоритет
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=0)
+    # ИСПОЛЬЗУЕМ БОЛЕЕ НАДЕЖНЫЙ ФИЛЬТР для перехвата данных из Mini App
+    app.add_handler(MessageHandler(filters.ViaWebApp(None), web_app_data_handler), group=0)
     
-    # Группа 1: Обработчики сообщений
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
+    # Группа 1: Обработчики специфичного контента (фото, платежи)
+    app.add_handler(PreCheckoutQueryHandler(precheckout_callback), group=1)
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback), group=1)
+    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1)
     
-    # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
+    # Группа 2: Обработчики текста. Они должны идти после специфичных обработчиков.
+    # ВАЖНО: Ваша функция menu_button_handler должна проверять, является ли текст кнопкой,
+    # и если нет, то НЕ обрабатывать его, чтобы управление перешло к handle_text.
+    # Судя по коду, вы так и делаете (is_menu_button_text).
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=2)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
-    
-    # Обработчики платежей
-    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    
+
     # Глобальный обработчик ошибок
     app.add_error_handler(error_handler)
 
