@@ -18,14 +18,15 @@
             --text-secondary: #A0A0A0;
             --border-color: #3A3A3C;
             --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
-            --gold-highlight: #F4C7C3; /* Розовое золото, как у iPhone */
+            /* Изменен цвет на розовое золото */
+            --gold-highlight: #D9A7C7; 
             --text-accent: var(--gold-highlight);
         }
         
         html, body {
-            position: fixed;
-            inset: 0;
-            overflow: hidden;
+            position: fixed; 
+            inset: 0;  
+            overflow: hidden; /* Предотвращает прокрутку на уровне body */
             font-family: var(--font-family);
             background-color: var(--bg-main);
             color: var(--text-primary);
@@ -38,90 +39,91 @@
             max-width: 450px;
             height: 100%;
             position: relative;
-            overflow: hidden;
+            overflow: hidden; /* Важно для предотвращения прокрутки */
+            display: flex; /* Добавлено */
+            flex-direction: column; /* Добавлено */
         }
 
-        .app-container {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        .app-container {  
+            height: 100%;  
+            display: flex;  
+            flex-direction: column;  
+            overflow: hidden; /* Предотвращает внутреннюю прокрутку контейнера */
         }
         .scrollable-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
+            flex-grow: 1;  
+            overflow-y: auto;  
             -webkit-overflow-scrolling: touch;
             padding: 3rem 0 120px 0;
         }
-        .content-wrapper {
-            padding: 0 1rem;
+        .content-wrapper {  
+            padding: 0 1rem;  
         }
         
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
         p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-        .swiper-container-wrapper {
-            margin-top: 2rem;
+        .swiper-container-wrapper {  
+            margin-top: 2rem;  
             position: relative;
+            /* Убрали overflow: hidden отсюда, чтобы не обрезать тень */
         }
-        .swiper-container-wrapper h2 {
-            margin-bottom: 1rem;
+        .swiper-container-wrapper h2 {  
+            margin-bottom: 1rem;  
             padding: 0 1rem;
         }
-        .swiper {
-            padding: 0 1rem;
-            overflow-x: hidden;
-        }
-        .swiper-wrapper {
-            overflow-x: hidden;
+        .swiper {  
+            /* Убедимся, что свайпер не выходит за пределы */
+            margin: 0 1rem;
+            width: calc(100% - 2rem);
+            overflow: visible;  
         }
         
         .swiper-slide {
-            width: 200px;
-            height: 130px;
+            width: 200px; /* Увеличена ширина карточек */
+            height: 130px; /* Уменьшена высота карточек */
         }
-        .tg-card.tg-card-selected {
-            box-shadow: 0 0 0 3px var(--gold-highlight), 0 10px 30px rgba(0,0,0,0.4);
+        .tg-card.tg-card-selected {  
+            box-shadow: 0 0 0 3px var(--gold-highlight), 0 10px 30px rgba(0,0,0,0.4);  
         }
 
-        .swiper-pagination {
-            position: absolute;
-            bottom: -30px !important;
-            width: 100%;
-            left: 0;
-            pointer-events: none;
+        .swiper-pagination {  
+            position: absolute;  
+            bottom: -30px !important;  
+            width: 100%;  
+            left: 0;  
+            pointer-events: none;  
         }
-        .swiper-pagination-bullet {
-            background: var(--text-secondary) !important;
-            opacity: 0.4 !important;
-            pointer-events: auto;
+        .swiper-pagination-bullet {  
+            background: var(--text-secondary) !important;  
+            opacity: 0.4 !important;  
+            pointer-events: auto;  
         }
-        .swiper-pagination-bullet-active {
-            background: var(--text-accent) !important;
-            opacity: 1 !important;
+        .swiper-pagination-bullet-active {  
+            background: var(--text-accent) !important;  
+            opacity: 1 !important;  
         }
         
-        .tg-card {
-            transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
-            border-radius: 20px;
-            overflow: hidden;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-            height: 100%;
+        .tg-card {  
+            transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;  
+            border-radius: 20px;  
+            overflow: hidden;  
+            cursor: pointer;  
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);  
+            height: 100%;  
         }
-        .tg-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        .tg-card:hover {  
+            transform: translateY(-6px);  
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);  
         }
-        .carousel-card {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 1rem;
-            text-align: left;
+        .carousel-card {  
+            height: 100%;  
+            display: flex;  
+            flex-direction: column;  
+            justify-content: space-between;  
+            padding: 1rem;  
+            text-align: left;  
         }
         .card-icon { font-size: 1.75rem; }
         .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
@@ -134,89 +136,89 @@
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
 
-        .ios-tab-bar {
-            position: absolute;
-            bottom: 1.25rem;
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 2.5rem);
-            max-width: 400px;
-            display: flex;
-            background: rgba(20, 20, 20, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 0.5rem;
-            z-index: 100;
-            border: 1px solid rgba(255,255,255,0.1);
+        .ios-tab-bar {  
+            position: absolute;  
+            bottom: 1.25rem;  
+            left: 50%;  
+            transform: translateX(-50%);  
+            width: calc(100% - 2.5rem);  
+            max-width: 400px;  
+            display: flex;  
+            background: rgba(20, 20, 20, 0.7);  
+            backdrop-filter: blur(20px);  
+            -webkit-backdrop-filter: blur(20px);  
+            border-radius: 24px;  
+            padding: 0.5rem;  
+            z-index: 100;  
+            border: 1px solid rgba(255,255,255,0.1);  
         }
-        .tab-item {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
+        .tab-item {  
+            flex-grow: 1;  
+            display: flex;  
+            flex-direction: column;  
+            align-items: center;  
+            justify-content: center;  
+            color: var(--text-secondary);  
+            cursor: pointer;  
+            transition: color 0.2s ease;  
+            -webkit-tap-highlight-color: transparent;  
         }
-        .tab-item.active {
-            color: var(--text-accent);
+        .tab-item.active {  
+            color: var(--text-accent);  
         }
-        .tab-item svg {
-            width: 28px;
-            height: 28px;
-            margin-bottom: 2px;
+        .tab-item svg {  
+            width: 28px;  
+            height: 28px;  
+            margin-bottom: 2px;  
         }
-        .tab-item span {
-            font-size: 0.625rem;
-            font-weight: 500;
+        .tab-item span {  
+            font-size: 0.625rem;  
+            font-weight: 500;  
         }
-        #profile-page {
-            display: none;
+        #profile-page {  
+            display: none;  
         }
-        .ios-card {
-            background-color: var(--bg-card);
-            border-radius: 1rem;
-            padding: 1rem;
-            margin-top: 1.5rem;
+        .ios-card {  
+            background-color: var(--bg-card);  
+            border-radius: 1rem;  
+            padding: 1rem;  
+            margin-top: 1.5rem;  
         }
-        .profile-header {
-            display: flex;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1rem;
+        .profile-header {  
+            display: flex;  
+            align-items: center;  
+            border-bottom: 1px solid var(--border-color);  
+            padding-bottom: 1rem;  
         }
-        .profile-avatar {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            margin-right: 1rem;
-            object-fit: cover;
-            background-color: #333;
+        .profile-avatar {  
+            width: 64px;  
+            height: 64px;  
+            border-radius: 50%;  
+            margin-right: 1rem;  
+            object-fit: cover;  
+            background-color: #333;  
         }
-        .profile-info h2 {
-            font-size: 1.25rem;
-            font-weight: 700;
+        .profile-info h2 {  
+            font-size: 1.25rem;  
+            font-weight: 700;  
         }
-        .profile-info p {
-            font-size: 0.9rem;
+        .profile-info p {  
+            font-size: 0.9rem;  
         }
-        .profile-gems {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 1rem;
+        .profile-gems {  
+            display: flex;  
+            justify-content: space-between;  
+            align-items: center;  
+            padding-top: 1rem;  
         }
-        .profile-gems .label {
-            font-weight: 500;
-            color: var(--text-secondary);
+        .profile-gems .label {  
+            font-weight: 500;  
+            color: var(--text-secondary);  
         }
-        .profile-gems .value {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: var(--text-accent);
+        .profile-gems .value {  
+            font-weight: 700;  
+            font-size: 1.1rem;  
+            color: var(--text-accent);  
         }
 
         #debug-info {
@@ -240,7 +242,7 @@
         <div id="debug-info">Проверка данных Telegram...</div>
         <div class="app-container">
             <div class="scrollable-content">
-                <div id="main-content" class="content-wrapper">
+                <div id="main-page" class="content-wrapper">
                     <div class="mb-8">
                         <h1>Панель управления</h1>
                         <p class="subtitle">Выберите инструменты для работы с ИИ</p>
@@ -313,7 +315,7 @@
         { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
     ];
 
-    const mainContent = document.getElementById('main-content');
+    const mainPage = document.getElementById('main-page');
     const profilePage = document.getElementById('profile-page');
     const tabHome = document.getElementById('tab-home');
     const tabProfile = document.getElementById('tab-profile');
@@ -326,7 +328,7 @@
 
     function populateCarousel(containerId, items, action) {
         const wrapper = document.getElementById(containerId);
-        wrapper.innerHTML = '';
+        wrapper.innerHTML = ''; // Очищаем карусель перед заполнением
         items.forEach(item => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
@@ -347,22 +349,23 @@
     }
     
     function showPage(page) {
-        mainContent.style.display = 'none';
+        mainPage.style.display = 'none';
         profilePage.style.display = 'none';
         tabHome.classList.remove('active');
         tabProfile.classList.remove('active');
         if (page === 'home') {
-            mainContent.style.display = 'block';
+            mainPage.style.display = 'block';
             tabHome.classList.add('active');
         } else if (page === 'profile') {
             profilePage.style.display = 'block';
             tabProfile.classList.add('active');
-            loadProfileData();
+            // Данные профиля теперь загружаются один раз при инициализации
         }
     }
 
-    function safeDisplayProfileData() {
+    function displayProfileData() {
         try {
+            // Используем tg.initDataUnsafe.user, так как это стандартный способ
             const user = tg.initDataUnsafe?.user;
             const avatarImg = document.getElementById('profile-avatar-img');
             const profileName = document.getElementById('profile-name');
@@ -372,56 +375,44 @@
                 avatarImg.src = user.photo_url || 'https://via.placeholder.com/64';
                 profileName.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
                 profileId.textContent = `ID: ${user.id}`;
-                debugInfo.textContent = '✅ [DEBUG] Данные профиля загружены!';
+                
+                debugInfo.textContent = '✅ [DEBUG] Данные пользователя успешно загружены!';
                 debugInfo.style.backgroundColor = '#28a745';
             } else {
                 avatarImg.src = 'https://via.placeholder.com/64';
                 profileName.textContent = 'Пользователь';
                 profileId.textContent = 'ID: Н/Д';
-                debugInfo.textContent = '❌ [DEBUG] Данные пользователя не получены! Запустите через Telegram.';
+                
+                debugInfo.textContent = '❌ [DEBUG] Данные пользователя не найдены. Откройте приложение через меню бота.';
                 debugInfo.style.backgroundColor = '#dc3545';
+                debugInfo.style.opacity = '1'; // Показываем ошибку
+                debugInfo.style.display = 'block'; // Показываем ошибку
             }
         } catch (e) {
             console.error("Ошибка при отображении данных профиля:", e);
-            document.getElementById('profile-avatar-img').src = 'https://via.placeholder.com/64';
             document.getElementById('profile-name').textContent = 'Ошибка загрузки';
             document.getElementById('profile-id').textContent = 'ID: Н/Д';
-            debugInfo.textContent = '❌ [DEBUG] Ошибка загрузки данных профиля!';
+            debugInfo.textContent = `❌ [DEBUG] JS Ошибка: ${e.message}`;
             debugInfo.style.backgroundColor = '#dc3545';
+            debugInfo.style.opacity = '1';
+            debugInfo.style.display = 'block';
         }
-    }
-
-    function loadProfileData() {
-        // Ждем готовности Telegram WebApp
-        tg.ready();
-        setTimeout(() => {
-            safeDisplayProfileData();
-            if (!tg.initDataUnsafe?.user?.id) {
-                let attempts = 0;
-                const interval = setInterval(() => {
-                    attempts++;
-                    if (tg.initDataUnsafe?.user?.id) {
-                        safeDisplayProfileData();
-                        clearInterval(interval);
-                    } else if (attempts > 20) {
-                        clearInterval(interval);
-                        safeDisplayProfileData();
-                    }
-                }, 200);
-            }
-        }, 100);
     }
     
     function init() {
         tg.ready();
         tg.expand();
+        // Устанавливаем цвет шапки и фона
+        tg.setHeaderColor(getComputedStyle(document.documentElement).getPropertyValue('--bg-main').trim());
+        tg.setBackgroundColor(getComputedStyle(document.documentElement).getPropertyValue('--bg-main').trim());
 
-        if (tg.initData && tg.initData.length > 0) {
-            debugInfo.textContent = '✅ [DEBUG] Данные от Telegram ПОЛУЧЕНЫ!';
-            debugInfo.style.backgroundColor = '#28a745';
+        // Логика для панели отладки
+        if (tg.initData) {
+             debugInfo.textContent = '✅ [DEBUG] Данные от Telegram ПОЛУЧЕНЫ!';
+             debugInfo.style.backgroundColor = '#28a745';
         } else {
-            debugInfo.textContent = '❌ [DEBUG] Данные НЕ ПОЛУЧЕНЫ! Запустите через меню бота.';
-            debugInfo.style.backgroundColor = '#dc3545';
+             debugInfo.textContent = '❌ [DEBUG] Данные НЕ ПОЛУЧЕНЫ! Запустите через меню бота.';
+             debugInfo.style.backgroundColor = '#dc3545';
         }
         setTimeout(() => {
             debugInfo.style.opacity = '0';
@@ -435,8 +426,6 @@
             slidesPerView: 'auto',
             spaceBetween: 16,
             pagination: { el: ".swiper-pagination", clickable: true },
-            preventClicks: true,
-            preventClicksPropagation: true
         };
         new Swiper("#agents-swiper", swiperOptions);
         new Swiper("#models-swiper", swiperOptions);
@@ -445,9 +434,11 @@
         tabProfile.addEventListener('click', () => showPage('profile'));
         
         showPage('home');
-        loadProfileData();
+        // Загружаем данные профиля сразу при инициализации
+        displayProfileData(); 
     }
 
+    // Инициализация приложения
     init();
 </script>
 </body>
