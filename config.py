@@ -83,6 +83,7 @@ class BotConstants:
     FS_BOT_DATA_COLLECTION = "bot_data"
     FS_BOT_DATA_DOCUMENT = "data"
     FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"
+    FS_APP_MESSAGES_COLLECTION = "app_messages" 
 
     MENU_MAIN = "main_menu"
     MENU_AI_MODES_SUBMENU = "ai_modes_submenu"
