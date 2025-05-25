@@ -17,7 +17,6 @@
       --text-primary: #FFFFFF;
       --text-secondary: #A0A0A0;
       --text-accent: #00FFC2;
-      --gold-accent: #ffd700; /* Золотой для рамки */
       --border-color: #3A3A3C;
       --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
     }
@@ -32,58 +31,56 @@
     .app-container { height: 100%; display: flex; flex-direction: column; }
     .scrollable-content {
       flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 1.5rem 1.5rem 120px 1.5rem; /* Боковые отступы здесь */
+      padding: 1.5rem 0 120px 0;
     }
+    .content-wrapper { padding: 0 1.5rem; }
     
+    /* Типографика */
     h1 { font-size: 1.875rem; font-weight: 800; }
     h2 { font-size: 1.25rem; font-weight: 700; }
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
+    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Точная верстка карусели <<< */
     .swiper-container-wrapper {
         margin-top: 2rem;
-        position: relative; /* Для позиционирования пагинации */
-        padding-bottom: 30px; /* Место для пагинации */
+        position: relative;
     }
-    /* ИСПРАВЛЕНИЕ ГОРИЗОНТАЛЬНОЙ ПРОКРУТКИ: убран отрицательный margin */
     .swiper {
-      overflow: visible; /* Важно для теней и чтобы слайды не обрезались */
+        padding: 0 1.5rem;
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        overflow: visible;
     }
-    
     .swiper-slide {
-      width: 200px !important; /* Ширина карточки */
-      height: 160px !important; /* Общая высота слайда */
+      width: 160px; /* Вернули размер карточек как было */
+      height: 170px;
     }
-    .carousel-card {
-      height: 150px !important; /* Высота самой карточки */
-      display: flex; flex-direction: column; justify-content: space-between;
-      padding: 1rem; text-align: left;
-    }
-
-    /* ИСПРАВЛЕНИЕ ПОЗИЦИИ ТОЧЕК ПАГИНАЦИИ */
     .swiper-pagination {
         position: absolute;
-        bottom: 0px !important; /* Сдвигаем пагинацию вниз относительно swiper-container-wrapper */
+        bottom: -30px !important; /* Гарантированно выносим за пределы слайдов */
         width: 100%;
         left: 0;
         pointer-events: none;
     }
+    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
     
     .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
     .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
     
     .tg-card {
-      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
       border-radius: 20px; overflow: hidden;
       cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-      border: 1px solid transparent; /* Прозрачная рамка для плавности */
       height: 100%;
     }
     .tg-card:hover { 
       transform: translateY(-6px); 
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      border-color: var(--gold-accent); /* ЗОЛОТАЯ РАМКА */
     }
-    
+    .carousel-card {
+      height: 100%; display: flex; flex-direction: column; justify-content: space-between;
+      padding: 1rem; text-align: left;
+    }
     .card-icon { font-size: 1.75rem; }
     .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
     .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
@@ -95,6 +92,7 @@
     .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
     .palette-6 { background-color: #2D2D2D; }
 
+    /* Tab Bar & Profile */
     .ios-tab-bar {
       position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
       width: calc(100% - 2.5rem); max-width: 400px; display: flex;
@@ -111,7 +109,10 @@
     .tab-item span { font-size: 0.625rem; font-weight: 500; }
     #profile-page { display: none; }
     .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-    .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+    .profile-header {
+      display: flex; align-items: center; border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1rem;
+    }
     .profile-avatar {
       width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover;
       background-color: #333;
@@ -127,7 +128,7 @@
 
 <div class="app-container">
   <div class="scrollable-content">
-    <div id="main-content">
+    <div id="main-content" class="content-wrapper">
       <div class="mb-8">
         <h1>Панель управления</h1>
         <p class="subtitle">Выберите инструменты для работы с ИИ</p>
@@ -147,7 +148,7 @@
           </div>
       </div>
     </div>
-    <div id="profile-page">
+    <div id="profile-page" class="content-wrapper">
         <div class="mb-8">
           <h1>Профиль</h1>
           <p class="subtitle">Информация о вашем аккаунте</p>
@@ -181,120 +182,128 @@
 </div>
 
 <script>
-    // Оборачиваем весь код в DOMContentLoaded для гарантии, что HTML загружен
-    document.addEventListener("DOMContentLoaded", function() {
-        const tg = window.Telegram.WebApp;
+    const tg = window.Telegram.WebApp;
 
-        const agents = [
-          { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
-          { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
-          { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
-          { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
-          { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
-          { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
-        ];
-        const models = [
-          { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
-          { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
-          { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
-          { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
-          { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
-        ];
+    const agents = [
+      { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
+      { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
+      { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
+      { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
+      { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
+      { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
+    ];
+    const models = [
+      { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
+      { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
+      { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
+      { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
+      { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
+    ];
 
-        const mainContent = document.getElementById('main-content');
-        const profilePage = document.getElementById('profile-page');
-        const tabHome = document.getElementById('tab-home');
-        const tabProfile = document.getElementById('tab-profile');
-        
-        function sendDataToBot(action, target) {
-          tg.sendData(JSON.stringify({ action, target }));
-          tg.HapticFeedback.notificationOccurred('success');
-        }
+    const mainContent = document.getElementById('main-content');
+    const profilePage = document.getElementById('profile-page');
+    const tabHome = document.getElementById('tab-home');
+    const tabProfile = document.getElementById('tab-profile');
+    
+    function sendDataToBot(action, target) {
+      tg.sendData(JSON.stringify({ action, target }));
+      tg.HapticFeedback.notificationOccurred('success');
+    }
 
-        function populateCarousel(containerId, items, action) {
-          const wrapper = document.getElementById(containerId);
-          if (!wrapper) { console.error("Контейнер карусели не найден:", containerId); return; }
-          items.forEach(item => {
-            const slide = document.createElement('div');
-            slide.className = 'swiper-slide';
-            slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
-            slide.addEventListener('click', () => {
-                sendDataToBot(action, item.key);
-                tg.showPopup({
-                    title: 'Настройка применена!',
-                    message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
-                });
+    function populateCarousel(containerId, items, action) {
+      const wrapper = document.getElementById(containerId);
+      items.forEach(item => {
+        const slide = document.createElement('div');
+        slide.className = 'swiper-slide';
+        slide.innerHTML = `<div class="tg-card carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div>`;
+        slide.addEventListener('click', () => {
+            sendDataToBot(action, item.key);
+            tg.showPopup({
+                title: 'Настройка применена!',
+                message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
             });
-            wrapper.appendChild(slide);
-          });
-        }
-        
-        function showPage(page) {
-            mainContent.style.display = 'none';
-            profilePage.style.display = 'none';
-            tabHome.classList.remove('active');
-            tabProfile.classList.remove('active');
-            if (page === 'home') {
-                mainContent.style.display = 'block';
-                tabHome.classList.add('active');
-            } else if (page === 'profile') {
-                profilePage.style.display = 'block';
-                tabProfile.classList.add('active');
-            }
-        }
-        
-        function displayProfileData() {
-            const user = tg.initDataUnsafe?.user;
-            const nameEl = document.getElementById('profile-name');
-            const idEl = document.getElementById('profile-id');
-            const avatarEl = document.getElementById('profile-avatar-img');
-
-            if (user && user.id) {
-                nameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-                idEl.textContent = `ID: ${user.id}`;
-                if (user.photo_url) {
-                    avatarEl.src = user.photo_url;
-                    avatarEl.style.display = 'block';
-                } else {
-                    avatarEl.style.display = 'none'; 
-                }
-            } else {
-                nameEl.textContent = 'Не удалось загрузить данные';
-                idEl.textContent = '';
-                avatarEl.style.display = 'none'; 
-                console.log("displayProfileData: Данные пользователя (user или user.id) отсутствуют при попытке отображения.");
-            }
-        }
-        
-        // Основная инициализация приложения
-        function mainInit() {
-            // Попытка отобразить данные пользователя (могут быть доступны сразу)
-            displayProfileData(); 
-            
-            populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-            populateCarousel('models-swiper-wrapper', models, 'set_model');
-
-            const swiperOptions = {
-              slidesPerView: 'auto',
-              spaceBetween: 16,
-              pagination: { el: ".swiper-pagination", clickable: true },
-            };
-            new Swiper("#agents-swiper", swiperOptions);
-            new Swiper("#models-swiper", swiperOptions);
-            
-            tabHome.addEventListener('click', () => showPage('home'));
-            tabProfile.addEventListener('click', () => showPage('profile'));
-            
-            showPage('home');
-            tg.expand();
-        }
-
-        // Ждем, пока Telegram API будет полностью готово
-        tg.ready(function() {
-            console.log("Telegram WebApp is ready. Running mainInit().");
-            mainInit(); // Запускаем основную инициализацию
         });
-    });
+        wrapper.appendChild(slide);
+      });
+    }
+    
+    function showPage(page) {
+        mainContent.style.display = 'none';
+        profilePage.style.display = 'none';
+        tabHome.classList.remove('active');
+        tabProfile.classList.remove('active');
+        if (page === 'home') {
+            mainContent.style.display = 'block';
+            tabHome.classList.add('active');
+        } else if (page === 'profile') {
+            profilePage.style.display = 'block';
+            tabProfile.classList.add('active');
+        }
+    }
+
+    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Надежная загрузка данных профиля <<<
+    function safeDisplayProfileData() {
+        try {
+            const user = tg.initDataUnsafe?.user;
+            if (user && user.id) {
+                document.getElementById('profile-avatar-img').src = user.photo_url || '';
+                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+            } else {
+                 document.getElementById('profile-name').textContent = 'Не удалось загрузить';
+            }
+        } catch (e) {
+            console.error("Ошибка при отображении данных профиля:", e);
+            document.getElementById('profile-name').textContent = 'Ошибка загрузки';
+        }
+    }
+
+    function loadProfileData() {
+      // Пытаемся отобразить данные сразу
+      safeDisplayProfileData();
+
+      // Если данных нет, делаем несколько попыток с интервалом
+      if (!tg.initDataUnsafe?.user?.id) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (tg.initDataUnsafe?.user?.id) {
+            safeDisplayProfileData();
+            clearInterval(interval);
+          } else if (attempts > 10) { // Прекращаем попытки после 1 секунды
+            clearInterval(interval);
+          }
+        }, 100);
+      }
+    }
+    // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
+    
+    // Инициализация
+    function init() {
+        tg.ready();
+        tg.expand();
+
+        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
+        populateCarousel('models-swiper-wrapper', models, 'set_model');
+
+        const swiperOptions = {
+          slidesPerView: 'auto',
+          spaceBetween: 16,
+          pagination: { el: ".swiper-pagination", clickable: true },
+        };
+        new Swiper("#agents-swiper", swiperOptions);
+        new Swiper("#models-swiper", swiperOptions);
+        
+        tabHome.addEventListener('click', () => showPage('home'));
+        tabProfile.addEventListener('click', () => {
+            showPage('profile');
+            loadProfileData(); // Загружаем данные при каждом клике на вкладку
+        });
+        
+        showPage('home');
+    }
+
+    init();
 </script>
 </body>
 </html>
