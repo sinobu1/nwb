@@ -18,192 +18,166 @@
       --tg-text-secondary: #7f8b97;
       --tg-card-bg: #17212b;
     }
-    
-    /* Используем переменные цвета из Telegram для бесшовной интеграции */
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--tg-theme-bg-color, var(--tg-secondary));
       color: var(--tg-theme-text-color, var(--tg-text-primary));
-      padding-top: 1rem; /* Добавим отступ сверху вместо хедера */
     }
-    
-    .tool-card {
-        cursor: pointer;
-    }
-
-    /* Стили для новых кнопок меню */
-    .menu-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.75rem; /* 12px */
-    }
-
-    .menu-button {
-        display: flex;
-        align-items: center;
-        padding: 0.75rem; /* 12px */
-        background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg));
-        border-radius: 12px;
-        font-size: 0.875rem; /* 14px */
-        font-weight: 500;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .menu-button:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-    
-    .menu-button svg {
-        margin-right: 0.75rem;
-        width: 20px;
-        height: 20px;
-        flex-shrink: 0;
-    }
-    
+    .tool-card, .menu-button { cursor: pointer; }
+    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .menu-button { display: flex; align-items: center; padding: 0.75rem; background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg)); border-radius: 12px; font-size: 0.875rem; font-weight: 500; transition: background-color 0.2s; }
+    .menu-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+    .menu-button svg { margin-right: 0.75rem; width: 20px; height: 20px; flex-shrink: 0; }
+    /* Стили для навигации */
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; padding: 8px 0; background-color: var(--tg-theme-secondary-bg-color, #17212b); border-top: 1px solid var(--tg-theme-hint-color, #333); }
+    .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--tg-theme-hint-color, #7f8b97); font-size: 12px; border: none; background: none; cursor: pointer; }
+    .nav-item.active { color: var(--tg-theme-link-color, var(--tg-primary)); }
+    .nav-item svg { width: 24px; height: 24px; margin-bottom: 2px; }
+    /* Стили для профиля */
+    .profile-card { background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg)); border-radius: 12px; padding: 24px; text-align: center; }
+    .profile-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 16px; object-fit: cover; border: 2px solid var(--tg-theme-button-color, var(--tg-primary)); }
+    .profile-name { font-size: 1.25rem; font-weight: 600; }
+    .profile-info { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; color: var(--tg-theme-hint-color, #7f8b97); }
+    .profile-info span { color: var(--tg-theme-text-color, #e1e3e6); font-weight: 500; }
     /* ... остальные стили из вашего файла ... */
-    .swiper-pagination-bullet {
-      background: var(--tg-text-secondary) !important;
-      opacity: 0.5 !important;
-    }
-    
-    .swiper-pagination-bullet-active {
-      background: var(--tg-primary) !important;
-      opacity: 1 !important;
-    }
-    
-    .tool-card {
-      height: 150px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      padding: 16px;
-      color: white;
-      position: relative;
-      overflow: hidden;
-      border-radius: 12px;
-    }
-    
-    .tool-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.7));
-      z-index: 1;
-    }
-    
-    .tool-card-content {
-      position: relative;
-      z-index: 2;
-    }
-    
+    .swiper-pagination-bullet { background: var(--tg-text-secondary) !important; opacity: 0.5 !important; }
+    .swiper-pagination-bullet-active { background: var(--tg-primary) !important; opacity: 1 !important; }
+    .tool-card { height: 150px; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; color: white; position: relative; overflow: hidden; border-radius: 12px; }
+    .tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, rgba(0,0,0,0.7)); z-index: 1; }
+    .tool-card-content { position: relative; z-index: 2; }
     .image-gen { background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); }
     .text-gen { background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%); }
     .chatbot { background: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%); }
   </style>
 </head>
-<body class="min-h-screen flex flex-col">
-
-  <main class="flex-1 p-4 space-y-6">
-    <div style="background-color: var(--tg-theme-secondary-bg-color, #182533);" class="p-4 rounded-xl max-w-[85%]">
-      <p class="text-sm">👋 Привет! Выберите агент из карусели или используйте меню управления ботом ниже.</p>
-    </div>
-
-    <div class="swiper mySwiper">
-      <div class="swiper-wrapper">
-        <div class="swiper-slide">
-          <div class="tg-card tool-card text-gen" data-tool="idea_generator">
-            <div class="tool-card-content"><h3 class="font-medium">Генератор идей</h3></div>
-          </div>
-        </div>
-        <div class="swiper-slide">
-          <div class="tg-card tool-card chatbot" data-tool="universal_ai_basic">
-            <div class="tool-card-content"><h3 class="font-medium">Универсальный</h3></div>
-          </div>
-        </div>
-        <div class="swiper-slide">
-          <div class="tg-card tool-card image-gen" data-tool="photo_dietitian_analyzer">
-            <div class="tool-card-content"><h3 class="font-medium">🥑 Диетолог</h3></div>
-          </div>
-        </div>
+<body class="pb-20"> <div id="home-view">
+    <main class="flex-1 p-4 space-y-6">
+      <div style="background-color: var(--tg-theme-secondary-bg-color, #182533);" class="p-4 rounded-xl max-w-[85%]">
+        <p class="text-sm">👋 Привет! Выберите агент из карусели или используйте меню управления ботом ниже.</p>
       </div>
-      <div class="swiper-pagination"></div>
-    </div>
-
-    <div>
+      <div class="swiper mySwiper">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide"><div class="tg-card tool-card text-gen" data-tool="idea_generator"><div class="tool-card-content"><h3 class="font-medium">Генератор идей</h3></div></div></div>
+          <div class="swiper-slide"><div class="tg-card tool-card chatbot" data-tool="universal_ai_basic"><div class="tool-card-content"><h3 class="font-medium">Универсальный</h3></div></div></div>
+          <div class="swiper-slide"><div class="tg-card tool-card image-gen" data-tool="photo_dietitian_analyzer"><div class="tool-card-content"><h3 class="font-medium">🥑 Диетолог</h3></div></div></div>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+      <div>
         <h2 class="text-sm font-medium mb-3">Управление ботом</h2>
         <div class="menu-grid">
-            <button id="btn-agents" class="menu-button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                <span>Агенты ИИ</span>
-            </button>
-            <button id="btn-models" class="menu-button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                <span>Модели ИИ</span>
-            </button>
-            <button id="btn-limits" class="menu-button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
-                <span>Лимиты</span>
-            </button>
-            <button id="btn-bonus" class="menu-button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4H5z" /></svg>
-                <span>Бонус</span>
-            </button>
-            <button id="btn-gems" class="menu-button">
-                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
-                <span>Гемы</span>
-            </button>
-            <button id="btn-help" class="menu-button">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <span>Помощь</span>
-            </button>
+          <button id="btn-agents" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg><span>Агенты ИИ</span></button>
+          <button id="btn-models" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span>Модели ИИ</span></button>
+          <button id="btn-limits" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg><span>Лимиты</span></button>
+          <button id="btn-bonus" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4H5z" /></svg><span>Бонус</span></button>
+          <button id="btn-gems" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg><span>Гемы</span></button>
+          <button id="btn-help" class="menu-button"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span>Помощь</span></button>
         </div>
-    </div>
-  </main>
+      </div>
+    </main>
+  </div>
+
+  <div id="profile-view" style="display: none;">
+      <main class="flex-1 p-4">
+          <div class="profile-card">
+              <img id="profile-avatar" src="" alt="User Avatar" class="profile-avatar">
+              <h2 id="profile-name" class="profile-name"></h2>
+              <div class="profile-info">
+                  <p>Баланс: <span id="profile-gems"></span> 💎</p>
+                  <p>User ID: <span id="profile-id"></span></p>
+              </div>
+          </div>
+      </main>
+  </div>
+  
+  <nav class="bottom-nav">
+      <button id="nav-home" class="nav-item active">
+          <svg fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
+          <span>Дом</span>
+      </button>
+      <button id="nav-profile" class="nav-item">
+          <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+          <span>Профиль</span>
+      </button>
+  </nav>
 
   <script>
-    // Initialize Swiper
-    const swiper = new Swiper(".mySwiper", {
-      slidesPerView: 1.5,
-      spaceBetween: 12,
-      pagination: { el: ".swiper-pagination", clickable: true },
-    });
-
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // --- Universal function to send data to the bot ---
+    // --- Инициализация Swiper ---
+    const swiper = new Swiper(".mySwiper", { slidesPerView: 1.5, spaceBetween: 12, pagination: { el: ".swiper-pagination", clickable: true } });
+
+    // --- Универсальная функция отправки команд боту ---
     function sendCommandToBot(command, details = {}) {
-        const dataToSend = {
-            command: command,
-            details: details,
-            user: tg.initDataUnsafe?.user
-        };
-        tg.sendData(JSON.stringify(dataToSend));
+        tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
     }
 
-    // --- Carousel click handlers (Agent selection) ---
-    document.querySelectorAll('.tool-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const agentId = card.dataset.tool;
-            if (agentId) {
-                // Send a command to change the agent
-                sendCommandToBot('set_agent_from_app', { agent_id: agentId });
-            }
-        });
-    });
-
-    // --- Menu button click handlers ---
+    // --- Обработчики кликов на карусель и меню ---
+    document.querySelectorAll('.tool-card').forEach(card => card.addEventListener('click', () => sendCommandToBot('set_agent_from_app', { agent_id: card.dataset.tool })));
     document.getElementById('btn-agents').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'ai_modes_submenu' }));
     document.getElementById('btn-models').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'models_submenu' }));
     document.getElementById('btn-limits').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'limits_submenu' }));
     document.getElementById('btn-bonus').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'bonus_submenu' }));
     document.getElementById('btn-gems').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'gems_submenu' }));
     document.getElementById('btn-help').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'help_submenu' }));
+    
+    // --- ЛОГИКА НАВИГАЦИИ И ПРОФИЛЯ ---
+    const homeView = document.getElementById('home-view');
+    const profileView = document.getElementById('profile-view');
+    const navHome = document.getElementById('nav-home');
+    const navProfile = document.getElementById('nav-profile');
+
+    // Функция для переключения вкладок
+    function showView(viewId) {
+        homeView.style.display = 'none';
+        profileView.style.display = 'none';
+        navHome.classList.remove('active');
+        navProfile.classList.remove('active');
+
+        if (viewId === 'home') {
+            homeView.style.display = 'block';
+            navHome.classList.add('active');
+        } else if (viewId === 'profile') {
+            profileView.style.display = 'block';
+            navProfile.classList.add('active');
+        }
+    }
+
+    navHome.addEventListener('click', () => showView('home'));
+    navProfile.addEventListener('click', () => showView('profile'));
+
+    // Функция для заполнения данных профиля
+    function populateProfile() {
+        // 1. Берем данные из Telegram
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+            document.getElementById('profile-id').textContent = user.id;
+            // Устанавливаем аватар, если он есть
+            const avatar = document.getElementById('profile-avatar');
+            if (user.photo_url) {
+                avatar.src = user.photo_url;
+            } else {
+                avatar.style.display = 'none'; // или можно поставить заглушку
+            }
+        }
+
+        // 2. Берем баланс гемов из URL
+        try {
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const gemBalance = parseFloat(hashParams.get('gem_balance')).toFixed(1) || '0.0';
+            document.getElementById('profile-gems').textContent = gemBalance;
+        } catch (e) {
+            document.getElementById('profile-gems').textContent = 'N/A';
+            console.error("Could not parse gems from URL hash", e);
+        }
+    }
+    
+    // Вызываем функцию при загрузке страницы
+    populateProfile();
+
   </script>
 </body>
 </html>
