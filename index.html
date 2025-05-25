@@ -35,25 +35,36 @@
 
         .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .app-container { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-        .scrollable-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 120px; }
+        
+        .scrollable-content {
+            flex-grow: 1; overflow-y: auto; overflow-x: hidden;
+            -webkit-overflow-scrolling: touch; padding-bottom: 120px;
+        }
+        /* Стилизация скроллбара */
+        .scrollable-content::-webkit-scrollbar { width: 5px; }
+        .scrollable-content::-webkit-scrollbar-track { background: transparent; }
+        .scrollable-content::-webkit-scrollbar-thumb { background-color: #444; border-radius: 10px; border: 2px solid transparent; }
+        .scrollable-content::-webkit-scrollbar-thumb:hover { background-color: #555; }
+
         .content-wrapper { padding: 0 1rem; }
         
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
         p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-        /* Стили карусели */
-        .swiper-container-wrapper { margin-top: 2rem; }
-        .swiper-container-wrapper h2 { margin-bottom: 1rem; padding: 0 1rem; }
+        /* Стили карусели и навигации */
+        .swiper-container-wrapper { margin-top: 2rem; position: relative; }
+        .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 1rem; }
+        .swiper-nav-arrows { display: flex; gap: 0.5rem; }
+        .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-primary); transition: background-color 0.2s, opacity 0.2s; }
+        .swiper-nav-arrow:hover { background-color: #333; }
+        .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
         .swiper { width: 100%; overflow: visible; padding: 0 1rem; box-sizing: border-box; }
         .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
         .tg-card.tg-card-selected { padding: 3px; background: var(--gold-gradient); box-shadow: 0 10px 30px rgba(216, 171, 78, 0.4); }
         .tg-card.tg-card-selected .carousel-card-inner { background-color: var(--bg-card); height: 100%; border-radius: 17px; }
         .tg-card { transition: transform 0.25s, box-shadow 0.25s; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.25); height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; border-radius: 20px; }
-        .card-icon { font-size: 1.75rem; }
-        .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
-        .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
         
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
         .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
@@ -63,6 +74,7 @@
         .palette-6 { background-color: #2D2D2D; }
 
         /* Стили для карточек */
+        .full-screen-card-list { display: grid; gap: 1rem; /* Увеличен отступ */ margin-top: 1.5rem; }
         .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; transition: background-color 0.2s ease; border: 1px solid var(--border-color); }
         .full-screen-card:hover { background-color: #2c2c2e; }
         .full-screen-card .icon { font-size: 2.5rem; flex-shrink: 0; }
@@ -74,27 +86,8 @@
         .selection-container { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; }
         .selection-container label { font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; }
         .select-wrapper { position: relative; margin-top: 0.75rem; }
-        .custom-select {
-            -webkit-appearance: none; -moz-appearance: none; appearance: none;
-            width: 100%;
-            background-color: var(--bg-select);
-            color: var(--text-primary);
-            padding: 0.75rem 2.5rem 0.75rem 1rem;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-        }
-        .select-wrapper::after {
-            content: '⌄';
-            font-size: 1.5rem;
-            color: var(--text-secondary);
-            position: absolute;
-            right: 1rem; top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-        }
+        .custom-select { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 2.5rem 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; font-weight: 500; cursor: pointer; }
+        .select-wrapper::after { content: '⌄'; font-size: 1.5rem; color: var(--text-secondary); position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); pointer-events: none; }
 
         /* Общие стили страниц и таб-бара */
         .ios-tab-bar { position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); max-width: 400px; display: flex; background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; z-index: 100; border: 1px solid rgba(255,255,255,0.1); }
@@ -105,7 +98,14 @@
         .page { display: none; padding-top: 3rem; }
         .page.active { display: block; }
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-        #debug-info { display: none; /* Скрыто по умолчанию */ }
+        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover; background-color: #333; }
+        .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
+        .profile-info p { font-size: 0.9rem; }
+        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
+        .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
+        .profile-gems .value { font-weight: 700; font-size: 1.1rem; color: var(--text-accent); }
+        #debug-info { display: none; }
     </style>
 </head>
 <body>
@@ -129,11 +129,23 @@
                         </div>
                     </div>
                     <div class="swiper-container-wrapper">
-                        <h2>Агенты</h2>
+                        <div class="swiper-header">
+                            <h2>Агенты</h2>
+                            <div class="swiper-nav-arrows">
+                                <div id="agents-nav-prev" class="swiper-nav-arrow disabled"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                                <div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                            </div>
+                        </div>
                         <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
                     </div>
                     <div class="swiper-container-wrapper">
-                        <h2>Модели</h2>
+                         <div class="swiper-header">
+                            <h2>Модели</h2>
+                            <div class="swiper-nav-arrows">
+                                <div id="models-nav-prev" class="swiper-nav-arrow disabled"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                                <div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                            </div>
+                        </div>
                         <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                     </div>
                 </div>
@@ -155,11 +167,11 @@
                             <p class="subtitle">Информация о вашем аккаунте</p>
                         </div>
                         <div class="ios-card">
-                            <div class="profile-header">
-                                <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
+                           <div class="profile-header">
+                                <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar" onerror="this.src='https://via.placeholder.com/64';">
                                 <div class="profile-info">
-                                    <h2 id="profile-name"></h2>
-                                    <p id="profile-id"></p>
+                                    <h2 id="profile-name">Загрузка...</h2>
+                                    <p id="profile-id">ID: Н/Д</p>
                                 </div>
                             </div>
                             <div class="profile-gems">
@@ -224,11 +236,9 @@
         // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
         let selectedAgentKey = agents[0].key;
         let selectedModelKey = models[0].key;
+        let agentsSwiper, modelsSwiper;
 
         // --- DOM ЭЛЕМЕНТЫ ---
-        const tabHome = document.getElementById('tab-home');
-        const tabTools = document.getElementById('tab-tools');
-        const tabProfile = document.getElementById('tab-profile');
         const agentSelect = document.getElementById('agent-select');
         const modelSelect = document.getElementById('model-select');
 
@@ -249,7 +259,7 @@
             if(tab) tab.classList.add('active');
         }
         
-        // --- ЛОГИКА СТРАНИЦЫ ВЫБОРА ---
+        // --- ЛОГИКА СТРАНИЦЫ ВЫБОРА И НАВИГАЦИИ ---
         function openSelectionPage() {
             populateSelectionDropdowns();
             showPage('selection-page');
@@ -264,33 +274,33 @@
 
         function populateSelectionDropdowns() {
             agentSelect.innerHTML = '';
-            modelSelect.innerHTML = ''; // Очистка перед заполнением
+            modelSelect.innerHTML = ''; // Исправлено: очищаем оба списка
             
-            agents.forEach(a => {
-                const option = new Option(`${a.icon} ${a.name}`, a.key);
-                agentSelect.appendChild(option);
-            });
-            
-            models.forEach(m => {
-                const option = new Option(`${m.icon} ${m.name}`, m.key);
-                modelSelect.appendChild(option);
-            });
+            agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
+            models.forEach(m => modelSelect.appendChild(new Option(`${m.name}`, m.key)));
             
             agentSelect.value = selectedAgentKey;
             modelSelect.value = selectedModelKey;
         }
 
         function updateHomeSelectionVisuals() {
-            document.querySelectorAll('#agents-swiper .tg-card, #models-swiper .tg-card').forEach(c => c.classList.remove('tg-card-selected'));
-            
+            document.querySelectorAll('.swiper-slide .tg-card').forEach(c => c.classList.remove('tg-card-selected'));
             const selectedAgentCard = document.querySelector(`#agents-swiper .swiper-slide[data-key="${selectedAgentKey}"] .tg-card`);
             if (selectedAgentCard) selectedAgentCard.classList.add('tg-card-selected');
-
             const selectedModelCard = document.querySelector(`#models-swiper .swiper-slide[data-key="${selectedModelKey}"] .tg-card`);
             if (selectedModelCard) selectedModelCard.classList.add('tg-card-selected');
         }
 
-        // --- ФУНКЦИИ ЗАПОЛНЕНИЯ КОНТЕНТА ---
+        function updateNavArrows(swiper, prefix) {
+            const prev = document.getElementById(`${prefix}-nav-prev`);
+            const next = document.getElementById(`${prefix}-nav-next`);
+            if (prev && next) {
+                prev.classList.toggle('disabled', swiper.isBeginning);
+                next.classList.toggle('disabled', swiper.isEnd);
+            }
+        }
+
+        // --- ЗАПОЛНЕНИЕ КОНТЕНТА ---
         function populateCarousel(containerId, items, type) {
             const wrapper = document.getElementById(containerId);
             if (!wrapper) return;
@@ -298,8 +308,8 @@
             items.forEach(item => {
                 const slide = document.createElement('div');
                 slide.className = 'swiper-slide';
-                slide.dataset.key = item.key; // Важно для обновления UI
-                slide.innerHTML = `<div class="tg-card"><div class="carousel-card-inner carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div></div>`;
+                slide.dataset.key = item.key;
+                slide.innerHTML = `<div class="tg-card"><div class="carousel-card-inner carousel-card ${item.palette}"><div class="card-icon">${item.icon || ''}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div></div>`;
                 slide.addEventListener('click', () => {
                     if (type === 'agent') selectedAgentKey = item.key;
                     if (type === 'model') selectedModelKey = item.key;
@@ -329,12 +339,9 @@
                     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
                     document.getElementById('profile-name').textContent = fullName || 'Пользователь';
                     document.getElementById('profile-id').textContent = `ID: ${user.id}`;
-                } else {
-                     throw new Error("User data not found");
-                }
+                } else { throw new Error("User data not found"); }
             } catch (e) {
                 console.error("Profile data error:", e);
-                // Fallback values
                 document.getElementById('profile-name').textContent = 'Нет данных';
                 document.getElementById('profile-id').textContent = 'ID: Н/Д';
             }
@@ -345,32 +352,40 @@
             tg.ready();
             tg.expand();
             tg.BackButton.onClick(closeSelectionPage);
+            
+            // Предотвращение "сползания" окна
+            document.body.addEventListener('touchmove', (e) => {
+                if (!e.target.closest('.scrollable-content')) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
 
             // Заполнение контента
             populateCarousel('agents-swiper-wrapper', agents, 'agent');
             populateCarousel('models-swiper-wrapper', models, 'model');
             populateToolsList();
             displayProfileData();
+            
+            // Инициализация Swiper
+            agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 16, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+            modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+            
             updateHomeSelectionVisuals();
-
-            // Swiper
-            new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 16 });
-            new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16 });
             
             // Навигация
-            tabHome.addEventListener('click', () => showPage('home-page'));
-            tabTools.addEventListener('click', () => showPage('tools-page'));
-            tabProfile.addEventListener('click', () => showPage('profile-page'));
+            document.getElementById('tab-home').addEventListener('click', () => showPage('home-page'));
+            document.getElementById('tab-tools').addEventListener('click', () => showPage('tools-page'));
+            document.getElementById('tab-profile').addEventListener('click', () => showPage('profile-page'));
+
+            // Навигация для стрелок карусели
+            document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
+            document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
+            document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
+            document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
 
             // Обработчики для выпадающих списков
-            agentSelect.addEventListener('change', (e) => {
-                selectedAgentKey = e.target.value;
-                sendDataToBot('set_agent', selectedAgentKey);
-            });
-            modelSelect.addEventListener('change', (e) => {
-                selectedModelKey = e.target.value;
-                sendDataToBot('set_model', selectedModelKey);
-            });
+            agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; sendDataToBot('set_agent', selectedAgentKey); });
+            modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; sendDataToBot('set_model', selectedModelKey); });
         }
 
         init();
