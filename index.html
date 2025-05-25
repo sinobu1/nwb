@@ -182,13 +182,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram.WebApp;
     let lastMessageInfo = { sender: null, date: null };
 
-    // ... (константы agents, models, tools и переменные DOM остаются без изменений) ...
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
     const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
     const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
+    
     let selectedAgentKey = agents[0].key;
     let selectedModelKey = models[0].key;
     let agentsSwiper, modelsSwiper;
+    let currentMiniAppChatHistory = [];
+    let pollingInterval = null;
+
+    // DOM Элементы
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
     const chatTitle = document.getElementById('chat-title');
@@ -200,325 +204,375 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const sendMicContainer = document.getElementById('send-mic-btn-container');
 
+    // --- ВАЖНО: ВАШ ПУБЛИЧНЫЙ URL БЭКЕНДА ---
+    // Замените на ваш реальный URL, который вы указали в WEBHOOK_URL в config.py
+    // Убедитесь, что он НЕ заканчивается на /
+    const YOUR_BACKEND_BASE_URL = "https://nwb-production.up.railway.app"; 
+    // --- КОНЕЦ ВАЖНОЙ НАСТРОЙКИ ---
+
     function formatTime(date) { return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
-    function sendDataToBot(data) {
-        if (!tg.sendData) {
-            console.error("Telegram.WebApp.sendData is not available.");
+    function saveChatToLocalStorage() {
+        if (selectedAgentKey) {
+            localStorage.setItem('miniAppChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory));
+        }
+    }
+
+    function loadChatFromLocalStorage() {
+        chatMessagesContainer.innerHTML = ''; 
+        lastMessageInfo = { sender: null, date: null };
+        currentMiniAppChatHistory = []; 
+
+        if (selectedAgentKey) {
+            const savedHistory = localStorage.getItem('miniAppChatHistory_' + selectedAgentKey);
+            if (savedHistory) {
+                const parsedHistory = JSON.parse(savedHistory);
+                parsedHistory.forEach(msg => {
+                    addMessageToChat(msg.sender, msg.text, { isRestoredFromHistory: true, timestamp: msg.timestamp });
+                });
+            }
+        }
+    }
+
+    function addMessageToChat(sender, text, options = {}) {
+        const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestamp } = options;
+        const now = msgTimestamp ? new Date(msgTimestamp) : new Date();
+        const currentDate = now.toDateString();
+
+        if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
+            const divider = document.createElement('div');
+            divider.className = 'chat-date-divider';
+            const today = new Date().toDateString();
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+            if (currentDate === today) { divider.textContent = 'Сегодня'; }
+            else if (currentDate === yesterday) { divider.textContent = 'Вчера'; }
+            else { divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); }
+            chatMessagesContainer.appendChild(divider);
+        }
+        
+        const lastMessageElement = chatMessagesContainer.querySelector('.chat-message:last-of-type');
+        if (!isTyping && lastMessageElement && sender === lastMessageInfo.sender && currentDate === lastMessageInfo.date) {
+             lastMessageElement.classList.add('no-tail', 'grouped');
+             lastMessageElement.classList.remove('tailed');
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message message-${sender} tailed`;
+        
+        const contentSpan = document.createElement('span');
+        contentSpan.className = 'message-content';
+        contentSpan.textContent = text;
+        msgDiv.appendChild(contentSpan);
+
+        if (!isTyping) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            const timeSpan = document.createElement('span');
+            timeSpan.textContent = formatTime(now);
+            metaDiv.appendChild(timeSpan);
+            msgDiv.appendChild(metaDiv);
+
+            if (sender === 'bot' && !isRestoredFromHistory) {
+                const saveButton = document.createElement('button');
+                saveButton.innerHTML = '💾';
+                saveButton.title = 'Сохранить в основной чат';
+                saveButton.className = 'save-to-bot-btn';
+                saveButton.style.cssText = 'margin-left: 8px; padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer;';
+                saveButton.onclick = () => {
+                    let userQueryText = "N/A";
+                    const botMsgIndex = currentMiniAppChatHistory.findIndex(m => m.timestamp === now.toISOString() && m.text === text && m.sender === 'bot');
+                    if (botMsgIndex > 0 && currentMiniAppChatHistory[botMsgIndex - 1].sender === 'user') {
+                        userQueryText = currentMiniAppChatHistory[botMsgIndex - 1].text;
+                    }
+                    
+                    tg.sendData(JSON.stringify({
+                        action: 'save_chat_to_telegram',
+                        payload: { user_query: userQueryText, ai_response: text }
+                    }));
+                    saveButton.textContent = '✅';
+                    saveButton.disabled = true;
+                    tg.showAlert('Диалог сохранен в основной чат с ботом!');
+                };
+                metaDiv.appendChild(saveButton);
+            }
+        } else {
+            msgDiv.classList.add('typing');
+        }
+        
+        chatMessagesContainer.appendChild(msgDiv);
+        if (!isTyping && !isRestoredFromHistory) {
+            currentMiniAppChatHistory.push({ sender, text, timestamp: now.toISOString() });
+            saveChatToLocalStorage();
+        }
+        lastMessageInfo = { sender: sender, date: currentDate };
+
+        requestAnimationFrame(() => {
+            chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+        });
+        return msgDiv;
+    }
+
+    async function submitMessageToBackend(userText, agentKey, modelKey) {
+        const userId = tg.initDataUnsafe?.user?.id;
+        if (!userId) {
+            addMessageToChat('bot', "Ошибка: Не удалось определить пользователя.");
+            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+            if (typingIndicator) typingIndicator.remove();
             return;
         }
-        // Мы НЕ закрываем приложение. Просто отправляем данные.
-        tg.sendData(JSON.stringify(data));
-    }
 
-   // --- Новые и обновленные функции ---
+        const backendProcessUrl = `${YOUR_BACKEND_BASE_URL}/api/process_app_message/${userId}`;
 
-function saveChatToLocalStorage() {
-    localStorage.setItem('miniAppChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory));
-}
-
-function loadChatFromLocalStorage() {
-    const savedHistory = localStorage.getItem('miniAppChatHistory_' + selectedAgentKey);
-    chatMessagesContainer.innerHTML = ''; // Очищаем перед отрисовкой
-    lastMessageInfo = { sender: null, date: null };
-    currentMiniAppChatHistory = []; // Начинаем с чистого листа для текущей сессии
-
-    if (savedHistory) {
-        const parsedHistory = JSON.parse(savedHistory);
-        parsedHistory.forEach(msg => {
-            addMessageToChat(msg.sender, msg.text, { isRestoredFromHistory: true, timestamp: msg.timestamp });
-        });
-    }
-}
-
-function addMessageToChat(sender, text, options = {}) {
-    const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestamp } = options;
-    const now = msgTimestamp ? new Date(msgTimestamp) : new Date(); // Используем переданное время или текущее
-    const currentDate = now.toDateString();
-
-    // Отображение разделителя даты (без изменений)
-    if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
-        const divider = document.createElement('div');
-        divider.className = 'chat-date-divider';
-        const today = new Date().toDateString();
-        const yesterday = new Date(Date.now() - 86400000).toDateString();
-        if (currentDate === today) { divider.textContent = 'Сегодня'; }
-        else if (currentDate === yesterday) { divider.textContent = 'Вчера'; }
-        else { divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); }
-        chatMessagesContainer.appendChild(divider);
-    }
-    
-    const lastMessageElement = chatMessagesContainer.querySelector('.chat-message:last-of-type');
-    if (!isTyping && lastMessageElement && sender === lastMessageInfo.sender && currentDate === lastMessageInfo.date) {
-         lastMessageElement.classList.add('no-tail', 'grouped');
-         lastMessageElement.classList.remove('tailed');
-    }
-
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `chat-message message-${sender} tailed`;
-    
-    const contentSpan = document.createElement('span');
-    contentSpan.className = 'message-content';
-    contentSpan.textContent = text;
-    msgDiv.appendChild(contentSpan);
-
-    if (!isTyping) {
-        const metaDiv = document.createElement('div');
-        metaDiv.className = 'message-meta';
-        const timeSpan = document.createElement('span');
-        timeSpan.textContent = formatTime(now);
-        metaDiv.appendChild(timeSpan);
-        msgDiv.appendChild(metaDiv);
-
-        if (sender === 'bot' && !isRestoredFromHistory) { // Добавляем кнопку только для новых сообщений бота
-            const saveButton = document.createElement('button');
-            saveButton.innerHTML = '💾'; // Иконка сохранения
-            saveButton.title = 'Сохранить в основной чат';
-            saveButton.className = 'save-to-bot-btn'; // Стилизуйте эту кнопку
-            saveButton.style.marginLeft = '8px';
-            saveButton.style.padding = '2px 6px';
-            saveButton.style.border = '1px solid var(--border-color)';
-            saveButton.style.borderRadius = '4px';
-            saveButton.style.background = 'var(--bg-card)';
-            saveButton.style.color = 'var(--text-secondary)';
-            saveButton.style.cursor = 'pointer';
-
-            saveButton.onclick = () => {
-                let userQueryText = "Запрос не найден";
-                // Поиск сообщения пользователя перед этим сообщением бота
-                const allMessages = Array.from(chatMessagesContainer.querySelectorAll('.chat-message'));
-                const botMsgIndex = allMessages.findIndex(el => el === msgDiv);
-                if (botMsgIndex > 0 && allMessages[botMsgIndex - 1].classList.contains('message-user')) {
-                    userQueryText = allMessages[botMsgIndex - 1].querySelector('.message-content').textContent;
-                }
-                
-                tg.sendData(JSON.stringify({
-                    action: 'save_chat_to_telegram',
-                    payload: { user_query: userQueryText, ai_response: text }
-                }));
-                saveButton.textContent = '✅';
-                saveButton.disabled = true;
-                tg.showAlert('Диалог сохранен в основной чат с ботом!');
-            };
-            metaDiv.appendChild(saveButton);
-        }
-    } else {
-        msgDiv.classList.add('typing');
-    }
-    
-    chatMessagesContainer.appendChild(msgDiv);
-    if (!isTyping && !isRestoredFromHistory) {
-        currentMiniAppChatHistory.push({ sender, text, timestamp: now.toISOString() });
-        saveChatToLocalStorage();
-    }
-    lastMessageInfo = { sender: sender, date: currentDate };
-
-    requestAnimationFrame(() => {
-        chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-    });
-    return msgDiv;
-}
-
-async function submitMessageToBackend(userText, agentKey, modelKey) {
-    const userId = tg.initDataUnsafe?.user?.id;
-    if (!userId) {
-        addMessageToChat('bot', "Ошибка: Не удалось определить пользователя.");
-        return;
-    }
-
-    // ВАЖНО: Замените на ваш публичный URL сервера (из CONFIG.WEBHOOK_URL в Python)
-    const backendProcessUrl = `${CONFIG.WEBHOOK_URL.rstrip('https://nwb-production.up.railway.app/')}/api/process_app_message/${userId}`;
-    // Если CONFIG.WEBHOOK_URL недоступен в JS, впишите URL вручную:
-    // const backendProcessUrl = `https://your-app-name.onrender.com/api/process_app_message/${userId}`;
-
-    try {
-        const response = await fetch(backendProcessUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKey })
-        });
-        if (!response.ok) {
-            // Ошибка от нашего бэкенда, ее не нужно добавлять в чат,
-            // так как ответ для чата придет через polling
-            console.error("Error submitting message to backend:", response.statusText);
-            tg.showAlert("Ошибка отправки сообщения на сервер.");
-        }
-        // Ответ от этого эндпоинта нам не нужен для отображения,
-        // он только подтверждает получение. Ответ ИИ придет через polling.
-    } catch (error) {
-        console.error("Network error submitting message to backend:", error);
-        tg.showAlert("Ошибка сети при отправке сообщения.");
-        const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-        if (typingIndicator) typingIndicator.remove();
-    }
-}
-
-function handleSendMessage() {
-    const text = chatInput.value.trim();
-    if (!text) return;
-
-    addMessageToChat('user', text); // Добавляем в UI и локальную историю
-    chatInput.value = '';
-    handleInput.call(chatInput); 
-
-    // Удаляем предыдущий индикатор печати, если был
-    const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-    if(oldTypingIndicator) oldTypingIndicator.remove();
-
-    addMessageToChat('bot', 'Печатает', { isTyping: true }); // Показываем новый индикатор
-
-    // Отправляем сообщение на бэкенд для обработки ИИ
-    submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
-}
-
-// Функция fetchUpdates для опроса остается такой же, как в предыдущем ответе
-// (которая вызывает /api/get_updates/{user_id})
-function fetchUpdates() {
-    const userId = tg.initDataUnsafe?.user?.id;
-    if (!userId || !document.getElementById('chat-screen').classList.contains('active')) {
-        // Не опрашиваем, если ID пользователя нет или экран чата не активен
-        return;
-    }
-    const backendGetUpdatesUrl = `${CONFIG.WEBHOOK_URL.rstrip('https://nwb-production.up.railway.app/')}/api/get_updates/${userId}`;
-    // Или ваш захардкоженный URL:
-    // const backendGetUpdatesUrl = `https://your-app-name.onrender.com/api/get_updates/${userId}`;
-
-    fetch(backendGetUpdatesUrl)
-        .then(response => response.json())
-        .then(data => {
-            if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+        try {
+            const response = await fetch(backendProcessUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKey })
+            });
+            if (!response.ok) {
+                console.error("Error submitting message to backend:", response.status, response.statusText);
+                tg.showAlert(`Ошибка отправки на сервер: ${response.status}`);
                 const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
                 if (typingIndicator) typingIndicator.remove();
-                
-                data.messages.forEach(msg => {
-                    addMessageToChat(msg.sender, msg.text, { timestamp: msg.timestamp });
-                });
             }
-        })
-        .catch(error => console.error("Polling error:", error));
-}
-
-let pollingInterval = null;
-function startPolling() {
-    stopPolling(); // Очищаем предыдущий интервал, если он был
-    fetchUpdates(); // Первоначальный вызов
-    pollingInterval = setInterval(fetchUpdates, 3000); // Опрос каждые 3 секунды
-}
-function stopPolling() {
-    if (pollingInterval) clearInterval(pollingInterval);
-    pollingInterval = null;
-}
-
-// В openChat запускаем polling и загрузку из localStorage
-function openChat() {
-    agentSelect.value = selectedAgentKey;
-    modelSelect.value = selectedModelKey;
-    updateChatTitle();
-    
-    loadChatFromLocalStorage(); // Загружаем историю при открытии чата
-
-    if (currentMiniAppChatHistory.length === 0) { // Если история пуста, показываем приветствие
-        const agent = agents.find(a => a.key === selectedAgentKey);
-        addMessageToChat('bot', `Здравствуйте! Я - ${agent.name}. Чем могу помочь?`);
+            // Ответ от этого эндпоинта только подтверждает получение.
+            // Реальный ответ ИИ придет через polling (fetchUpdates).
+        } catch (error) {
+            console.error("Network error submitting message to backend:", error);
+            tg.showAlert("Ошибка сети при отправке сообщения.");
+            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+            if (typingIndicator) typingIndicator.remove();
+        }
     }
-    
-    switchScreen(chatScreen);
-    tg.BackButton.show();
-    startPolling();
-}
 
-function closeChat() {
-    stopPolling();
-    // Можно добавить saveChatToLocalStorage() здесь, если хотите сохранять при каждом закрытии,
-    // но addMessageToChat уже сохраняет по мере добавления.
-    switchScreen(mainScreen);
-    tg.BackButton.hide();
-}
+    function handleSendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        addMessageToChat('user', text);
+        chatInput.value = '';
+        handleInput.call(chatInput); 
+
+        const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+        if(oldTypingIndicator) oldTypingIndicator.remove();
+        addMessageToChat('bot', 'Печатает', { isTyping: true });
+
+        submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
+    }
 
     function fetchUpdates() {
-    const userId = tg.initDataUnsafe?.user?.id;
-    if (!userId) return;
+        const userId = tg.initDataUnsafe?.user?.id;
+        if (!userId || !chatScreen.classList.contains('active')) {
+            return; // Не опрашиваем, если не в чате или нет ID
+        }
+        
+        const backendGetUpdatesUrl = `${YOUR_BACKEND_BASE_URL}/api/get_updates/${userId}`;
 
-    // Обращаемся к нашему новому API-эндпоинту
-    fetch(`https://nwb-production.up.railway.app/api/get_updates/${userId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
-                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-                if (typingIndicator) typingIndicator.remove();
-                
-                data.messages.forEach(msg => {
-                    addMessageToChat(msg.sender, msg.text);
-                });
+        fetch(backendGetUpdatesUrl)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+                    const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                    if (typingIndicator) typingIndicator.remove();
+                    
+                    data.messages.forEach(msg => {
+                        // Проверяем, нет ли уже такого сообщения (по timestamp и тексту)
+                        const existingMsg = currentMiniAppChatHistory.find(
+                            m => m.timestamp === msg.timestamp && m.text === msg.text && m.sender === msg.sender
+                        );
+                        if (!existingMsg) {
+                           addMessageToChat(msg.sender, msg.text, { timestamp: msg.timestamp });
+                        }
+                    });
+                }
+            })
+            .catch(error => console.error("Polling error:", error));
+    }
+
+    function startPolling() {
+        stopPolling(); 
+        fetchUpdates(); 
+        pollingInterval = setInterval(fetchUpdates, 3000);
+    }
+    function stopPolling() {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+
+    function openChat() {
+        agentSelect.value = selectedAgentKey;
+        modelSelect.value = selectedModelKey;
+        updateChatTitle();
+        
+        loadChatFromLocalStorage(); 
+
+        if (currentMiniAppChatHistory.length === 0) {
+            const agent = agents.find(a => a.key === selectedAgentKey);
+            if (agent) { // Проверка, что агент найден
+                 addMessageToChat('bot', `Здравствуйте! Я - ${agent.name}. Чем могу помочь?`);
+            } else {
+                 addMessageToChat('bot', `Здравствуйте! Чем могу помочь?`); // Запасной вариант
             }
-        })
-        .catch(error => console.error("Polling error:", error));
-}
+        }
+        
+        switchScreen(chatScreen);
+        tg.BackButton.show();
+        startPolling();
+    }
 
+    function closeChat() {
+        stopPolling();
+        switchScreen(mainScreen);
+        tg.BackButton.hide();
+    }
     
-    function switchScreen(screenToShow) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); screenToShow.classList.add('active'); }
-    function showTab(tabId) { document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active')); document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); document.getElementById(`${tabId}-content`).classList.add('active'); document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active'); }
-    function handleInput() { chatInputShadow.textContent = this.value + ' '; this.style.height = 'auto'; this.style.height = `${this.scrollHeight}px`; sendMicContainer.classList.toggle('has-text', this.value.trim().length > 0); }
-    function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
-    function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
-    function displayProfileData() { try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); const avatar = document.getElementById('profile-avatar-img'); if (user.photo_url) { avatar.src = user.photo_url; } else { avatar.style.display = 'none'; } document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
-    function updateNavArrows(swiper, prefix) { const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
-    function openSettingsModal() { settingsModal.style.display = 'flex'; }
-    function closeSettingsModal() { settingsModal.style.display = 'none'; }
+    function updateChatTitle() {
+        const agent = agents.find(a => a.key === selectedAgentKey);
+        const model = models.find(m => m.key === selectedModelKey);
+        chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || 'Агент'} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || 'Модель'}`;
+    }
+    
+    function handleInput() { 
+        chatInputShadow.textContent = this.value + ' '; 
+        this.style.height = 'auto'; 
+        this.style.height = `${chatInputShadow.scrollHeight}px`; 
+        sendMicContainer.classList.toggle('has-text', this.value.trim().length > 0); 
+    }
+
+    function switchScreen(screenToShow) { 
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
+        screenToShow.classList.add('active'); 
+    }
+    function showTab(tabId) { 
+        document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active')); 
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active')); 
+        const contentPane = document.getElementById(`${tabId}-content`);
+        if (contentPane) contentPane.classList.add('active'); // Проверка на null
+        const tabItem = document.querySelector(`.tab-item[data-tab="${tabId}"]`);
+        if (tabItem) tabItem.classList.add('active'); // Проверка на null
+    }
+    function populateCarousel(containerId, items, type) { 
+        const wrapper = document.getElementById(containerId); 
+        if (!wrapper) return; 
+        wrapper.innerHTML = ''; 
+        items.forEach(item => { 
+            const slide = document.createElement('div'); 
+            slide.className = 'swiper-slide'; 
+            slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; 
+            slide.addEventListener('click', () => { 
+                if (type === 'agent') selectedAgentKey = item.key; 
+                if (type === 'model') selectedModelKey = item.key; 
+                openChat(); 
+            }); 
+            wrapper.appendChild(slide); 
+        }); 
+    }
+    function populateToolsList() { 
+        const list = document.getElementById('tools-list'); 
+        if (!list) return; 
+        list.innerHTML = ''; 
+        tools.forEach(item => { 
+            const card = document.createElement('div'); 
+            card.className = 'full-screen-card'; 
+            card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; 
+            list.appendChild(card); 
+        }); 
+    }
+    function displayProfileData() { 
+        try { 
+            const user = tg.initDataUnsafe?.user; 
+            if (!user || !user.id) throw new Error("User data not found"); 
+            const avatar = document.getElementById('profile-avatar-img'); 
+            if (user.photo_url) { avatar.src = user.photo_url; } 
+            else { if(avatar) avatar.style.display = 'none'; } // Проверка на null
+            const profileNameEl = document.getElementById('profile-name');
+            if(profileNameEl) profileNameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; 
+            const profileIdEl = document.getElementById('profile-id');
+            if(profileIdEl) profileIdEl.textContent = `ID: ${user.id}`; 
+        } catch (e) { 
+            const profileNameEl = document.getElementById('profile-name');
+            if(profileNameEl) profileNameEl.textContent = 'Нет данных'; 
+            const profileIdEl = document.getElementById('profile-id');
+            if(profileIdEl) profileIdEl.textContent = 'ID: Н/Д'; 
+        } 
+    }
+    function updateNavArrows(swiper, prefix) { 
+        const prev = document.getElementById(`${prefix}-nav-prev`); 
+        const next = document.getElementById(`${prefix}-nav-next`); 
+        if(prev && next) { 
+            prev.classList.toggle('disabled', swiper.isBeginning); 
+            next.classList.toggle('disabled', swiper.isEnd); 
+        } 
+    }
+    function openSettingsModal() { if(settingsModal) settingsModal.style.display = 'flex'; }
+    function closeSettingsModal() { if(settingsModal) settingsModal.style.display = 'none'; }
 
     function init() {
-    tg.ready();
-    tg.expand();
-    // tg.MainButton.setText("Новая Кнопка").show().onClick(() => tg.showAlert("Клик!")); // Пример главной кнопки
-    tg.MainButton.hide(); 
-    tg.BackButton.onClick(closeChat);
-    
-    // Важно: При инициализации приложения не загружаем историю глобально,
-    // а делаем это при открытии конкретного чата в openChat()
-    // loadChatFromLocalStorage(); 
-
-    populateCarousel('agents-swiper-wrapper', agents, 'agent');
-    populateCarousel('models-swiper-wrapper', models, 'model');
-    populateToolsList();
-    displayProfileData();
-    agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-    models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
-    // ... (создание Swiper-ов и привязка остальных событий)
-    agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
-    modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
-    document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-    document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
-    document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
-    document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
-    document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
-    sendMicContainer.addEventListener('click', handleSendMessage);
-    chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-    chatInput.addEventListener('input', handleInput);
-    document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
-    document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
-    settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
-    agentSelect.addEventListener('change', (e) => { 
-        selectedAgentKey = e.target.value; 
-        updateChatTitle(); 
-        // Теперь настройки тоже можно отправлять через fetch для консистентности, 
-        // но sendData тоже будет работать (с сервисным сообщением)
-        tg.sendData(JSON.stringify({ action: 'set_agent', target: selectedAgentKey }));
-        // Обновляем историю чата для нового агента
-        loadChatFromLocalStorage(); 
-        if (currentMiniAppChatHistory.length === 0) {
-             const agent = agents.find(a => a.key === selectedAgentKey);
-             addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
+        tg.ready();
+        tg.expand();
+        tg.MainButton.hide(); 
+        tg.BackButton.onClick(closeChat);
+        
+        populateCarousel('agents-swiper-wrapper', agents, 'agent');
+        populateCarousel('models-swiper-wrapper', models, 'model');
+        populateToolsList();
+        displayProfileData();
+        
+        agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+        
+        if (document.getElementById("agents-swiper")) {
+            agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
         }
-    });
-    modelSelect.addEventListener('change', (e) => { 
-        selectedModelKey = e.target.value; 
-        updateChatTitle();
-        tg.sendData(JSON.stringify({ action: 'set_model', target: selectedModelKey }));
-    });
-    handleInput.call(chatInput);
-}
+        if (document.getElementById("models-swiper")) {
+            modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+        }
+        
+        document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+        
+        const agentsNavPrev = document.getElementById('agents-nav-prev');
+        if(agentsNavPrev) agentsNavPrev.addEventListener('click', () => agentsSwiper?.slidePrev());
+        const agentsNavNext = document.getElementById('agents-nav-next');
+        if(agentsNavNext) agentsNavNext.addEventListener('click', () => agentsSwiper?.slideNext());
+        
+        const modelsNavPrev = document.getElementById('models-nav-prev');
+        if(modelsNavPrev) modelsNavPrev.addEventListener('click', () => modelsSwiper?.slidePrev());
+        const modelsNavNext = document.getElementById('models-nav-next');
+        if(modelsNavNext) modelsNavNext.addEventListener('click', () => modelsSwiper?.slideNext());
 
-init();
+        if(sendMicContainer) sendMicContainer.addEventListener('click', handleSendMessage);
+        if(chatInput) chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
+        if(chatInput) chatInput.addEventListener('input', handleInput);
+        
+        const chatSettingsBtn = document.getElementById('chat-settings-btn');
+        if(chatSettingsBtn) chatSettingsBtn.addEventListener('click', openSettingsModal);
+        
+        const modalCloseBtn = document.querySelector('.modal-close-btn');
+        if(modalCloseBtn) modalCloseBtn.addEventListener('click', closeSettingsModal);
+        if(settingsModal) settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
+        
+        if(agentSelect) agentSelect.addEventListener('change', (e) => { 
+            selectedAgentKey = e.target.value; 
+            updateChatTitle(); 
+            tg.sendData(JSON.stringify({ action: 'set_agent', target: selectedAgentKey }));
+            loadChatFromLocalStorage(); 
+            if (currentMiniAppChatHistory.length === 0) {
+                 const agent = agents.find(a => a.key === selectedAgentKey);
+                 if(agent) addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
+            }
+        });
+        if(modelSelect) modelSelect.addEventListener('change', (e) => { 
+            selectedModelKey = e.target.value; 
+            updateChatTitle();
+            tg.sendData(JSON.stringify({ action: 'set_model', target: selectedModelKey }));
+        });
+        
+        if(chatInput) handleInput.call(chatInput); // Проверка на null
+        showTab('home'); // Показываем главную вкладку при инициализации
+    }
+
+    init();
+});
 </script>
 </body>
 </html>
