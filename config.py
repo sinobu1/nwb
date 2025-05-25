@@ -44,7 +44,7 @@ class AppConfig:
 
     # --- URL ДЛЯ ВАШЕГО MINI APP ---
     # ВАЖНО: Замените placeholder на реальный URL вашего приложения (например, с GitHub Pages)
-    MINI_APP_URL = os.getenv("MINI_APP_URL", "https://your-username.github.io/gemio/") # Пример
+    MINI_APP_URL = os.getenv("MINI_APP_URL", "https://sinobu1.github.io/nwb/") # Пример
 
     ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152")) # Ваш ID администратора
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
