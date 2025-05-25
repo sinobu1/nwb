@@ -1,91 +1,436 @@
-# main.py
-import asyncio
-from telegram import BotCommand, Update
-from telegram.ext import (
-    Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
-)
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"/>
+    <title>AI Assistant</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
+    <style>
+        :root {
+            --bg-main: #101010;
+            --bg-card: #1E1E1E;
+            --bg-select: #2C2C2E;
+            --bg-user-msg: #3E3E42;
+            --text-primary: #FFFFFF;
+            --text-secondary: #A0A0A0;
+            --border-color: #3A3A3C;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
+            --gold-highlight: #d8ab4e;
+        }
+        
+        html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior-y: contain; }
+        .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.2s ease-out, visibility 0.2s ease-out; background-color: var(--bg-main); z-index: 10; will-change: opacity, visibility; }
+        .screen.active { z-index: 20; }
+        .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
-# Импортируем конфигурацию, логгер, сервисы и глобальные объекты из config.py
-from config import CONFIG, logger, firestore_service, genai # genai импортируется для настройки в main
+        #main-screen { flex-grow: 1; }
+        #main-content-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3rem 1rem 1rem 1rem; }
+        .content-pane { display: none; }
+        .content-pane.active { display: block; }
 
-# Импортируем все наши обработчики из handlers.py
-from handlers import (
-    start, open_menu_command, usage_command,
-    gems_info_command, get_news_bonus_info_command, help_command,
-    menu_button_handler, handle_text, precheckout_callback,
-    successful_payment_callback, error_handler,
-    photo_handler, web_app_data_handler # <<< ДОБАВЬТЕ web_app_data_handler
-)
+        h1, h2, p { margin: 0; }
+        h1 { font-size: 1.875rem; font-weight: 800; }
+        h2 { font-size: 1.25rem; font-weight: 700; }
+        p.subtitle { font-size: 1rem; color: var(--text-secondary); margin-top: 0.25rem; }
 
-async def main():
-    """Основная функция для запуска бота."""
+        .swiper-container-wrapper { margin-top: 2rem; }
+        .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .swiper-nav-arrows { display: flex; gap: 0.5rem; }
+        .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s, transform 0.1s; }
+        .swiper-nav-arrow:active { transform: scale(0.9); }
+        .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
+        
+        .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
+        .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; }
+        .card-icon { font-size: 1.75rem; }
+        .card-title { font-size: 1rem; font-weight: 700; color: #FFFFFF; }
+        .card-description { font-size: 0.875rem; color: #FFFFFF; opacity: 0.85; margin-top: 0.25rem; }
+        
+        .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
+        .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
+        .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
+        .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
+        .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
+        .palette-6 { background-color: #2D2D2D; }
+
+        .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
+        .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; transition: transform 0.1s; }
+        .full-screen-card:active { transform: scale(0.98); }
+        
+        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
+        .chat-header .title { font-weight: 600; text-align: center; flex-grow: 1; }
+        .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
+        .chat-header-btn:hover { background-color: var(--bg-card); }
+        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+        
+        .ios-tab-bar { flex-shrink: 0; max-width: 400px; width: calc(100% - 2.5rem); margin: 0 auto 1.25rem auto; display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); z-index: 100; }
+        .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; }
+        .tab-item.active { color: var(--gold-highlight); }
+        .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
+        .tab-item span { font-size: 0.625rem; font-weight: 500; }
+        
+        .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
+        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
+        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
+        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
+        
+        .chat-message { padding: 0.6rem 1rem; border-radius: 1.25rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.75rem; will-change: transform, opacity; }
+        @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
+        .message-bot { background-color: var(--bg-card); align-self: flex-start; }
+        .message-user { background-color: var(--bg-user-msg); align-self: flex-end; }
+        .message-bot.tailed { border-bottom-left-radius: 0.25rem; }
+        .message-user.tailed { border-bottom-right-radius: 0.25rem; }
+        .chat-message.grouped { margin-top: 0.25rem; }
+        .chat-message.no-tail { border-bottom-left-radius: 1.25rem; border-bottom-right-radius: 1.25rem; }
+        .message-bot.typing { color: var(--text-secondary); font-style: italic; }
+        .typing .message-content::after { content: '.'; animation: dots 1.2s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
+        .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--text-secondary); float: right; margin-left: 0.75rem; margin-top: 0.25rem; line-height: 1; user-select: none; }
+        .message-meta svg { width: 1rem; height: 1rem; }
+        .message-status-read svg { color: #4fc3f7; }
+        .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.8rem; font-weight: 500; padding: 0.25rem 0.75rem; border-radius: 1rem; width: fit-content; }
+
+        .chat-input-area { flex-shrink: 0; padding: 0.5rem 0.75rem; border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.5rem; }
+        .chat-input-wrapper { flex-grow: 1; position: relative; }
+        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 20px; padding: 0.75rem 1rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; line-height: 1.4; min-height: calc(0.75rem * 2 + 1.4em); max-height: 120px; overflow-y: auto; }
+        #chat-input-shadow { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; pointer-events: none; z-index: -1; word-wrap: break-word; white-space: pre-wrap; font-size: 1rem; line-height: 1.4; padding: 0.75rem 1rem; }
+        .chat-action-btn { width: 40px; height: 40px; background-color: var(--bg-card); color: var(--text-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s ease; }
+        #attach-btn { background-color: transparent; }
+        #send-mic-btn-container { background-color: var(--gold-highlight); color: black; position: relative; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: scale(0.9); }
+        #send-mic-btn-container.has-text { transform: scale(1); }
+        #send-mic-btn-container > div { position: absolute; top: 50%; left: 50%; transition: opacity 0.15s ease, transform 0.15s ease; transform: translate(-50%, -50%); }
+        #mic-btn-icon { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #send-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); color: black; }
+        #send-mic-btn-container.has-text #mic-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+        #send-mic-btn-container.has-text #send-btn-icon { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        .chat-action-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <div id="main-screen" class="screen active">
+            <div id="main-content-area">
+                <div id="home-content" class="content-pane active">
+                    <h1>Главная</h1><p class="subtitle">Панель управления ассистентом</p>
+                    <div class="full-screen-card" style="margin-top: 1.5rem;">
+                        <div class="icon" style="font-size: 2rem;">🎨</div><div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
+                    </div>
+                    <div class="swiper-container-wrapper">
+                        <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
+                        <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
+                    </div>
+                    <div class="swiper-container-wrapper">
+                        <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
+                        <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
+                    </div>
+                </div>
+                <div id="tools-content" class="content-pane">
+                    <h1>Инструменты</h1><p class="subtitle">Полезные функции на базе ИИ</p>
+                    <div id="tools-list" class="full-screen-card-list"></div>
+                </div>
+                <div id="profile-content" class="content-pane">
+                    <h1>Профиль</h1><p class="subtitle">Информация о вашем аккаунте</p>
+                    <div class="ios-card">
+                       <div class="profile-header"><img id="profile-avatar-img" alt="Avatar" class="profile-avatar"><div class="profile-info"><h2 id="profile-name"></h2><p id="profile-id"></p></div></div>
+                       <div class="profile-gems"><span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span></div>
+                    </div>
+                </div>
+            </div>
+            <nav class="ios-tab-bar">
+                <div class="tab-item active" data-tab="home"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm0 11H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm11-11h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm-1 12h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"/></svg><span>Главная</span></div>
+                <div class="tab-item" data-tab="tools"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83L19.5 9.5l1.21-2.46zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg><span>Инструменты</span></div>
+                <div class="tab-item" data-tab="profile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 19.2c-2.5 0-4.71-1.28-6-3.2.03-2 4-3.1 6-3.1s5.97 1.1 6 3.1c-1.29 1.92-3.5 3.2-6 3.2zM12 5a3 3 0 110 6 3 3 0 010-6zm0-3a10 10 0 100 20 10 10 0 000-20z"/></svg><span>Профиль</span></div>
+            </nav>
+        </div>
+
+        <div id="chat-screen" class="screen">
+            <div class="chat-header">
+                 <div id="chat-title" class="title"></div>
+                 <div id="chat-settings-btn" class="chat-header-btn">
+                     <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17-.47.41l.36 2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                 </div>
+            </div>
+            <div class="chat-messages" id="chat-messages-container"></div>
+            <div class="chat-input-area">
+                <div id="attach-btn" class="chat-action-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                </div>
+                <div class="chat-input-wrapper">
+                    <div id="chat-input-shadow"></div>
+                    <textarea id="chat-input" placeholder="Сообщение..." rows="1"></textarea>
+                </div>
+                <div id="send-mic-btn-container" class="chat-action-btn">
+                    <div id="mic-btn-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a2 2 0 0 0 2-2V6a2 2 0 0 0-4 0v6a2 2 0 0 0 2 2zm-1-10a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0V4z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.93V21h-2a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-3.07A7 7 0 0 0 19 11z"/></svg>
+                    </div>
+                    <div id="send-btn-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3.49999 20.5C4.33332 21.3333 5.66666 21.1667 6.33332 20.5L21.3333 13C22.1667 12.5 22.1667 11.5 21.3333 11L6.33332 3.5C5.66666 2.83333 4.33332 2.66667 3.49999 3.5C2.66666 4.33333 2.83332 5.66667 3.49999 6.33333L16.1667 12L3.49999 17.6667C2.83332 18.3333 2.66666 19.6667 3.49999 20.5Z"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings-modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn" style="cursor: pointer;">✕</div></div>
+                <div><label for="agent-select">АГЕНТ</label><select id="agent-select" class="custom-select"></select></div>
+                <div style="margin-top: 1rem;"><label for="model-select">МОДЕЛЬ</label><select id="model-select" class="custom-select"></select></div>
+            </div>
+        </div>
+    </div>
     
-    # Конфигурация Google Gemini API (используется для Vision агента Диетолога)
-    if CONFIG.GOOGLE_GEMINI_API_KEY and \
-       "YOUR_" not in CONFIG.GOOGLE_GEMINI_API_KEY and \
-       CONFIG.GOOGLE_GEMINI_API_KEY.startswith("AIzaSy"): # Проверка ключа
-        try:
-            genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY)
-            logger.info("Google Gemini API (for Vision) successfully configured.")
-        except Exception as e:
-            logger.error(f"Failed to configure Google Gemini API (for Vision): {e}", exc_info=True)
-    else:
-        logger.warning("Google Gemini API key (for Vision) is not configured or is missing. Photo dietitian may not work as intended.")
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И КОНСТАНТЫ ---
+    const tg = window.Telegram.WebApp;
+    let lastMessageInfo = { sender: null, date: null };
 
-    # Проверка Firestore
-    if not firestore_service._db: # Используем _db для проверки инициализации
-        logger.critical("Firestore (db) was NOT initialized successfully! Bot will not work correctly.")
-        return
+    // Данные, которые мы будем синхронизировать с ботом
+    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
+    const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
+    const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
 
-    # Сборка приложения
-    app_builder = Application.builder().token(CONFIG.TELEGRAM_TOKEN)
-    app_builder.read_timeout(30).connect_timeout(30) # Настройка таймаутов
-    app = app_builder.build()
+    let selectedAgentKey = agents[0].key;
+    let selectedModelKey = models[0].key;
+    let agentsSwiper, modelsSwiper;
 
-    # Регистрация обработчиков с группами для правильного порядка срабатывания
-    # Группа 0: Команды
-    app.add_handler(CommandHandler("start", start), group=0)
-    app.add_handler(CommandHandler("menu", open_menu_command), group=0)
-    app.add_handler(CommandHandler("usage", usage_command), group=0)
-    app.add_handler(CommandHandler("gems", gems_info_command), group=0) 
-    app.add_handler(CommandHandler("bonus", get_news_bonus_info_command), group=0)
-    app.add_handler(CommandHandler("help", help_command), group=0)
+    // --- DOM ЭЛЕМЕНТЫ ---
+    const mainScreen = document.getElementById('main-screen');
+    const chatScreen = document.getElementById('chat-screen');
+    const chatTitle = document.getElementById('chat-title');
+    const chatMessagesContainer = document.getElementById('chat-messages-container');
+    const chatInput = document.getElementById('chat-input');
+    const chatInputShadow = document.getElementById('chat-input-shadow');
+    const settingsModal = document.getElementById('settings-modal');
+    const agentSelect = document.getElementById('agent-select');
+    const modelSelect = document.getElementById('model-select');
+    const sendMicContainer = document.getElementById('send-mic-btn-container');
+
+    // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+    function formatTime(date) { return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+    function getStatusIcon(status) {
+        if (status === 'sent') { return `<svg fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/></svg>`; }
+        if (status === 'read') { return `<svg fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.235.235 0 0 1 .02-.022z"/><path d="M4.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093L4.97 4.97z"/></svg>`; }
+        return '';
+    }
+
+    /**
+     * Новая функция для отправки данных боту через WebApp
+     * @param {object} data - Объект с данными для отправки
+     */
+    function sendDataToBot(data) {
+        tg.sendData(JSON.stringify(data));
+    }
+
+    // --- ЛОГИКА ИНТЕРФЕЙСА ---
+    function switchScreen(screenToShow) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        screenToShow.classList.add('active');
+    }
+
+    function showTab(tabId) {
+        document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        document.getElementById(`${tabId}-content`).classList.add('active');
+        document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
+    }
     
-    # Группа 1: Обработчики фото и кнопок меню (фото должно иметь приоритет или быть специфичным)
-    # Photo handler должен идти перед menu_button_handler, если кнопки - это текст, который может быть частью фото-диалога
-    # Но т.к. фото - это отдельный тип, порядок здесь не так критичен, как для текстовых.
-    app.add_handler(MessageHandler(filters.PHOTO, photo_handler), group=1) 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, menu_button_handler), group=1)
-
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler), group=1)
+    function closeChat() {
+        switchScreen(mainScreen);
+        tg.BackButton.hide();
+    }
     
-    # Группа 2: Общий обработчик текстовых сообщений (запросы к ИИ)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text), group=2)
+    function addMessageToChat(sender, text, options = {}) {
+        const { isTyping = false, status = 'sent' } = options;
+        const now = new Date();
+        const currentDate = now.toDateString();
+
+        // --- (логика разделителей даты и группировки сообщений остается без изменений) ---
+        if (currentDate !== lastMessageInfo.date) {
+            const divider = document.createElement('div');
+            divider.className = 'chat-date-divider';
+            const today = new Date().toDateString();
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+            if (currentDate === today) { divider.textContent = 'Сегодня'; }
+            else if (currentDate === yesterday) { divider.textContent = 'Вчера'; }
+            else { divider.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }); }
+            chatMessagesContainer.appendChild(divider);
+        }
+        
+        const lastMessageElement = chatMessagesContainer.querySelector('.chat-message:last-of-type');
+        if (lastMessageElement && sender === lastMessageInfo.sender && currentDate === lastMessageInfo.date) {
+            lastMessageElement.classList.add('no-tail', 'grouped');
+            lastMessageElement.classList.remove('tailed');
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message message-${sender} tailed`;
+        
+        const contentSpan = document.createElement('span');
+        contentSpan.className = 'message-content';
+        contentSpan.textContent = text;
+        msgDiv.appendChild(contentSpan);
+
+        if (!isTyping) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            const timeSpan = document.createElement('span');
+            timeSpan.textContent = formatTime(now);
+            metaDiv.appendChild(timeSpan);
+            if (sender === 'user') {
+                const statusSpan = document.createElement('span');
+                statusSpan.className = `message-status-${status}`;
+                statusSpan.innerHTML = getStatusIcon(status);
+                metaDiv.appendChild(statusSpan);
+            }
+            msgDiv.appendChild(metaDiv);
+        } else {
+            msgDiv.classList.add('typing');
+        }
+        
+        chatMessagesContainer.appendChild(msgDiv);
+        lastMessageInfo = { sender: sender, date: currentDate };
+
+        requestAnimationFrame(() => {
+            chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+        });
+        return msgDiv;
+    }
+
+    function openChat() {
+        // Устанавливаем текущие выбранные значения в селекторы модального окна
+        agentSelect.value = selectedAgentKey;
+        modelSelect.value = selectedModelKey;
+        
+        updateChatTitle();
+        chatMessagesContainer.innerHTML = ''; 
+        lastMessageInfo = { sender: null, date: null };
+        addMessageToChat('bot', `Здравствуйте! Я - ${agents.find(a=>a.key === selectedAgentKey).name}. Чем могу помочь?`);
+        switchScreen(chatScreen);
+        tg.BackButton.show();
+    }
+
+    function handleSendMessage() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        addMessageToChat('user', text, { status: 'sent' }); // Отображаем у себя немедленно
+        chatInput.value = '';
+        handleInput.call(chatInput); 
+
+        // Отправляем данные боту для обработки
+        sendDataToBot({
+            action: 'app_chat_message',
+            payload: {
+                text: text,
+                agentKey: selectedAgentKey,
+                modelKey: selectedModelKey
+            }
+        });
+
+        // Имитируем ответ бота. В реальном решении здесь будет логика получения ответа.
+        const typingIndicator = addMessageToChat('bot', 'Печатает', { isTyping: true });
+        
+        // ВАЖНО: Это заглушка. В реальном приложении ответ придет от бота.
+        // Мы его получим через событие `main_button_pressed` или другой механизм.
+        // Пока что оставляем таймер для демонстрации.
+        setTimeout(() => {
+            typingIndicator.remove();
+            // Этот текст будет заменен на реальный ответ от бота
+            addMessageToChat('bot', 'Ваше сообщение получено и обрабатывается ботом. Ответ появится в основном чате Telegram.');
+        }, 2500);
+    }
     
-    # Обработчики платежей
-    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+    function handleInput() {
+        chatInputShadow.textContent = this.value + ' ';
+        this.style.height = 'auto';
+        this.style.height = `${this.scrollHeight}px`;
+        sendMicContainer.classList.toggle('has-text', this.value.trim().length > 0);
+    }
     
-    # Глобальный обработчик ошибок
-    app.add_error_handler(error_handler)
+    function updateChatTitle() {
+        const agent = agents.find(a => a.key === selectedAgentKey);
+        const model = models.find(m => m.key === selectedModelKey);
+        chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
+    }
+    
+    function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
+    function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
+    function displayProfileData() { try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); const avatar = document.getElementById('profile-avatar-img'); if (user.photo_url) { avatar.src = user.photo_url; } else { avatar.style.display = 'none'; } document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
+    function updateNavArrows(swiper, prefix) { const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
+    function openSettingsModal() { settingsModal.style.display = 'flex'; }
+    function closeSettingsModal() { settingsModal.style.display = 'none'; }
+    
+    // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
+    function init() {
+        tg.ready();
+        tg.expand();
+        tg.BackButton.onClick(closeChat);
 
-    # Установка команд бота
-    bot_commands = [
-        BotCommand("menu", "📋 Открыть главное меню"),
-        BotCommand("usage", "📊 Лимиты и баланс гемов"),
-        BotCommand("gems", "💎 Магазин Гемов"),
-        BotCommand("bonus", "🎁 Бонус канала"),
-        BotCommand("help", "❓ Помощь")
-    ]
-    try:
-        await app.bot.set_my_commands(bot_commands)
-        logger.info("Bot commands have been successfully set.")
-    except Exception as e:
-        logger.error(f"Failed to set bot commands: {e}", exc_info=True)
+        // Настройка получения ответа от бота
+        // Бот может отправлять событие в Mini App. Мы будем его слушать.
+        // Этот метод официально не задокументирован для всех случаев, но является
+        // одним из способов получения данных.
+        tg.onEvent('viewportChanged', (isStable) => {
+            // Это событие может быть использовано как триггер для запроса обновлений, если нужно
+        });
+        
+        populateCarousel('agents-swiper-wrapper', agents, 'agent');
+        populateCarousel('models-swiper-wrapper', models, 'model');
+        populateToolsList();
+        displayProfileData();
+        
+        agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+        
+        agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+        modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+        
+        // --- ПРИВЯЗКА СОБЫТИЙ ---
+        document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+        document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
+        document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
+        document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
+        document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
 
-    logger.info("Bot polling is starting...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, timeout=30)
+        sendMicContainer.addEventListener('click', handleSendMessage);
+        chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
+        chatInput.addEventListener('input', handleInput);
+        
+        document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
+        document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
+        settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
+        
+        // Отправка данных боту при изменении настроек в модальном окне
+        agentSelect.addEventListener('change', (e) => { 
+            selectedAgentKey = e.target.value; 
+            updateChatTitle(); 
+            sendDataToBot({ action: 'set_agent', target: selectedAgentKey });
+        });
+        modelSelect.addEventListener('change', (e) => { 
+            selectedModelKey = e.target.value; 
+            updateChatTitle();
+            sendDataToBot({ action: 'set_model', target: selectedModelKey });
+        });
 
-if __name__ == '__main__':
-    asyncio.run(main())
+        // Первоначальный вызов для установки правильного состояния
+        handleInput.call(chatInput);
+    }
+
+    init();
+});
+</script>
+</body>
+</html>
