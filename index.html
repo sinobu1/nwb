@@ -188,21 +188,16 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tg = window.Telegram.WebApp;
 
-        // ДАННЫЕ (ВОССТАНОВЛЕНЫ ДАННЫЕ ДЛЯ МОДЕЛЕЙ)
+        // --- ДАННЫЕ (остаются без изменений) ---
         const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
-        const models = [ 
-            { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, 
-            { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, 
-            { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, 
-            { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, 
-            { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } 
-        ];
+        const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
         const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
 
         let selectedAgentKey = agents[0].key;
         let selectedModelKey = models[0].key;
         let agentsSwiper, modelsSwiper;
 
+        // --- ЭЛЕМЕНТЫ DOM (остаются без изменений) ---
         const mainScreen = document.getElementById('main-screen');
         const chatScreen = document.getElementById('chat-screen');
         const chatTitle = document.getElementById('chat-title');
@@ -213,18 +208,58 @@
         const agentSelect = document.getElementById('agent-select');
         const modelSelect = document.getElementById('model-select');
 
+        // --- НОВЫЕ СТИЛИ ДЛЯ ЧАТА ---
+        // Добавляем стили прямо в JS, чтобы не трогать основной CSS.
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            .chat-message {
+                padding: 0.6rem 1rem;
+                border-radius: 1.25rem;
+                max-width: 80%;
+                word-wrap: break-word;
+                line-height: 1.4;
+            }
+            .message-bot {
+                background-color: var(--bg-card);
+                align-self: flex-start;
+                border-bottom-left-radius: 0.25rem;
+            }
+            .message-user {
+                background-color: var(--bg-user-msg);
+                align-self: flex-end;
+                border-bottom-right-radius: 0.25rem;
+            }
+            .message-bot.typing {
+                color: var(--text-secondary);
+                font-style: italic;
+            }
+            /* Анимация многоточия для индикатора загрузки */
+            .typing::after {
+                content: '.';
+                animation: dots 1.2s steps(5, end) infinite;
+            }
+            @keyframes dots {
+                0%, 20% { content: '.'; }
+                40% { content: '..'; }
+                60% { content: '...'; }
+                80%, 100% { content: '...'; }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+
+        // --- ОСНОВНЫЕ ФУНКЦИИ ---
+
         function showTab(tabId) {
             document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            const currentPane = document.getElementById(`${tabId}-content`);
-            if (currentPane) currentPane.classList.add('active');
-            const currentTab = document.querySelector(`.tab-item[data-tab="${tabId}"]`);
-            if (currentTab) currentTab.classList.add('active');
+            document.getElementById(`${tabId}-content`).classList.add('active');
+            document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
         }
 
         function openChat() {
             updateChatTitle();
-            chatMessagesContainer.innerHTML = '';
+            chatMessagesContainer.innerHTML = ''; // Очищаем старые сообщения
             addMessageToChat('bot', 'Здравствуйте! Чем могу помочь?');
             mainScreen.classList.remove('active');
             chatScreen.classList.add('active');
@@ -236,25 +271,51 @@
             mainScreen.classList.add('active');
             tg.BackButton.hide();
         }
-
-        function addMessageToChat(sender, text) {
+        
+        // УЛУЧШЕННАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ СООБЩЕНИЯ
+        function addMessageToChat(sender, text, id = null) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `chat-message message-${sender}`;
             msgDiv.textContent = text;
+            if (id) {
+                msgDiv.id = id; // Присваиваем ID, чтобы потом найти и обновить это сообщение
+            }
             chatMessagesContainer.appendChild(msgDiv);
-            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+            // Плавно прокручиваем чат вниз к новому сообщению
+            chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
         }
 
+        // УЛУЧШЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ
         function handleSendMessage() {
-            console.log("Attempting to send message..."); // Для отладки
             const text = chatInput.value.trim();
-            if (text) {
-                addMessageToChat('user', text);
-                chatInput.value = '';
-                chatInput.style.height = `calc(0.75rem * 2 + 1.4em)`; // Сброс высоты на одну строку
-                
-                setTimeout(() => { addMessageToChat('bot', `Это симуляция ответа...`); }, 1000);
-            }
+            if (!text) return; // Не даем отправить пустое сообщение
+
+            addMessageToChat('user', text);
+            chatInput.value = '';
+            handleInput(); // Сбрасываем высоту поля ввода до одной строки
+            
+            // Добавляем индикатор "Печатает..."
+            const typingIndicatorId = 'typing-indicator';
+            addMessageToChat('bot typing', 'Печатает', typingIndicatorId);
+
+            // Симуляция ответа от бота
+            setTimeout(() => {
+                const typingIndicator = document.getElementById(typingIndicatorId);
+                if (typingIndicator) {
+                    // Находим индикатор и заменяем его на реальный ответ
+                    typingIndicator.textContent = 'Это симуляция ответа...';
+                    typingIndicator.classList.remove('typing'); // Убираем класс с анимацией
+                }
+                // Прокручиваем чат еще раз на случай, если ответ длинный
+                chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+            }, 1500); // Немного увеличим задержку для наглядности
+        }
+        
+        // ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ ДЛЯ ИЗМЕНЕНИЯ ВЫСОТЫ TEXTAREA
+        function handleInput() {
+            chatInput.style.height = 'auto'; // Сбрасываем высоту
+            // Устанавливаем новую высоту, равную высоте контента
+            chatInput.style.height = `${chatInput.scrollHeight}px`;
         }
 
         function updateChatTitle() {
@@ -265,6 +326,8 @@
 
         function openSettingsModal() { settingsModal.style.display = 'flex'; }
         function closeSettingsModal() { settingsModal.style.display = 'none'; }
+
+        // --- БЛОКИ ИНИЦИАЛИЗАЦИИ (остаются без глобальных изменений) ---
 
         function populateCarousel(containerId, items, type) {
             const wrapper = document.getElementById(containerId);
@@ -303,6 +366,7 @@
                 document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
                 document.getElementById('profile-id').textContent = `ID: ${user.id}`;
             } catch (e) {
+                console.error("Failed to display profile data:", e);
                 document.getElementById('profile-name').textContent = 'Нет данных';
                 document.getElementById('profile-id').textContent = 'ID: Н/Д';
             }
@@ -342,19 +406,8 @@
             sendBtn.addEventListener('click', handleSendMessage);
             chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
             
-            // Убрано авто-изменение высоты на КАЖДЫЙ ввод для производительности. 
-            // Высота textarea будет управляться CSS (min-height, max-height, overflow-y: auto).
-            // chatInput.addEventListener('input', () => { 
-            //     chatInput.style.height = 'auto'; 
-            //     const scrollHeight = chatInput.scrollHeight;
-            //     const maxHeight = parseInt(getComputedStyle(chatInput).maxHeight, 10);
-            //     if (scrollHeight <= maxHeight) {
-            //        chatInput.style.height = `${scrollHeight}px`;
-            //     } else {
-            //        chatInput.style.height = `${maxHeight}px`;
-            //     }
-            // });
-
+            // ВОССТАНАВЛИВАЕМ АВТО-ИЗМЕНЕНИЕ ВЫСОТЫ, но теперь оно оптимизировано
+            chatInput.addEventListener('input', handleInput);
 
             document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
             document.querySelector('.modal-close-btn').addEventListener('click', closeSettingsModal);
