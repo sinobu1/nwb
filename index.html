@@ -12,55 +12,76 @@
   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
   <style>
     :root {
-      --bg-color: #000000; /* Полностью черный для iOS-стиля */
-      --card-bg: #1c1c1e; /* Стандартный темно-серый фон в iOS */
+      --bg-color: #000000;
+      --card-bg: #1c1c1e;
       --text-primary: #ffffff;
-      --text-secondary: #8e8e93; /* Серый для второстепенного текста в iOS */
-      --gold-accent: #ffd700; /* Более яркое золото */
-      --gold-hover: #ffe44d;
+      --text-secondary: #8e8e93;
+      --gold-accent: #ffd700;
       --separator-color: #38383a;
     }
     
-    html {
-      background-color: var(--bg-color);
+    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Фиксация скролла <<< */
+    html, body {
+      overscroll-behavior-y: contain; /* Предотвращает "утягивание" страницы вниз */
+      height: 100%;
+      width: 100%;
+      overflow: hidden; /* Запрещаем скролл для body */
+      position: fixed; /* Фиксируем позицию */
     }
+    
+    .app-container {
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100); /* Для мобильных браузеров */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .scrollable-content {
+        flex-grow: 1;
+        overflow-y: auto; /* Включаем скролл только для этой области */
+        padding: 1rem 1rem 120px 1rem; /* Отступ снизу для Tab Bar */
+        -webkit-overflow-scrolling: touch; /* Плавный скролл на iOS */
+    }
+    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
       background-color: var(--bg-color);
       color: var(--text-primary);
-      padding-bottom: 100px; /* Отступ для нижнего меню */
     }
     
     .tg-card {
       color: var(--text-primary);
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;
-      border-radius: 12px;
+      transition: border 0.25s ease; /* Анимируем только рамку */
+      border-radius: 14px; /* Чуть больше скругление в стиле iOS */
       overflow: hidden;
       cursor: pointer;
-      border: 1px solid transparent; /* Прозрачная рамка для плавности */
+      border: 1px solid transparent;
     }
     
     .tg-card:hover {
-      transform: translateY(-4px);
-      border: 1px solid var(--gold-accent); /* Золотая рамка при наведении */
+      /* Убрали transform для исключения "подпрыгивания" */
+      border: 1px solid var(--gold-accent);
     }
     
     .swiper-container-wrapper {
         position: relative;
-        padding-bottom: 40px; /* Увеличили отступ для точек */
-        margin-bottom: 1rem;
+        padding-bottom: 35px; /* Точно выверенный отступ */
+        margin-bottom: 1.5rem; /* Отступ между каруселями */
     }
 
     .swiper-pagination {
-        bottom: 5px !important; /* Опускаем еще ниже */
+        bottom: 0 !important;
         position: absolute !important;
         width: 100%;
+        /* Убедимся, что клики проходят сквозь контейнер пагинации, если он пуст */
+        pointer-events: none; 
     }
 
     .swiper-pagination-bullet {
       background: #888 !important;
       opacity: 0.7 !important;
+      pointer-events: auto; /* Возвращаем кликабельность самим точкам */
     }
     
     .swiper-pagination-bullet-active {
@@ -70,11 +91,15 @@
 
     .carousel-card {
       height: 140px; display: flex; flex-direction: column; justify-content: space-between;
-      padding: 16px; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      padding: 16px; text-align: center;
+      /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Улучшение читаемости текста <<< */
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5); 
     }
     .card-icon { font-size: 2rem; line-height: 1; margin: 0 auto; }
-    .card-title { font-weight: 600; font-size: 0.95rem; }
-    .card-description { font-size: 0.75rem; color: var(--text-secondary); opacity: 0.9; }
+    .card-title { font-weight: 600; font-size: 1rem; color: #fff; }
+    .card-description { font-size: 0.8rem; color: rgba(255, 255, 255, 0.85); }
+    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
+
 
     /* Градиенты */
     .gradient-1 { background: linear-gradient(45deg, #667eea, #764ba2); }
@@ -86,142 +111,93 @@
     .gradient-7 { background: linear-gradient(45deg, #fa709a, #fee140); }
     .gradient-8 { background: linear-gradient(45deg, #30cfd0, #330867); }
 
-    /* >>> СТИЛИ ДЛЯ iOS TAB BAR И ПРОФИЛЯ <<< */
+    /* Стили для iOS Tab Bar и Профиля (без изменений) */
     .ios-tab-bar {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 40px);
-      max-width: 400px;
-      display: flex;
-      justify-content: space-around;
-      padding: 8px;
-      background: rgba(28, 28, 30, 0.85); /* Полупрозрачный фон */
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      z-index: 100;
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      width: calc(100% - 40px); max-width: 400px; display: flex;
+      justify-content: space-around; padding: 8px;
+      background: rgba(28, 28, 30, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+      border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); z-index: 100;
     }
     .tab-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: color 0.2s ease;
-      -webkit-tap-highlight-color: transparent;
-      flex-grow: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: var(--text-secondary); cursor: pointer; transition: color 0.2s ease;
+      -webkit-tap-highlight-color: transparent; flex-grow: 1;
     }
-    .tab-item.active {
-      color: var(--gold-accent);
-    }
-    .tab-item svg {
-      width: 26px;
-      height: 26px;
-      margin-bottom: 2px;
-    }
-    .tab-item span {
-      font-size: 10px;
-      font-weight: 500;
-    }
-
-    #profile-page {
-      display: none; /* Скрываем по умолчанию */
-    }
-
+    .tab-item.active { color: var(--gold-accent); }
+    .tab-item svg { width: 26px; height: 26px; margin-bottom: 2px; }
+    .tab-item span { font-size: 10px; font-weight: 500; }
+    #profile-page { display: none; }
     .ios-card {
-      background-color: var(--card-bg);
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 1rem;
+      background-color: var(--card-bg); border-radius: 12px;
+      padding: 16px; margin-top: 1rem;
     }
     .profile-header {
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid var(--separator-color);
+      display: flex; align-items: center; border-bottom: 1px solid var(--separator-color);
       padding-bottom: 12px;
     }
     .profile-avatar {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      margin-right: 16px;
-      object-fit: cover;
+      width: 60px; height: 60px; border-radius: 50%;
+      margin-right: 16px; object-fit: cover;
     }
-    .profile-info h2 {
-      font-weight: 600;
-      font-size: 1.2rem;
-    }
-    .profile-info p {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-    }
+    .profile-info h2 { font-weight: 600; font-size: 1.2rem; }
+    .profile-info p { color: var(--text-secondary); font-size: 0.9rem; }
     .profile-gems {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: flex; justify-content: space-between; align-items: center;
       padding-top: 12px;
     }
-    .profile-gems .label {
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-    .profile-gems .value {
-      font-weight: 600;
-      font-size: 1.1rem;
-      color: var(--gold-accent);
-    }
+    .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
+    .profile-gems .value { font-weight: 600; font-size: 1.1rem; color: var(--gold-accent); }
   </style>
 </head>
 <body>
 
-  <main id="main-content" class="p-4">
-    <div class="bg-transparent p-2 mb-4">
-      <h1 class="text-xl font-bold">Панель управления</h1>
-      <p class="text-sm text-gray-400">Выберите агента и модель для работы с ИИ.</p>
-    </div>
-
-    <div class="swiper-container-wrapper">
-        <h2 class="text-lg font-semibold mb-3 px-2">🤖 Агенты ИИ</h2>
-        <div class="swiper" id="agents-swiper">
-          <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
-          <div class="swiper-pagination"></div>
-        </div>
-    </div>
-
-    <div class="swiper-container-wrapper">
-        <h2 class="text-lg font-semibold mb-3 px-2">⚙️ Модели ИИ</h2>
-        <div class="swiper" id="models-swiper">
-          <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
-          <div class="swiper-pagination"></div>
-        </div>
-    </div>
-  </main>
-
-  <div id="profile-page" class="p-4">
+<div class="app-container">
+  <div class="scrollable-content">
+    <div id="main-content">
       <div class="bg-transparent p-2 mb-4">
-        <h1 class="text-xl font-bold">Ваш Профиль</h1>
-        <p class="text-sm text-gray-400">Информация о вашем аккаунте.</p>
+        <h1 class="text-2xl font-bold">Панель управления</h1>
+        <p class="text-md text-gray-400 mt-1">Выберите агента и модель для работы с ИИ.</p>
       </div>
-      <div class="ios-card">
-        <div class="profile-header">
-          <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar bg-gray-700">
-          <div class="profile-info">
-            <h2 id="profile-name"></h2>
-            <p id="profile-id"></p>
+
+      <div class="swiper-container-wrapper">
+          <h2 class="text-lg font-semibold mb-3 px-2">🤖 Агенты ИИ</h2>
+          <div class="swiper" id="agents-swiper">
+            <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
+            <div class="swiper-pagination"></div>
+          </div>
+      </div>
+
+      <div class="swiper-container-wrapper">
+          <h2 class="text-lg font-semibold mb-3 px-2">⚙️ Модели ИИ</h2>
+          <div class="swiper" id="models-swiper">
+            <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
+            <div class="swiper-pagination"></div>
+          </div>
+      </div>
+    </div>
+
+    <div id="profile-page">
+        <div class="bg-transparent p-2 mb-4">
+          <h1 class="text-2xl font-bold">Ваш Профиль</h1>
+          <p class="text-md text-gray-400 mt-1">Информация о вашем аккаунте.</p>
+        </div>
+        <div class="ios-card">
+          <div class="profile-header">
+            <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar bg-gray-700">
+            <div class="profile-info">
+              <h2 id="profile-name"></h2>
+              <p id="profile-id"></p>
+            </div>
+          </div>
+          <div class="profile-gems">
+            <span class="label">💎 Баланс гемов</span>
+            <span id="gem-balance" class="value">Загрузка...</span>
           </div>
         </div>
-        <div class="profile-gems">
-          <span class="label">💎 Баланс гемов</span>
-          <span id="gem-balance" class="value">Загрузка...</span>
-        </div>
-      </div>
+    </div>
   </div>
-
-
+  
   <nav class="ios-tab-bar">
     <div class="tab-item active" id="tab-home">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5,3H19V5H17V7H15V9H13V11H11V9H9V7H7V5H5V3M7,9H9V11H7V9M15,9H17V11H15V9M7,13H17V15H13V17H11V15H7V13M9,19V17H7V19H5V21H9V19M15,19V17H17V19H19V21H15V19Z"/></svg>
@@ -232,15 +208,16 @@
       <span>Профиль</span>
     </div>
   </nav>
+</div>
 
   <script>
     const tg = window.Telegram.WebApp;
     tg.ready();
     tg.expand();
 
-    // --- ДАННЫЕ ---
+    // --- ДАННЫЕ (описания сокращены для лучшего вида) ---
     const agents = [
-      { key: "universal_ai_basic", name: "Универсальный", icon: "🌍", desc: "Ответы на любые темы", gradient: "gradient-5" },
+      { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", gradient: "gradient-5" },
       { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", gradient: "gradient-4" },
       { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", gradient: "gradient-2" },
       { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", gradient: "gradient-8" },
@@ -251,7 +228,7 @@
 
     const models = [
       { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", gradient: "gradient-1" },
-      { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая модель", gradient: "gradient-3" },
+      { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", gradient: "gradient-3" },
       { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", gradient: "gradient-5" },
       { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", gradient: "gradient-4" },
       { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Компактная и быстрая", gradient: "gradient-2" }
@@ -304,56 +281,42 @@
     }
 
     function loadProfileData() {
-        // Загрузка данных пользователя из Telegram
         const user = tg.initDataUnsafe?.user;
         if (user) {
             document.getElementById('profile-avatar-img').src = user.photo_url || '';
             document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
             document.getElementById('profile-id').textContent = `ID: ${user.id}`;
         }
-        
-        // ВАЖНО: Баланс гемов нужно запрашивать у вашего бэкенда.
-        // Mini App не может получить его напрямую.
-        // Это пример, как это могло бы выглядеть.
-        // Сейчас мы просто покажем заглушку.
-        const gemBalanceEl = document.getElementById('gem-balance');
-        gemBalanceEl.textContent = 'Недоступно'; // Заглушка
-        
-        // Пример запроса к бэкенду (потребует реализации на стороне бота)
-        /*
-        fetch('https://your-bot-backend.com/api/getGems', {
-            headers: { 'Authorization': `Bearer ${tg.initData}` }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.gems !== undefined) {
-                gemBalanceEl.textContent = data.gems.toFixed(1);
-            }
-        })
-        .catch(err => {
-            gemBalanceEl.textContent = 'Ошибка';
-            console.error(err);
-        });
-        */
+        document.getElementById('gem-balance').textContent = 'Недоступно';
     }
 
     // --- ИНИЦИАЛИЗАЦИЯ И ОБРАБОТЧИКИ ---
+
+    // Фикс для 100vh на мобильных
+    const setVh = () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    window.addEventListener('resize', setVh);
+    setVh();
 
     populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
     populateCarousel('models-swiper-wrapper', models, 'set_model');
 
     const swiperOptions = {
-      slidesPerView: 2.2, spaceBetween: 12,
+      slidesPerView: 2.3, spaceBetween: 12,
       pagination: { el: ".swiper-pagination", clickable: true },
+      breakpoints: {
+        390: { slidesPerView: 2.5, spaceBetween: 12 },
+        640: { slidesPerView: 4.5, spaceBetween: 16 },
+      },
     };
     new Swiper("#agents-swiper", swiperOptions);
     new Swiper("#models-swiper", swiperOptions);
     
-    // Обработчики для таб-бара
     tabHome.addEventListener('click', () => showPage('home'));
     tabProfile.addEventListener('click', () => showPage('profile'));
     
-    // Показываем главную страницу по умолчанию
     showPage('home');
 
   </script>
