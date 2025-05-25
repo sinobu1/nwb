@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
   <link rel="preconnect" href="https://fonts.gstatic.com/"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
   <title>AI Assistant</title>
@@ -16,7 +16,6 @@
       --tg-secondary: #0e1621;
       --tg-text-primary: #e1e3e6;
       --tg-card-bg: #17212b;
-      /* Определяем наши градиенты здесь */
       --gradient-purple: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
       --gradient-green: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
       --gradient-pink: linear-gradient(45deg, #ff758c 0%, #ff7eb3 100%);
@@ -29,6 +28,11 @@
       background-color: var(--tg-theme-bg-color, var(--tg-secondary));
       color: var(--tg-theme-text-color, var(--tg-text-primary));
       overscroll-behavior: none;
+      padding-bottom: 80px; /* Место для нижнего меню + отступ */
+    }
+    #app-container {
+        max-width: 720px; /* Ограничение максимальной ширины */
+        margin: 0 auto;
     }
     .content-card {
         background-color: var(--tg-theme-secondary-bg-color, var(--tg-card-bg));
@@ -37,13 +41,32 @@
     }
     .tool-card {
         cursor: pointer; height: 120px; display: flex; align-items: flex-end; padding: 1rem; color: white; position: relative; overflow: hidden; border-radius: 12px;
+        transition: transform 0.2s ease-in-out, outline 0.2s ease-in-out;
     }
     .tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent, rgba(0,0,0,0.6)); z-index: 1; }
     .tool-card h3 { position: relative; z-index: 2; font-weight: 600; }
-    .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-    .menu-button { cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.75rem; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 12px; font-size: 0.75rem; font-weight: 500; transition: background-color 0.2s; aspect-ratio: 1 / 1; }
+    .tool-card.selected {
+        outline: 3px solid var(--tg-theme-button-color, var(--tg-primary));
+        outline-offset: -3px;
+        transform: scale(0.95);
+    }
+    .image-tool-card {
+        cursor: pointer; height: 180px; display: flex; flex-direction: column; justify-content: flex-end; padding: 1rem; color: white; position: relative; overflow: hidden; border-radius: 12px;
+        background-size: cover; background-position: center;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+        transition: transform 0.2s ease-in-out, outline 0.2s ease-in-out;
+    }
+    .image-tool-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(transparent 50%, rgba(0,0,0,0.8) 100%); z-index: 1; }
+    .image-tool-card h3 { position: relative; z-index: 2; font-weight: 600; font-size: 1.1rem; }
+    .image-tool-card.selected {
+        outline: 3px solid var(--tg-theme-button-color, var(--tg-primary));
+        outline-offset: -3px;
+        transform: scale(0.97); /* Для картинок можно чуть меньше сжатие */
+    }
+    .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .menu-button { cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0.5rem; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 10px; font-size: 0.65rem; font-weight: 500; transition: background-color 0.2s; aspect-ratio: 1 / 0.9; color: var(--tg-theme-text-color, #e1e3e6); }
     .menu-button:hover { background-color: var(--tg-theme-hint-color, rgba(255,255,255,0.1)); }
-    .menu-button svg { width: 24px; height: 24px; margin-bottom: 0.5rem; }
+    .menu-button svg { width: 20px; height: 20px; margin-bottom: 0.25rem; stroke: var(--tg-theme-button-text-color, var(--tg-primary)); }
     /* Стили для iOS-навигации */
     .bottom-nav-container { position: fixed; bottom: 1rem; left: 0; right: 0; display: flex; justify-content: center; padding: 0 1rem; z-index: 100; }
     .bottom-nav { position: relative; display: flex; background-color: var(--tg-theme-secondary-bg-color, #2c3e50); border-radius: 20px; padding: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -56,19 +79,28 @@
     .profile-name { font-size: 1.25rem; font-weight: 600; }
     .profile-info { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; color: var(--tg-theme-hint-color, #7f8b97); }
     .profile-info span { color: var(--tg-theme-text-color, #e1e3e6); font-weight: 500; }
+    .swiper-pagination-bullet { background: var(--tg-text-secondary) !important; opacity: 0.5 !important; }
+    .swiper-pagination-bullet-active { background: var(--tg-primary) !important; opacity: 1 !important; }
   </style>
 </head>
 <body class="pb-24">
-
+ <div id="app-container">
   <div id="home-view">
     <main class="p-4 space-y-5">
-      <div>
+      <div id="featured-carousel-container">
+        <h2 class="text-base font-semibold mb-3">🔥 Топовые Режимы</h2>
+        <div class="swiper" id="featured-swiper">
+          <div class="swiper-wrapper" id="featured-wrapper">
+            </div>
+        </div>
+      </div>
+      <div id="agents-carousel-container">
         <h2 class="text-base font-semibold mb-3">Выберите Агента</h2>
         <div class="swiper" id="agents-swiper">
           <div class="swiper-wrapper" id="agents-wrapper"></div>
         </div>
       </div>
-      <div>
+      <div id="models-carousel-container">
         <h2 class="text-base font-semibold mb-3">Выберите Модель</h2>
         <div class="swiper" id="models-swiper">
           <div class="swiper-wrapper" id="models-wrapper"></div>
@@ -88,11 +120,10 @@
 
   <div id="profile-view" style="display: none;">
       <main class="p-4"><div class="content-card profile-card">
-          <img id="profile-avatar" src="" alt="User Avatar" class="profile-avatar">
-          <h2 id="profile-name" class="profile-name"></h2>
+          <img id="profile-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="User Avatar" class="profile-avatar"> <h2 id="profile-name" class="profile-name">Загрузка...</h2>
           <div class="profile-info">
-              <p>Баланс: <span id="profile-gems"></span> 💎</p>
-              <p>User ID: <span id="profile-id"></span></p>
+              <p>Баланс: <span id="profile-gems">0.0</span> 💎</p>
+              <p>User ID: <span id="profile-id">0</span></p>
           </div>
       </div></main>
   </div>
@@ -110,63 +141,95 @@
     tg.ready();
     tg.expand();
 
-    // --- Карта соответствия ID и стилей ---
-    // Теперь мы можем задать уникальный цвет для каждого агента или модели
     const styleMap = {
         'default': 'var(--gradient-blue)',
-        // Агенты
         'photo_dietitian_analyzer': 'var(--gradient-purple)',
         'idea_generator': 'var(--gradient-green)',
         'universal_ai_basic': 'var(--gradient-pink)',
         'career_coach': 'var(--gradient-orange)',
         'programming_partner': 'var(--gradient-violet)',
-        // Модели
         'google_gemini_2_0_flash': 'var(--gradient-blue)',
         'google_gemini_2_5_flash_preview': 'var(--gradient-purple)',
         'custom_api_grok_3': 'var(--gradient-orange)',
     };
     
-    // --- Динамическая генерация каруселей ---
-    function renderCarousel(containerId, data, command, detailKey) {
+    function renderCarousel(carouselType, containerId, data, command, detailKey, excludeFeatured = false) {
         const wrapper = document.getElementById(containerId);
-        if (!wrapper) return;
+        if (!wrapper) { console.error(`Wrapper ${containerId} not found`); return; }
         wrapper.innerHTML = '';
+        let itemCount = 0;
         data.forEach((item) => {
+            if (excludeFeatured && item.image_url) return;
+            itemCount++;
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
-            // Ищем стиль в карте, если не находим - используем стиль по умолчанию
             const backgroundStyle = styleMap[item.id] || styleMap['default'];
-            slide.innerHTML = `<div class="tool-card" style="background: ${backgroundStyle};" data-id="${item.id}"><h3>${item.name}</h3></div>`;
-            slide.querySelector('.tool-card').addEventListener('click', () => {
-                const details = { [detailKey]: item.id };
-                sendCommandToBot(command, details);
+            slide.innerHTML = `<div class="tool-card" style="background: ${backgroundStyle};" data-id="${item.id}" data-carousel-type="${carouselType}"><h3>${item.name}</h3></div>`;
+            slide.querySelector('.tool-card').addEventListener('click', function() {
+                document.querySelectorAll(`.tool-card[data-carousel-type="${carouselType}"]`).forEach(card => card.classList.remove('selected'));
+                document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
+                this.classList.add('selected');
+                sendCommandToBot(command, { [detailKey]: item.id });
             });
             wrapper.appendChild(slide);
         });
+        const containerElement = document.getElementById(carouselType + '-carousel-container');
+        if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
     }
 
-    // --- Универсальная функция отправки команд ---
+    function renderFeaturedCarousel(containerId, data, type) { // type can be 'agent' or 'model'
+        const wrapper = document.getElementById(containerId);
+        if (!wrapper) { console.error(`Wrapper ${containerId} not found`); return; }
+        wrapper.innerHTML = ''; 
+        const featuredItems = data.filter(item => item.image_url);
+        let itemCount = 0;
+        featuredItems.forEach((item) => {
+            itemCount++;
+            const slide = document.createElement('div');
+            slide.className = 'swiper-slide';
+            const command = type === 'agent' ? 'set_agent_from_app' : 'set_model_from_app';
+            const detailKey = type === 'agent' ? 'agent_id' : 'model_id';
+            slide.innerHTML = `<div class="image-tool-card" style="background-image: url('${item.image_url}');" data-id="${item.id}" data-carousel-type="featured"><h3>${item.name}</h3></div>`;
+            slide.querySelector('.image-tool-card').addEventListener('click', function() {
+                document.querySelectorAll('.image-tool-card[data-carousel-type="featured"]').forEach(card => card.classList.remove('selected'));
+                document.querySelectorAll('.tool-card').forEach(card => card.classList.remove('selected'));
+                this.classList.add('selected');
+                sendCommandToBot(command, { [detailKey]: item.id });
+            });
+            wrapper.appendChild(slide);
+        });
+        const containerElement = document.getElementById('featured-carousel-container');
+        if(containerElement) containerElement.style.display = itemCount > 0 ? 'block' : 'none';
+    }
+
     function sendCommandToBot(command, details = {}) {
         tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
     }
 
-    // --- Инициализация вкладок и данных ---
     function initializeApp(params) {
-        renderCarousel('agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id');
-        renderCarousel('models-wrapper', params.models_data || [], 'set_model_from_app', 'model_id');
-        new Swiper("#agents-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
-        new Swiper("#models-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
+        // Предполагаем, что топовые - это агенты. Если могут быть и модели, нужна доп. логика или отдельная карусель.
+        renderFeaturedCarousel('featured-wrapper', params.agents_data || [], 'agent');
+        renderCarousel('agents', 'agents-wrapper', params.agents_data || [], 'set_agent_from_app', 'agent_id', true);
+        renderCarousel('models', 'models-wrapper', params.models_data || [], 'set_model_from_app', 'model_id', true); // Если модели тоже могут быть featured с картинками, здесь тоже нужно true
+        
+        if(document.getElementById('featured-wrapper').children.length > 0) new Swiper("#featured-swiper", { slidesPerView: 1.8, spaceBetween: 12, centeredSlides: true });
+        if(document.getElementById('agents-wrapper').children.length > 0) new Swiper("#agents-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
+        if(document.getElementById('models-wrapper').children.length > 0) new Swiper("#models-swiper", { slidesPerView: 2.2, spaceBetween: 12 });
         
         const user = tg.initDataUnsafe?.user;
         if (user) {
-            document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+            document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
             document.getElementById('profile-id').textContent = user.id;
-            if (user.photo_url) document.getElementById('profile-avatar').src = user.photo_url;
+            if (user.photo_url) {
+                document.getElementById('profile-avatar').src = user.photo_url;
+            } else {
+                document.getElementById('profile-avatar').style.display = 'none';
+            }
         }
         document.getElementById('profile-gems').textContent = parseFloat(params.gem_balance || 0).toFixed(1);
+        showView('home'); // Показываем домашнюю вкладку по умолчанию
     }
     
-    // --- Логика навигации ---
     const homeView = document.getElementById('home-view'), profileView = document.getElementById('profile-view');
     const navHome = document.getElementById('nav-home'), navProfile = document.getElementById('nav-profile');
     const navIndicator = document.getElementById('nav-indicator');
@@ -179,30 +242,41 @@
             navIndicator.style.transform = 'translateX(0%)';
         } else if (viewId === 'profile') {
             profileView.style.display = 'block'; navProfile.classList.add('active');
-            navIndicator.style.transform = 'translateX(100%)';
+            navIndicator.style.transform = 'translateX(calc(100% + 5px))'; // +5px это padding в .bottom-nav
         }
     }
     navHome.addEventListener('click', () => showView('home'));
     navProfile.addEventListener('click', () => showView('profile'));
 
-    // --- Обработчики кнопок меню ---
     document.getElementById('btn-limits').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'limits_submenu' }));
     document.getElementById('btn-bonus').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'bonus_submenu' }));
     document.getElementById('btn-gems').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'gems_submenu' }));
     document.getElementById('btn-help').addEventListener('click', () => sendCommandToBot('show_menu_from_app', { menu: 'help_submenu' }));
 
-    // --- Главная точка входа ---
     try {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const appData = {
-            gem_balance: hashParams.get('gem_balance'),
-            agents_data: JSON.parse(decodeURIComponent(hashParams.get('agents_data') || '[]')),
-            models_data: JSON.parse(decodeURIComponent(hashParams.get('models_data') || '[]'))
-        };
-        initializeApp(appData);
+        const agentsDataString = decodeURIComponent(hashParams.get('agents_data') || '[]');
+        const modelsDataString = decodeURIComponent(hashParams.get('models_data') || '[]');
+
+        if (agentsDataString === '[]' && modelsDataString === '[]' && !hashParams.has('gem_balance')) {
+            document.body.innerHTML = `<div style="padding: 20px; text-align: center;"><h2>Ошибка загрузки данных</h2><p>Пожалуйста, откройте приложение через команду /app в боте.</p></div>`;
+            if (window.Telegram && window.Telegram.WebApp) {
+                 window.Telegram.WebApp.MainButton.setText("Закрыть").show().onClick(() => window.Telegram.WebApp.close());
+            }
+        } else {
+            const appData = {
+                gem_balance: hashParams.get('gem_balance'),
+                agents_data: JSON.parse(agentsDataString),
+                models_data: JSON.parse(modelsDataString)
+            };
+            initializeApp(appData);
+        }
     } catch(e) {
         console.error("Failed to initialize app with data from URL:", e);
-        document.body.innerHTML = 'Ошибка загрузки данных. Пожалуйста, попробуйте открыть приложение снова.';
+        document.body.innerHTML = '<div style="padding: 20px; text-align: center;">Ошибка инициализации. Пожалуйста, попробуйте снова через бота.</div>';
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.MainButton.setText("Закрыть").show().onClick(() => window.Telegram.WebApp.close());
+        }
     }
   </script>
 </body>
