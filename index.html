@@ -26,30 +26,40 @@
         
         html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior-y: contain; }
         .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
-        .app-container { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .app-container { width: 100%; height: 100%; position: relative; }
 
-        .page {
-            display: none;
+        /* --- НОВАЯ СТРУКТУРА ЭКРАНОВ --- */
+        .screen {
             position: absolute;
             inset: 0;
+            display: flex;
             flex-direction: column;
+            transition: opacity 0.2s, visibility 0.2s;
         }
-        .page.active { display: flex; }
+        .screen:not(.active) {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #main-screen .content-pane { display: none; }
+        #main-screen .content-pane.active { display: block; }
         
-        .scrollable-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding: 3rem 0 8rem 0; }
-        .scrollable-content::-webkit-scrollbar { width: 5px; }
-        .scrollable-content::-webkit-scrollbar-track { background: transparent; }
-        .scrollable-content::-webkit-scrollbar-thumb { background-color: #444; border-radius: 10px; }
+        .scrollable-area { flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+        .scrollable-area.padded { padding: 3rem 0 8rem 0; }
+        .scrollable-area::-webkit-scrollbar { width: 5px; }
+        .scrollable-area::-webkit-scrollbar-thumb { background-color: #444; border-radius: 10px; }
 
         .content-wrapper { padding: 0 1rem; }
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
         p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
+        /* Карусели */
         .swiper-container-wrapper { margin-top: 2rem; position: relative; }
         .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0 1rem; }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
-        .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s, opacity 0.2s; }
+        .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s; }
         .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; }
         .swiper { width: 100%; overflow: visible; padding: 0 1rem; box-sizing: border-box; }
         .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
@@ -57,9 +67,9 @@
         .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; }
         .card-icon { font-size: 1.75rem; }
-        .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
-        .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
-        
+        .card-title { font-size: 1rem; font-weight: 700; }
+        .card-description { font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
         .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
         .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
@@ -67,15 +77,17 @@
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
 
+        /* Карточки */
         .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
         .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; }
         .full-screen-card .icon { font-size: 2.5rem; }
         .full-screen-card .info h3 { font-size: 1.125rem; font-weight: 700; }
         .full-screen-card .info p { font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem; }
 
-        #chat-page { display: none; }
+        /* Экран чата */
+        #chat-screen { background-color: var(--bg-main); }
         .chat-header { flex-shrink: 0; padding: 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
-        .chat-header .title { font-weight: 600; font-size: 0.9rem; text-align: center; }
+        .chat-header .title { font-weight: 600; text-align: center; }
         .chat-header .settings-btn { cursor: pointer; font-size: 1.5rem; line-height: 1; }
         .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         .chat-message { max-width: 80%; padding: 0.75rem 1rem; border-radius: 1.25rem; line-height: 1.4; word-wrap: break-word; }
@@ -85,99 +97,107 @@
         #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 1rem; padding: 0.75rem 1rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; max-height: 150px; }
         #send-btn { width: 36px; height: 36px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
         
+        /* Модальное окно */
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .modal-header h3 { font-size: 1.25rem; font-weight: 700; margin: 0; }
         .modal-close-btn { font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
-        .modal-content .select-wrapper { margin-top: 0.5rem; }
-        .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; }
+        .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
         
-        .ios-tab-bar { z-index: 100; position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%); width: calc(100% - 2.5rem); display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); }
+        /* Таб-бар */
+        .ios-tab-bar { flex-shrink: 0; padding: 0 1.25rem 1.25rem 1.25rem; }
+        .ios-tab-bar-inner { display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
         .tab-item.active { color: var(--gold-highlight); }
         .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
         .tab-item span { font-size: 0.625rem; font-weight: 500; }
+        
+        /* Карточка профиля */
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-        .profile-header, .profile-gems { /* ... */ }
+        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
+        .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
+        .profile-info p { font-size: 0.9rem; }
+        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
     </style>
 </head>
 <body>
     <div class="app-wrapper">
         <div class="app-container">
             
-            <div id="home-page" class="page active">
-                <div class="scrollable-content">
-                    <div class="content-wrapper">
-                        <h1>Главная</h1><p class="subtitle">Панель управления ассистентом</p>
-                        <div class="full-screen-card" id="image-generator-card" style="margin-top: 1.5rem;">
-                            <div class="icon">🎨</div>
-                            <div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
+            <div id="main-screen" class="screen active">
+                <div class="scrollable-area padded">
+                    <div id="home-content" class="content-pane active">
+                        <div class="content-wrapper">
+                            <h1>Главная</h1><p class="subtitle">Панель управления ассистентом</p>
+                            <div class="full-screen-card" style="margin-top: 1.5rem;">
+                                <div class="icon">🎨</div><div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
+                            </div>
+                        </div>
+                        <div class="swiper-container-wrapper">
+                            <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
+                            <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
+                        </div>
+                        <div class="swiper-container-wrapper">
+                            <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
+                            <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                         </div>
                     </div>
-                    <div class="swiper-container-wrapper">
-                        <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2" /></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
-                        <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
+                    <div id="tools-content" class="content-pane">
+                         <div class="scrollable-area padded">
+                            <div class="content-wrapper">
+                                <h1>Инструменты</h1><p class="subtitle">Полезные функции на базе ИИ</p>
+                                <div id="tools-list" class="full-screen-card-list"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="swiper-container-wrapper">
-                        <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="2"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="2"/></svg></div></div></div>
-                        <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="tools-page" class="page">
-                <div class="scrollable-content">
-                    <div class="content-wrapper">
-                        <h1>Инструменты</h1><p class="subtitle">Полезные функции на базе ИИ</p>
-                        <div id="tools-list" class="full-screen-card-list"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="profile-page" class="page">
-                <div class="scrollable-content">
-                   <div class="content-wrapper">
-                        <h1>Профиль</h1><p class="subtitle">Информация о вашем аккаунте</p>
-                        <div class="ios-card">
-                           <div class="profile-header">
-                                <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
-                                <div class="profile-info">
-                                    <h2 id="profile-name"></h2><p id="profile-id"></p>
+                    <div id="profile-content" class="content-pane">
+                        <div class="scrollable-area padded">
+                           <div class="content-wrapper">
+                                <h1>Профиль</h1><p class="subtitle">Информация о вашем аккаунте</p>
+                                <div class="ios-card">
+                                   <div class="profile-header">
+                                        <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
+                                        <div class="profile-info">
+                                            <h2 id="profile-name"></h2><p id="profile-id"></p>
+                                        </div>
+                                    </div>
+                                    <div class="profile-gems">
+                                        <span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="profile-gems" style="padding-top: 1rem;">
-                                <span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Недоступно</span>
-                            </div>
                         </div>
                     </div>
                 </div>
+                <nav class="ios-tab-bar">
+                    <div class="ios-tab-bar-inner">
+                        <div class="tab-item active" data-tab="home"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm0 11H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm11-11h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm-1 12h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"/></svg><span>Главная</span></div>
+                        <div class="tab-item" data-tab="tools"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83L19.5 9.5l1.21-2.46zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg><span>Инструменты</span></div>
+                        <div class="tab-item" data-tab="profile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 19.2c-2.5 0-4.71-1.28-6-3.2.03-2 4-3.1 6-3.1s5.97 1.1 6 3.1c-1.29 1.92-3.5 3.2-6 3.2zM12 5a3 3 0 110 6 3 3 0 010-6zm0-3a10 10 0 100 20 10 10 0 000-20z"/></svg><span>Профиль</span></div>
+                    </div>
+                </nav>
             </div>
 
-            <div id="chat-page" class="page">
+            <div id="chat-screen" class="screen">
                 <div class="chat-header">
                     <div id="chat-title" class="title"></div>
                     <div id="chat-settings-btn" class="settings-btn">⚙️</div>
                 </div>
-                <div class="chat-messages" id="chat-messages-container"></div>
+                <div class="chat-messages scrollable-area" id="chat-messages-container"></div>
                 <div class="chat-input-area">
                     <textarea id="chat-input" placeholder="Введите сообщение..." rows="1"></textarea>
                     <div id="send-btn"><svg width="20" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 </div>
             </div>
 
-            <nav id="main-tab-bar" class="ios-tab-bar">
-                <div class="tab-item active" id="tab-home"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm0 11H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm11-11h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm-1 12h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"/></svg><span>Главная</span></div>
-                <div class="tab-item" id="tab-tools"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83L19.5 9.5l1.21-2.46zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg><span>Инструменты</span></div>
-                <div class="tab-item" id="tab-profile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 19.2c-2.5 0-4.71-1.28-6-3.2.03-2 4-3.1 6-3.1s5.97 1.1 6 3.1c-1.29 1.92-3.5 3.2-6 3.2zM12 5a3 3 0 110 6 3 3 0 010-6zm0-3a10 10 0 100 20 10 10 0 000-20z"/></svg><span>Профиль</span></div>
-            </nav>
-        </div>
-
-        <div id="settings-modal">
-            <div class="modal-content">
-                <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn">✕</div></div>
-                <div><label>АГЕНТ</label><div class="select-wrapper"><select id="agent-select" class="custom-select"></select></div></div>
-                <div style="margin-top: 1rem;"><label>МОДЕЛЬ</label><div class="select-wrapper"><select id="model-select" class="custom-select"></select></div></div>
+            <div id="settings-modal">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn">✕</div></div>
+                    <div><label>АГЕНТ</label><select id="agent-select" class="custom-select"></select></div>
+                    <div style="margin-top: 1rem;"><label>МОДЕЛЬ</label><select id="model-select" class="custom-select"></select></div>
+                </div>
             </div>
         </div>
     </div>
@@ -197,7 +217,8 @@
         let agentsSwiper, modelsSwiper;
 
         // DOM ЭЛЕМЕНТЫ
-        const mainTabBar = document.getElementById('main-tab-bar');
+        const mainScreen = document.getElementById('main-screen');
+        const chatScreen = document.getElementById('chat-screen');
         const chatTitle = document.getElementById('chat-title');
         const chatMessagesContainer = document.getElementById('chat-messages-container');
         const chatInput = document.getElementById('chat-input');
@@ -207,29 +228,27 @@
         const modelSelect = document.getElementById('model-select');
 
         // --- ЛОГИКА НАВИГАЦИИ И ЧАТА ---
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        function showTab(tabId) {
+            document.querySelectorAll('#main-screen .content-pane').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             
-            const page = document.getElementById(pageId);
-            if(page) page.classList.add('active');
-
-            if (pageId === 'chat-page') {
-                mainTabBar.style.display = 'none';
-                tg.BackButton.show();
-            } else {
-                mainTabBar.style.display = 'flex';
-                tg.BackButton.hide();
-                const tab = document.getElementById(`tab-${pageId.replace('-page','')}`);
-                if(tab) tab.classList.add('active');
-            }
+            document.getElementById(`${tabId}-content`).classList.add('active');
+            document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
         }
 
-        function openChatPage() {
+        function openChat() {
             updateChatTitle();
             chatMessagesContainer.innerHTML = '';
             addMessageToChat('bot', 'Здравствуйте! Чем могу помочь?');
-            showPage('chat-page');
+            mainScreen.classList.remove('active');
+            chatScreen.classList.add('active');
+            tg.BackButton.show();
+        }
+
+        function closeChat() {
+            chatScreen.classList.remove('active');
+            mainScreen.classList.add('active');
+            tg.BackButton.hide();
         }
 
         function addMessageToChat(sender, text) {
@@ -255,9 +274,10 @@
         function updateChatTitle() {
             const agent = agents.find(a => a.key === selectedAgentKey);
             const model = models.find(m => m.key === selectedModelKey);
-            chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary)">&bull;</span> ${model?.name || ''}`;
+            chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary);">&bull;</span> ${model?.name || ''}`;
         }
 
+        // --- ЛОГИКА НАСТРОЕК В ЧАТЕ (Модальное окно) ---
         function openSettingsModal() { settingsModal.style.display = 'flex'; }
         function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
@@ -267,32 +287,57 @@
             items.forEach(item => {
                 const slide = document.createElement('div');
                 slide.className = 'swiper-slide';
-                slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div></div>`;
+                slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
                 slide.addEventListener('click', () => {
                     if (type === 'agent') selectedAgentKey = item.key;
                     if (type === 'model') selectedModelKey = item.key;
-                    openChatPage();
+                    openChat();
                 });
                 wrapper.appendChild(slide);
             });
         }
         
-        function populateToolsList() { /* ... */ }
-        function displayProfileData() { /* ... */ }
-        function updateNavArrows(swiper, prefix) { /* ... */ }
+        function populateToolsList() {
+            const list = document.getElementById('tools-list');
+            if (!list) return;
+            list.innerHTML = '';
+            tools.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'full-screen-card';
+                card.innerHTML = `<div class="icon">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`;
+                list.appendChild(card);
+            });
+        }
+        
+        function displayProfileData() {
+            try {
+                const user = tg.initDataUnsafe?.user;
+                if (!user || !user.id) throw new Error("User data not found");
+                document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64';
+                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+            } catch (e) {
+                console.error("Profile data error:", e);
+                document.getElementById('profile-name').textContent = 'Нет данных';
+                document.getElementById('profile-id').textContent = 'ID: Н/Д';
+            }
+        }
+        
+        function updateNavArrows(swiper, prefix) {
+             const prev = document.getElementById(`${prefix}-nav-prev`);
+             const next = document.getElementById(`${prefix}-nav-next`);
+             if(prev && next) {
+                prev.classList.toggle('disabled', swiper.isBeginning);
+                next.classList.toggle('disabled', swiper.isEnd);
+             }
+        }
 
         // --- ИНИЦИАЛИЗАЦИЯ ---
         function init() {
             tg.ready();
             tg.expand();
-            tg.BackButton.onClick(() => showPage('home-page'));
+            tg.BackButton.onClick(closeChat);
             
-            document.body.addEventListener('touchmove', (e) => {
-                if (!e.target.closest('.scrollable-content, .chat-messages')) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-
             // Заполнение UI
             populateCarousel('agents-swiper-wrapper', agents, 'agent');
             populateCarousel('models-swiper-wrapper', models, 'model');
@@ -307,9 +352,9 @@
             modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
             
             // Навигация
-            document.getElementById('tab-home').addEventListener('click', () => showPage('home-page'));
-            document.getElementById('tab-tools').addEventListener('click', () => showPage('tools-page'));
-            document.getElementById('tab-profile').addEventListener('click', () => showPage('profile-page'));
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                tab.addEventListener('click', () => showTab(tab.dataset.tab));
+            });
             document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
             document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
             document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
@@ -318,14 +363,14 @@
             // События чата и модального окна
             sendBtn.addEventListener('click', handleSendMessage);
             chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-            chatInput.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = (chatInput.scrollHeight) + 'px'; });
+            chatInput.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = `${chatInput.scrollHeight}px`; });
             document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
             document.querySelector('.modal-close-btn').addEventListener('click', closeSettingsModal);
             settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
-            agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; updateChatTitle(); sendDataToBot('set_agent', selectedAgentKey); });
-            modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; updateChatTitle(); sendDataToBot('set_model', selectedModelKey); });
+            agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; updateChatTitle(); });
+            modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; updateChatTitle(); });
             
-            showPage('home-page');
+            showTab('home');
         }
 
         init();
