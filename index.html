@@ -203,8 +203,21 @@
     }
 
     function sendCommandToBot(command, details = {}) {
-        tg.sendData(JSON.stringify({ command, details, user: tg.initDataUnsafe?.user }));
+    try {
+        // Данные для отправки
+        const dataToSend = JSON.stringify({ command, details, user: tg.initDataUnsafe?.user });
+
+        // Попытка отправки данных боту
+        window.Telegram.WebApp.sendData(dataToSend);
+
+        // Если предыдущая строка не вызвала ошибку, покажем этот alert
+        alert("Успех! Команда была отправлена боту. Проверьте консоль с логами. Отправлено: " + dataToSend);
+
+    } catch (error) {
+        // Если при отправке произошла ошибка, мы увидим её здесь
+        alert("ОШИБКА! Не удалось отправить команду: " + error);
     }
+}
 
     function initializeApp(params) {
         // Предполагаем, что топовые - это агенты. Если могут быть и модели, нужна доп. логика или отдельная карусель.
