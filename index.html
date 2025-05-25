@@ -7,10 +7,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"/>
   <title>AI Assistant</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
-  <style>
+  
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
+    <style>
     :root {
       --bg-main: #101010;
       --bg-card: #1E1E1E;
@@ -32,76 +33,67 @@
     .app-container { height: 100%; display: flex; flex-direction: column; }
     .scrollable-content {
       flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 1.5rem 0 120px 0;
+      padding: 24px 0 120px 0;
     }
-    .content-wrapper { padding: 0 1.5rem; }
+    .content-wrapper { padding: 0 24px; }
     
+    /* ИЗМЕНЕНИЕ: Замена утилит Tailwind на обычный CSS */
+    .header-block { margin-bottom: 32px; }
+    .card-description { margin-top: 4px; }
+
     /* Типографика */
     h1 { font-size: 1.875rem; font-weight: 800; }
     h2 { font-size: 1.25rem; font-weight: 700; }
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Стили карусели и карточек <<< */
-    .swiper-container-wrapper {
-        margin-top: 1.5rem; 
-        position: relative;
-        margin-bottom: 2rem; 
+    .swiper-section {
+        margin-top: 24px;
     }
-    .swiper-container-wrapper h2 {
-        margin-bottom: 1rem; /* Отступ от заголовка ("Агенты") до карточек */
+    .swiper-section h2 {
+        margin-bottom: 16px; /* Отступ от заголовка до карточек */
     }
+    
+    /* Swiper должен быть виден, чтобы избежать ошибок расчета ширины */
     .swiper {
-        padding: 0 1.5rem;
-        margin-left: -1.5rem;
-        margin-right: -1.5rem;
-        overflow: visible; /* Оставляем, чтобы тени не обрезались */
+      width: 100%;
+      height: 170px; /* Задаем явную высоту контейнеру */
+      overflow: visible;
     }
     .swiper-slide {
       width: 180px;  /* Карточки пошире */
-      height: 160px; /* Карточки пониже */
+      height: 160px; /* Карточки пониже */
+      display: flex; /* Для корректного отображения до инициализации */
+      align-items: stretch;
+      justify-content: stretch;
     }
-    .swiper-pagination {
-        position: absolute;
-        bottom: -30px !important;
-        width: 100%;
-        left: 0;
-        pointer-events: none;
-    }
-    
-    .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
-    .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
     
     .tg-card {
-      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
       border-radius: 20px;
       overflow: hidden;
       cursor: pointer;
-      height: 100%;
-      border: 2px solid transparent; /* Резервируем место под рамку, чтобы избежать "прыжка" */
+      border: 2px solid transparent;
       box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      display: flex; 
+      flex-direction: column; 
+      padding: 1rem; 
+      text-align: left;
     }
     .tg-card:hover { 
       transform: translateY(-6px); 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px rgba(255, 215, 0, 0.5); /* Золотое свечение */
-      border-color: var(--gold-highlight); /* Золотая рамка */
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 0 15px rgba(255, 215, 0, 0.5);
+      border-color: var(--gold-highlight);
     }
     
-    /* ИСПРАВЛЕНИЕ: Упрощенный и более надежный flex-макет для карточки */
-    .carousel-card {
-      height: 100%; 
-      display: flex; 
-      flex-direction: column; 
-      padding: 1rem; 
-      text-align: left;
-    }
     .card-icon { 
       font-size: 1.75rem; 
-      margin-bottom: auto; /* Главный фикс! Прижимает иконку к верху, а остальной контент к низу */
+      margin-bottom: auto; /* Прижимает иконку к верху, а текст к низу */
     }
     .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
     .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
-    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
-
+   
     .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
     .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
     .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
@@ -111,10 +103,10 @@
 
     /* Tab Bar & Profile */
     .ios-tab-bar {
-      position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
-      width: calc(100% - 2.5rem); max-width: 400px; display: flex;
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      width: calc(100% - 40px); max-width: 400px; display: flex;
       background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      border-radius: 24px; padding: 0.5rem; z-index: 100; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; padding: 8px; z-index: 100; border: 1px solid rgba(255,255,255,0.1);
     }
     .tab-item {
       flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -123,20 +115,14 @@
     }
     .tab-item.active { color: var(--text-accent); }
     .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
-    .tab-item span { font-size: 0.625rem; font-weight: 500; }
+    .tab-item span { font-size: 10px; font-weight: 500; }
     #profile-page { display: none; }
-    .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-    .profile-header {
-      display: flex; align-items: center; border-bottom: 1px solid var(--border-color);
-      padding-bottom: 1rem;
-    }
-    .profile-avatar {
-      width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover;
-      background-color: #333;
-    }
+    .ios-card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; margin-top: 24px; }
+    .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
+    .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 16px; object-fit: cover; background-color: #333; }
     .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
     .profile-info p { font-size: 0.9rem; }
-    .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
+    .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; }
     .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
     .profile-gems .value { font-weight: 700; font-size: 1.1rem; color: var(--text-accent); }
   </style>
@@ -146,27 +132,25 @@
 <div class="app-container">
   <div class="scrollable-content">
     <div id="main-content" class="content-wrapper">
-      <div class="mb-8">
+      <div class="header-block">
         <h1>Панель управления</h1>
         <p class="subtitle">Выберите инструменты для работы с ИИ</p>
       </div>
-      <div class="swiper-container-wrapper">
+      <div class="swiper-section">
           <h2>Агенты</h2>
-          <div class="swiper" id="agents-swiper">
-            <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
-            <div class="swiper-pagination"></div>
+                  <div class="swiper" id="agents-swiper">
+            <div class="swiper-wrapper"></div>
           </div>
       </div>
-      <div class="swiper-container-wrapper">
+      <div class="swiper-section">
           <h2>Модели</h2>
-          <div class="swiper" id="models-swiper">
-            <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
-            <div class="swiper-pagination"></div>
+                  <div class="swiper" id="models-swiper">
+            <div class="swiper-wrapper"></div>
           </div>
       </div>
     </div>
     <div id="profile-page" class="content-wrapper">
-        <div class="mb-8">
+        <div class="header-block">
           <h1>Профиль</h1>
           <p class="subtitle">Информация о вашем аккаунте</p>
         </div>
@@ -199,6 +183,8 @@
 </div>
 
 <script>
+  // Оборачиваем весь скрипт в DOMContentLoaded для гарантии, что HTML загружен
+  document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram.WebApp;
 
     const agents = [
@@ -223,100 +209,112 @@
     const tabProfile = document.getElementById('tab-profile');
     
     function sendDataToBot(action, target) {
-      tg.sendData(JSON.stringify({ action, target }));
-      tg.HapticFeedback.notificationOccurred('success');
+      if (tg.sendData) {
+        tg.sendData(JSON.stringify({ action, target }));
+      }
+      if (tg.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+      }
     }
 
-    function populateCarousel(containerId, items, action) {
-      const wrapper = document.getElementById(containerId);
-      if (!wrapper) return;
-      items.forEach(item => {
-        const slide = document.createElement('div');
-        slide.className = 'swiper-slide';
-        // Внутренняя структура карточки
-        slide.innerHTML = `
-          <div class="tg-card carousel-card ${item.palette}">
-            <div class="card-icon">${item.icon}</div>
-            <div>
-              <h3 class="card-title">${item.name}</h3>
-              <p class="card-description mt-1">${item.desc}</p>
+    function populateCarousel(swiperInstance, items, action) {
+      if (!swiperInstance) return;
+      const slides = items.map(item => {
+        return `
+          <div class="swiper-slide">
+            <div class="tg-card ${item.palette}" data-action="${action}" data-key="${item.key}" data-name="${item.name}">
+              <div class="card-icon">${item.icon}</div>
+              <div>
+                <h3 class="card-title">${item.name}</h3>
+                <p class="card-description">${item.desc}</p>
+              </div>
             </div>
-          </div>`;
-        slide.addEventListener('click', () => {
-            sendDataToBot(action, item.key);
-            tg.showPopup({
-                title: 'Настройка применена!',
-                message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
-            });
-        });
-        wrapper.appendChild(slide);
+          </div>
+        `;
       });
+      swiperInstance.el.querySelector('.swiper-wrapper').innerHTML = slides.join('');
     }
     
     function showPage(page) {
-        mainContent.style.display = 'none';
-        profilePage.style.display = 'none';
-        tabHome.classList.remove('active');
-        tabProfile.classList.remove('active');
-        if (page === 'home') {
-            mainContent.style.display = 'block';
-            tabHome.classList.add('active');
-        } else if (page === 'profile') {
-            profilePage.style.display = 'block';
-            tabProfile.classList.add('active');
-        }
+      mainContent.style.display = 'none';
+      profilePage.style.display = 'none';
+      tabHome.classList.remove('active');
+      tabProfile.classList.remove('active');
+
+      if (page === 'home') {
+        mainContent.style.display = 'block';
+        tabHome.classList.add('active');
+      } else if (page === 'profile') {
+        profilePage.style.display = 'block';
+        tabProfile.classList.add('active');
+        displayProfileData();
+      }
     }
 
-    // Загрузка данных профиля (остается без изменений, эта логика верна)
     function displayProfileData() {
         const user = tg.initDataUnsafe?.user;
         if (user && user.id) {
             document.getElementById('profile-avatar-img').src = user.photo_url || '';
             document.getElementById('profile-avatar-img').onerror = function() { 
-                this.style.backgroundColor = '#333'; // Показываем фон, если фото не загрузилось
-                this.src = ''; // Очищаем src, чтобы убрать иконку битого изображения
+                this.style.backgroundColor = '#333';
+                this.src = '';
             };
             document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
             document.getElementById('profile-id').textContent = `ID: ${user.id}`;
         } else {
             document.getElementById('profile-name').textContent = 'Данные не получены';
-            document.getElementById('profile-id').textContent = 'Попробуйте перезайти';
-            console.warn("Telegram user data is not available on demand.");
         }
     }
     
-    // Инициализация приложения
-    function init() {
-        tg.ready();
-        tg.expand();
+    // Главная функция инициализации
+    function initApp() {
+      tg.ready();
+      tg.expand();
 
-        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-        populateCarousel('models-swiper-wrapper', models, 'set_model');
+      // Даем приложению "вздохнуть" перед отрисовкой каруселей
+      setTimeout(() => {
+        const agentsSwiper = new Swiper('#agents-swiper', {
+          slidesPerView: 'auto',
+          spaceBetween: 16,
+          wrapperClass: 'swiper-wrapper',
+          slideClass: 'swiper-slide',
+        });
 
-        const swiperOptions = {
-          slidesPerView: 'auto',
-          spaceBetween: 16,
-          pagination: { el: ".swiper-pagination", clickable: true },
-        };
-        // Инициализируем обе карусели
-        new Swiper("#agents-swiper", swiperOptions);
-        new Swiper("#models-swiper", swiperOptions);
-        
-        tabHome.addEventListener('click', () => showPage('home'));
-        tabProfile.addEventListener('click', () => {
-            showPage('profile');
-            displayProfileData(); 
-        });
-        
-        showPage('home');
-        // Пытаемся загрузить данные профиля один раз при старте
-        // на случай, если они уже доступны
-        if (tg.initDataUnsafe?.user) {
-            displayProfileData();
-        }
+        const modelsSwiper = new Swiper('#models-swiper', {
+          slidesPerView: 'auto',
+          spaceBetween: 16,
+          wrapperClass: 'swiper-wrapper',
+          slideClass: 'swiper-slide',
+        });
+        
+        populateCarousel(agentsSwiper, agents, 'set_agent');
+        populateCarousel(modelsSwiper, models, 'set_model');
+
+        // Обработчик кликов на карточки (один для всех)
+        document.body.addEventListener('click', (event) => {
+            const card = event.target.closest('.tg-card');
+            if (!card) return;
+
+            const { action, key, name } = card.dataset;
+            sendDataToBot(action, key);
+            tg.showPopup({
+                title: 'Настройка применена!',
+                message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${name}".`
+            });
+        });
+      }, 100); // 100 миллисекунд задержки
+
+      tabHome.addEventListener('click', () => showPage('home'));
+      tabProfile.addEventListener('click', () => showPage('profile'));
+      
+      showPage('home');
+      if (tg.initDataUnsafe?.user) {
+          displayProfileData();
+      }
     }
 
-    document.addEventListener('DOMContentLoaded', init);
+    initApp();
+  });
 </script>
 </body>
 </html>
