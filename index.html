@@ -379,7 +379,7 @@ function fetchUpdates() {
         // Не опрашиваем, если ID пользователя нет или экран чата не активен
         return;
     }
-    const backendGetUpdatesUrl = `${CONFIG.WEBHOOK_URL.rstrip('/')}/api/get_updates/${userId}`;
+    const backendGetUpdatesUrl = `${CONFIG.WEBHOOK_URL.rstrip('https://nwb-production.up.railway.app/')}/api/get_updates/${userId}`;
     // Или ваш захардкоженный URL:
     // const backendGetUpdatesUrl = `https://your-app-name.onrender.com/api/get_updates/${userId}`;
 
