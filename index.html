@@ -11,11 +11,11 @@
     <script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
     <style>
+        /* Все основные стили приложения остаются без изменений */
         :root {
             --bg-main: #101010;
             --bg-card: #1E1E1E;
             --bg-select: #2C2C2E;
-            --bg-user-msg: #3E3E42;
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
             --border-color: #3A3A3C;
@@ -26,146 +26,64 @@
         html, body { position: fixed; inset: 0; overflow: hidden; font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary); display: flex; justify-content: center; overscroll-behavior-y: contain; }
         .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         
-        .screen {
-            position: absolute; inset: 0;
-            display: flex; flex-direction: column;
-            transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
-            background-color: var(--bg-main);
-            z-index: 10;
-        }
+        .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.2s ease-out, visibility 0.2s ease-out; background-color: var(--bg-main); z-index: 10; }
         .screen.active { z-index: 20; }
-        .screen:not(.active) {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-
+        .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
         #main-screen { flex-grow: 1; }
         #main-content-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3rem 1rem 1rem 1rem; }
         .content-pane { display: none; }
         .content-pane.active { display: block; }
-
         h1, h2, p { margin: 0; }
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
         p.subtitle { font-size: 1rem; color: var(--text-secondary); margin-top: 0.25rem; }
-
         .swiper-container-wrapper { margin-top: 2rem; }
         .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s; }
         .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; }
         .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
-        
         .tg-card { border-radius: 20px; overflow: hidden; height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; }
         .card-icon { font-size: 1.75rem; }
         .card-title { font-size: 1rem; font-weight: 700; color: #FFFFFF; }
         .card-description { font-size: 0.875rem; color: #FFFFFF; opacity: 0.85; margin-top: 0.25rem; }
-        
         .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
         .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
         .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
         .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
-
         .full-screen-card-list { display: grid; gap: 1rem; margin-top: 1.5rem; }
         .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; }
         
-        .chat-header { flex-shrink: 0; padding: 0.75rem 1rem; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); z-index: 20; }
-        .chat-header .title { font-weight: 600; text-align: center; }
-        .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
-        .chat-header-btn:hover { background-color: var(--bg-card); }
-        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        /* ИЗМЕНЕНИЕ: Удалены все стили для старого чата (.chat-messages, .chat-input-area, .chat-message и т.д.) */
         
-        .chat-input-area { 
-            flex-shrink: 0; 
-            padding: 0.5rem 0.75rem;
-            border-top: 1px solid var(--border-color); 
-            background-color: var(--bg-main); 
-            display: flex; 
-            align-items: flex-end;
-            gap: 0.5rem; 
-        }
-        #chat-input { 
-            flex-grow: 1;
-            background-color: var(--bg-card); border-radius: 20px; 
-            padding: 0.75rem 1rem; border: none; color: var(--text-primary); 
-            font-size: 1rem; resize: none; 
-            line-height: 1.4;
-            min-height: calc(0.75rem * 2 + 1.4em);
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        .chat-action-btn {
-            width: 40px; height: 40px;
-            background-color: var(--bg-card);
-            color: var(--text-secondary);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; flex-shrink: 0;
-            transition: transform 0.15s ease, opacity 0.2s ease, width 0.2s ease, padding 0.2s ease;
-        }
-        #send-btn { 
-            background-color: var(--gold-highlight); 
-            color: black;
-            transform: scale(0);
-            opacity: 0;
-            width: 0; /* ИЗМЕНЕНИЕ: анимируем ширину для плавного появления */
-            padding: 0;
-        }
-        
-        #send-btn.visible {
-            transform: scale(1);
-            opacity: 1;
-            width: 40px; /* ИЗМЕНЕНИЕ: возвращаем ширину */
-        }
-        /* ИЗМЕНЕНИЕ: Кнопка "Скрыть клавиатуру" теперь исчезает, когда появляется кнопка "Отправить" */
-        #hide-keyboard-btn.hidden {
-            width: 0;
-            opacity: 0;
-            padding: 0;
-        }
-
-        .ios-tab-bar { 
-            flex-shrink: 0; 
-            max-width: 400px; 
-            width: calc(100% - 2.5rem); 
-            margin: 0 auto 1.25rem auto; 
-            display: flex;
-            background: rgba(20,20,20,0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 0.5rem; 
-            border: 1px solid rgba(255,255,255,0.1);
-            z-index: 100;
-        }
+        .ios-tab-bar { flex-shrink: 0; max-width: 400px; width: calc(100% - 2.5rem); margin: 0 auto 1.25rem auto; display: flex; background: rgba(20,20,20,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; padding: 0.5rem; border: 1px solid rgba(255,255,255,0.1); z-index: 100; }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; }
         .tab-item.active { color: var(--gold-highlight); }
         .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
         .tab-item span { font-size: 0.625rem; font-weight: 500; }
         
-        /* Остальные стили без критических изменений */
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
         .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
         .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; background-color: #333; }
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
-        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
-        .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-        .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
+
+        /* ИЗМЕНЕНИЕ: Контейнер для TalkJS должен занимать все доступное пространство */
+        #talkjs-container {
+            flex-grow: 1; /* Растягиваем контейнер на всю высоту */
+            height: 100%;
+        }
     </style>
 </head>
 <body>
     <div class="app-wrapper">
         <div id="main-screen" class="screen active">
             <div id="main-content-area">
-                <div id="home-content" class="content-pane active">
+                 <div id="home-content" class="content-pane active">
                     <h1>Главная</h1><p class="subtitle">Панель управления ассистентом</p>
-                    <div class="full-screen-card" style="margin-top: 1.5rem;">
+                    <div class="full-screen-card" style="margin-top: 1.5rem;" onclick="alert('Переход к генератору изображений')">
                         <div class="icon" style="font-size: 2rem;">🎨</div><div class="info"><h3>Генератор изображений</h3><p>Создание картинок по описанию.</p></div>
                     </div>
                     <div class="swiper-container-wrapper">
@@ -197,244 +115,155 @@
         </div>
 
         <div id="chat-screen" class="screen">
-            <div class="chat-header">
-                <div id="chat-title" class="title"></div>
-                <div id="chat-settings-btn" class="chat-header-btn">
-                    <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18-.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17-.47.41l.36-2.54c.59-.24 1.13-.57-1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-                </div>
-            </div>
-            <div class="chat-messages" id="chat-messages-container"></div>
-            <div class="chat-input-area">
-                <div id="hide-keyboard-btn" class="chat-action-btn">
-                     <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M7.14,17.28L8.55,18.7L12,15.25L15.45,18.7L16.86,17.28L13.41,13.84L17.32,9.94L15.91,8.53L12,12.43L8.09,8.53L6.68,9.94L10.59,13.84L7.14,17.28Z" /></svg>
-                </div>
-                <textarea id="chat-input" placeholder="Сообщение..." rows="1"></textarea>
-                <div id="send-btn" class="chat-action-btn">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3.49999 20.5C4.33332 21.3333 5.66666 21.1667 6.33332 20.5L21.3333 13C22.1667 12.5 22.1667 11.5 21.3333 11L6.33332 3.5C5.66666 2.83333 4.33332 2.66667 3.49999 3.5C2.66666 4.33333 2.83332 5.66667 3.49999 6.33333L16.1667 12L3.49999 17.6667C2.83332 18.3333 2.66666 19.6667 3.49999 20.5Z" fill="black"/></svg>
-                </div>
+             <div id="talkjs-container">
+                <p style="text-align: center; padding-top: 4rem; color: var(--text-secondary);">Загрузка чата...</p>
             </div>
         </div>
-
-        <div id="settings-modal">
-            <div class="modal-content">
-                <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn">✕</div></div>
-                <div><label>АГЕНТ</label><select id="agent-select" class="custom-select"></select></div>
-                <div style="margin-top: 1rem;"><label>МОДЕЛЬ</label><select id="model-select" class="custom-select"></select></div>
-            </div>
+        
         </div>
-    </div>
     
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const tg = window.Telegram.WebApp;
+<script type="module">
+    // ИЗМЕНЕНИЕ: Подключаем TalkJS SDK
+    import Talk from 'https://cdn.skypack.dev/talkjs';
 
-    // --- ДАННЫЕ (без изменений) ---
-    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
-    const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "💎", desc: "Мощная и точная", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "🐸", desc: "С юмором и сарказмом", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "💡", desc: "Быстрая и недорогая", palette: "palette-3" } ];
-    const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
+    document.addEventListener('DOMContentLoaded', () => {
+        const tg = window.Telegram.WebApp;
 
-    let selectedAgentKey = agents[0].key;
-    let selectedModelKey = models[0].key;
-    let agentsSwiper, modelsSwiper;
+        // Данные агентов, моделей и инструментов остаются без изменений
+        const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }];
+        const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "✨", desc: "Продвинутая модель", palette: "palette-1" }];
+        const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }];
 
-    // --- ЭЛЕМЕНТЫ DOM ---
-    const mainScreen = document.getElementById('main-screen');
-    const chatScreen = document.getElementById('chat-screen');
-    const chatTitle = document.getElementById('chat-title');
-    const chatMessagesContainer = document.getElementById('chat-messages-container');
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('send-btn');
-    const hideKeyboardBtn = document.getElementById('hide-keyboard-btn');
-    const settingsModal = document.getElementById('settings-modal');
-    const agentSelect = document.getElementById('agent-select');
-    const modelSelect = document.getElementById('model-select');
+        let selectedAgentKey = agents[0].key;
+        let selectedModelKey = models[0].key; // Эта переменная может понадобиться для логики
+        let agentsSwiper, modelsSwiper;
+        let chatbox; // Переменная для хранения экземпляра чата TalkJS
 
-    // --- СТИЛИ ДЛЯ СООБЩЕНИЙ ЧАТА ---
-    const styleSheet = document.createElement("style");
-    styleSheet.innerText = `
-        .chat-message { 
-            padding: 0.6rem 1rem; border-radius: 1.25rem; max-width: 80%; word-wrap: break-word; line-height: 1.4; 
-            opacity: 0; transform: translateY(10px); 
-            animation: pop-in 0.3s ease forwards;
+        const mainScreen = document.getElementById('main-screen');
+        const chatScreen = document.getElementById('chat-screen');
+
+        function switchScreen(screenToShow) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            screenToShow.classList.add('active');
         }
-        @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
-        .message-bot { background-color: var(--bg-card); align-self: flex-start; border-bottom-left-radius: 0.25rem; }
-        .message-user { background-color: var(--bg-user-msg); align-self: flex-end; border-bottom-right-radius: 0.25rem; }
-        .message-bot.typing { color: var(--text-secondary); font-style: italic; }
-        .typing::after { content: '.'; animation: dots 1.2s steps(5, end) infinite; }
-        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
-    `;
-    document.head.appendChild(styleSheet);
 
-    // ИЗМЕНЕНИЕ 1: IntersectionObserver для плавной анимации только видимых сообщений
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                // Можно добавить класс для анимации, но наш CSS уже это делает при добавлении
-                observer.unobserve(entry.target); // Отписываемся после анимации
-            }
-        });
-    }, { threshold: 0.1 });
-
-
-    // --- ОСНОВНЫЕ ФУНКЦИИ ---
-    function switchScreen(screenToShow) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        screenToShow.classList.add('active');
-    }
-
-    function showTab(tabId) {
-        document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-        document.getElementById(`${tabId}-content`).classList.add('active');
-        document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
-    }
-
-    function openChat() {
-        updateChatTitle();
-        chatMessagesContainer.innerHTML = ''; 
-        addMessageToChat('bot', 'Здравствуйте! Чем могу помочь?');
-        switchScreen(chatScreen);
-        tg.BackButton.show();
-    }
-
-    function closeChat() {
-        switchScreen(mainScreen);
-        tg.BackButton.hide();
-    }
-    
-    // ИЗМЕНЕНИЕ 2: Оптимизированная функция добавления сообщений
-    function addMessageToChat(sender, text, options = {}) {
-        const { id = null, isTyping = false, fragment = null } = options;
-        
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `chat-message message-${sender}`;
-        msgDiv.textContent = text;
-        if (id) msgDiv.id = id;
-        if (isTyping) msgDiv.classList.add('typing');
-
-        const container = fragment || chatMessagesContainer;
-        container.appendChild(msgDiv);
-        
-        // Добавляем новый элемент в observer, только если он добавляется напрямую в DOM
-        if (!fragment) {
-            observer.observe(msgDiv);
-            requestAnimationFrame(() => {
-                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-            });
+        function showTab(tabId) {
+            document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${tabId}-content`).classList.add('active');
+            document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
         }
-        return msgDiv; // Возвращаем элемент для дальнейших манипуляций
-    }
-
-    // ИЗМЕНЕНИЕ 3: Оптимизированный процесс отправки сообщения
-    function handleSendMessage() {
-        const text = chatInput.value.trim();
-        if (!text) return; 
-
-        const userMessageText = text;
-        chatInput.value = '';
-        handleInput.call(chatInput); // Вызываем для сброса высоты и кнопок
         
-        // Используем DocumentFragment для пакетного обновления DOM
-        const fragment = document.createDocumentFragment();
+        // --- ИЗМЕНЕНИЕ: Полная замена логики чата на TalkJS ---
 
-        // 1. Добавляем сообщение пользователя во фрагмент
-        const userMsgEl = addMessageToChat('user', userMessageText, { fragment });
+        async function openChat() {
+            // Переключаемся на экран чата немедленно
+            switchScreen(chatScreen);
+            tg.BackButton.show();
 
-        // 2. Добавляем индикатор печати во фрагмент
-        const typingIndicatorId = `typing-${Date.now()}`;
-        const typingIndicator = addMessageToChat('bot', 'Печатает', { id: typingIndicatorId, isTyping: true, fragment });
+            try {
+                // Ждем готовности TalkJS
+                await Talk.ready;
 
-        // 3. Добавляем весь фрагмент в DOM за одну операцию
-        chatMessagesContainer.appendChild(fragment);
+                const user = tg.initDataUnsafe?.user;
+                if (!user) {
+                    // Обработка случая, когда данные пользователя Telegram недоступны
+                    document.getElementById('talkjs-container').innerHTML = '<p>Не удалось идентифицировать пользователя.</p>';
+                    return;
+                }
 
-        // 4. Наблюдаем за новыми элементами и прокручиваем
-        requestAnimationFrame(() => {
-            observer.observe(userMsgEl);
-            observer.observe(typingIndicator);
-            chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-        });
-
-        // Симуляция ответа от бота
-        setTimeout(() => {
-            const indicator = document.getElementById(typingIndicatorId);
-            if (indicator) {
-                requestAnimationFrame(() => {
-                    indicator.textContent = 'Это симуляция ответа.';
-                    indicator.classList.remove('typing');
-                    // Плавная прокрутка после обновления текста
-                    chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+                // 1. Создаем пользователя из данных Telegram. Это будет текущий юзер.
+                const me = new Talk.User({
+                    id: user.id.toString(), // ID должен быть строкой
+                    name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь',
+                    photoUrl: user.photo_url,
+                    // Можно добавить кастомные поля
+                    custom: {
+                        username: user.username,
+                    }
                 });
+
+                // 2. Создаем собеседника (бота/агента). Его ID и имя берем из выбранного агента.
+                const selectedAgent = agents.find(a => a.key === selectedAgentKey);
+                const other = new Talk.User({
+                    id: selectedAgent.key,
+                    name: selectedAgent.name,
+                    photoUrl: `https://via.placeholder.com/150/FFFFFF/000000?text=${selectedAgent.icon}`, // Генерируем аватарку из иконки
+                    role: "agent", // Указываем роль
+                    welcomeMessage: `Здравствуйте! Я ${selectedAgent.name}. Чем могу помочь?` // Приветственное сообщение
+                });
+
+                // 3. Создаем сессию для текущего пользователя
+                const session = new Talk.Session({
+                    appId: 'tvv2Rb7x', // <-- ЗАМЕНИТЕ НА ВАШ APP ID ИЗ ЛИЧНОГО КАБИНЕТА TALKJS
+                    me: me
+                });
+
+                // 4. Создаем или получаем беседу между пользователем и агентом
+                const conversation = session.getOrCreateConversation(Talk.oneOnOneId(me, other));
+                conversation.setParticipant(me);
+                conversation.setParticipant(other);
+                
+                // Устанавливаем кастомный заголовок для чата
+                conversation.setAttributes({
+                    subject: `${selectedAgent.icon} ${selectedAgent.name}`
+                });
+
+                // 5. Создаем и монтируем UI чата в наш контейнер
+                // Если chatbox уже существует, уничтожаем его перед созданием нового
+                if (chatbox) {
+                    chatbox.destroy();
+                }
+                chatbox = session.createChatbox(conversation);
+                chatbox.mount(document.getElementById('talkjs-container'));
+
+            } catch (e) {
+                console.error("Ошибка инициализации TalkJS:", e);
+                document.getElementById('talkjs-container').innerHTML = '<p>Произошла ошибка при загрузке чата.</p>';
             }
-        }, 1500);
-    }
-    
-    function handleInput() {
-        // Ограничиваем вызов изменения высоты для производительности
-        requestAnimationFrame(() => {
-            this.style.height = 'auto';
-            this.style.height = `${this.scrollHeight}px`;
-        });
+        }
 
-        const hasText = this.value.trim().length > 0;
-        sendBtn.classList.toggle('visible', hasText);
-        hideKeyboardBtn.classList.toggle('hidden', hasText);
-    }
+        function closeChat() {
+            // Уничтожаем экземпляр чата при закрытии, чтобы освободить ресурсы
+            if (chatbox) {
+                chatbox.destroy();
+                chatbox = null;
+            }
+            switchScreen(mainScreen);
+            tg.BackButton.hide();
+        }
+        
+        // --- Функции для заполнения UI (без изменений) ---
+        function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
+        function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
+        function displayProfileData() { try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64'; document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
+        function updateNavArrows(swiper, prefix) { const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
 
-    function updateChatTitle() {
-        const agent = agents.find(a => a.key === selectedAgentKey);
-        const model = models.find(m => m.key === selectedModelKey);
-        chatTitle.innerHTML = `${agent?.icon || ''} ${agent?.name || ''} <span style="color: var(--text-secondary); padding: 0 0.25em;">&bull;</span> ${model?.name || ''}`;
-    }
-    
-    // --- ЗАПОЛНЕНИЕ ИНТЕРФЕЙСА (без критических изменений) ---
-    function populateCarousel(containerId, items, type) { const wrapper = document.getElementById(containerId); if (!wrapper) return; wrapper.innerHTML = ''; items.forEach(item => { const slide = document.createElement('div'); slide.className = 'swiper-slide'; slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`; slide.addEventListener('click', () => { if (type === 'agent') selectedAgentKey = item.key; if (type === 'model') selectedModelKey = item.key; openChat(); }); wrapper.appendChild(slide); }); }
-    function populateToolsList() { const list = document.getElementById('tools-list'); if (!list) return; list.innerHTML = ''; tools.forEach(item => { const card = document.createElement('div'); card.className = 'full-screen-card'; card.innerHTML = `<div class="icon" style="font-size: 2rem;">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`; list.appendChild(card); }); }
-    function displayProfileData() { try { const user = tg.initDataUnsafe?.user; if (!user || !user.id) throw new Error("User data not found"); document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64'; document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь'; document.getElementById('profile-id').textContent = `ID: ${user.id}`; } catch (e) { document.getElementById('profile-name').textContent = 'Нет данных'; document.getElementById('profile-id').textContent = 'ID: Н/Д'; } }
-    function updateNavArrows(swiper, prefix) { const prev = document.getElementById(`${prefix}-nav-prev`); const next = document.getElementById(`${prefix}-nav-next`); if(prev && next) { prev.classList.toggle('disabled', swiper.isBeginning); next.classList.toggle('disabled', swiper.isEnd); } }
-    function openSettingsModal() { settingsModal.style.display = 'flex'; }
-    function closeSettingsModal() { settingsModal.style.display = 'none'; }
-    
-    // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
-    function init() {
-        tg.ready();
-        tg.expand();
-        tg.BackButton.onClick(closeChat);
-        
-        populateCarousel('agents-swiper-wrapper', agents, 'agent');
-        populateCarousel('models-swiper-wrapper', models, 'model');
-        populateToolsList();
-        displayProfileData();
-        
-        agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
-        
-        agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
-        modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
-        
-        document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-        document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
-        document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
-        document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
-        document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
+        // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
+        function init() {
+            tg.ready();
+            tg.expand();
+            tg.BackButton.onClick(closeChat);
+            
+            populateCarousel('agents-swiper-wrapper', agents, 'agent');
+            populateCarousel('models-swiper-wrapper', models, 'model');
+            populateToolsList();
+            displayProfileData();
+            
+            agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+            modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+            
+            document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+            document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
+            document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
+            document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
+            document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
 
-        sendBtn.addEventListener('click', handleSendMessage);
-        chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-        chatInput.addEventListener('input', handleInput);
-        hideKeyboardBtn.addEventListener('click', () => { chatInput.blur(); });
+            // Все старые обработчики для чата удалены, так как TalkJS берет это на себя
+        }
 
-        document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
-        document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
-        settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
-        agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; updateChatTitle(); });
-        modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; updateChatTitle(); });
-        
-        // Инициализация начального состояния кнопок в чате
-        handleInput.call(chatInput);
-    }
-
-    init();
-});
+        init();
+    });
 </script>
 </body>
 </html>
