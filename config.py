@@ -718,9 +718,9 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
         text = item_config["text"]
         web_app_url = item_config.get("web_app_url")
-        if web_app_url:
-        return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
-        return KeyboardButton(text)
+    if web_app_url:
+    return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
+    return KeyboardButton(text)
 
     group_by_two_keys = [
         BotConstants.MENU_MAIN, 
