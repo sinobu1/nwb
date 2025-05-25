@@ -302,6 +302,37 @@
         // Этот блок выполнится, если приложение открыто НЕ в Telegram
         document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h1>Ошибка</h1><p>Это веб-приложение предназначено для запуска только внутри Telegram.</p></div>';
     }
+
+    function setAgent(agentId) {
+    const data = {
+        command: 'set_agent_from_app',
+        details: { agent_id: agentId }
+    };
+    Telegram.WebApp.sendData(JSON.stringify(data));
+}
+
+function setModel(modelId) {
+    const data = {
+        command: 'set_model_from_app',
+        details: { model_id: modelId }
+    };
+    Telegram.WebApp.sendData(JSON.stringify(data));
+}
+
+// Пример привязки к кнопкам
+document.querySelectorAll('.agent-button').forEach(button => {
+    button.addEventListener('click', () => {
+        const agentId = button.dataset.agentId; // ID агента из data-атрибута
+        setAgent(agentId);
+    });
+});
+
+document.querySelectorAll('.model-button').forEach(button => {
+    button.addEventListener('click', () => {
+        const modelId = button.dataset.modelId; // ID модели из data-атрибута
+        setModel(modelId);
+    });
+});
   </script>
 </body>
 </html>
