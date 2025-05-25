@@ -3,7 +3,7 @@ import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters,
-    ContextTypes, PreCheckoutQueryHandler
+    ContextTypes, PreCheckoutQueryHandler, BaseFilter
 )
 
 # --- ДОБАВЬТЕ ЭТОТ КЛАСС ---
