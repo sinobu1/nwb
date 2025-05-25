@@ -102,7 +102,7 @@
         h2 { font-size: 1.25rem; font-weight: 700; }
 
 
-        .swiper-container-wrapper { margin-top: 1.5rem; }
+        .swiper-container-wrapper { margin-top: 0.75rem; } /* Further Reduced margin */
         .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.25rem; }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s, transform 0.1s; color: var(--text-secondary); }
@@ -130,10 +130,21 @@
         .full-screen-card .info h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.1rem;}
         .full-screen-card .info p { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.3;}
 
-        .ios-tab-bar { flex-shrink: 0; max-width: 400px; width: calc(100% - 2rem); margin: 0 auto 1rem auto; display: flex; background: rgba(28,28,30,0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border-radius: 20px; padding: 0.4rem; border: 1px solid rgba(255,255,255,0.08); z-index: 100; }
+        .ios-tab-bar {
+            flex-shrink: 0;
+            max-width: 400px;
+            width: calc(100% - 2rem);
+            margin: 0 auto 1rem auto;
+            display: flex;
+            /* Removed background and backdrop-filter for transparency */
+            border-radius: 20px;
+            padding: 0.3rem; /* Adjusted padding for border visibility */
+            border: 1px solid var(--border-color); /* Frame only */
+            z-index: 100;
+        }
         .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; padding: 0.25rem 0; }
         .tab-item.active { color: var(--gold-highlight); }
-        .tab-item svg { width: 26px; height: 26px; margin-bottom: 1px; }
+        .tab-item svg { width: 24px; height: 24px; margin-bottom: 2px; } /* Slightly smaller icons */
         .tab-item span { font-size: 0.6rem; font-weight: 500; }
 
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1rem; }
@@ -163,16 +174,60 @@
         .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-secondary); float: right; margin-left: 0.5rem; margin-top: 0.2rem; line-height: 1; user-select: none; }
         .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 1rem; width: fit-content; }
 
-        .chat-input-area { flex-shrink: 0; padding: 0.4rem 0.6rem; border-top: 1px solid var(--border-color); background-color: var(--bg-main); display: flex; align-items: flex-end; gap: 0.4rem; }
-        .chat-input-wrapper { flex-grow: 1; position: relative; }
-        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 18px; padding: 0.5rem 0.9rem; border: none; color: var(--text-primary); font-size: 0.9rem; resize: none; line-height: 1.3; min-height: calc(0.5rem * 2 + 1.3em); max-height: 100px; overflow-y: auto; }
+        .chat-input-area {
+            flex-shrink: 0;
+            padding: 0.35rem 0.5rem; /* Slightly reduced padding */
+            border-top: 1px solid var(--border-color);
+            background-color: var(--bg-main);
+            display: flex;
+            align-items: center; /* Vertically center items */
+            gap: 0.35rem; /* Slightly reduced gap */
+        }
+        .chat-input-wrapper {
+            flex-grow: 1; /* Allow input to take available space */
+            position: relative;
+            max-width: calc(100% - 80px); /* Max width considering buttons */
+        }
+        #chat-input {
+            width: 100%;
+            background-color: var(--bg-card);
+            border-radius: 16px; /* Slightly less rounded */
+            padding: 0.45rem 0.8rem; /* Adjusted padding */
+            border: none;
+            color: var(--text-primary);
+            font-size: 0.85rem; /* Slightly smaller font */
+            resize: none;
+            line-height: 1.3;
+            min-height: 34px; /* Adjusted min-height to match button */
+            max-height: 90px; /* Adjusted max-height */
+            overflow-y: auto;
+        }
         #chat-input:focus { outline: none; box-shadow: 0 0 0 1.5px var(--gold-highlight); }
-        #send-btn { width: 36px; height: 36px; background-color: var(--gold-highlight); color: black; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: opacity 0.2s, transform 0.15s ease; }
+        #send-btn {
+            width: 34px; /* Matched to input field height */
+            height: 34px; /* Matched to input field height */
+            background-color: var(--gold-highlight);
+            color: black;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: opacity 0.2s, transform 0.15s ease;
+        }
         #send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: scale(1); }
         #send-btn:not(:disabled):active { transform: scale(0.92); }
-        #send-btn svg { width: 18px; height: 18px; }
-        #attach-btn { width: 36px; height: 36px; }
-        #attach-btn svg { width: 20px; height: 20px; }
+        #send-btn svg { width: 16px; height: 16px; } /* Adjusted icon size */
+        #attach-btn {
+            width: 34px; /* Matched to input field height */
+            height: 34px; /* Matched to input field height */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #attach-btn svg { width: 18px; height: 18px; } /* Adjusted icon size */
+
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
@@ -182,7 +237,6 @@
         .save-to-bot-btn:hover { background-color: var(--bg-select); color: var(--text-primary); }
         .save-to-bot-btn:disabled { cursor: default; opacity: 0.6; }
 
-        /* Styles for Image Generator and Summarizer Screens */
         .feature-input-area { margin-bottom: 1rem; }
         .feature-input-area textarea, .feature-input-area input[type="text"] {
             width: 100%;
@@ -237,8 +291,7 @@
                         <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
                         <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
                     </div>
-                    <div class="swiper-container-wrapper">
-                        <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
+                    <div class="swiper-container-wrapper"> <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
                         <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                     </div>
                 </div>
@@ -267,9 +320,29 @@
                 </div>
             </div>
             <nav class="ios-tab-bar">
-                <div class="tab-item active" data-tab="home"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 3H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm0 11H4a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1zm11-11h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V4a1 1 0 00-1-1zm-1 12h-6a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1v-6a1 1 0 00-1-1z"/></svg><span>Главная</span></div>
-                <div class="tab-item" data-tab="tools"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83L19.5 9.5l1.21-2.46zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg><span>Инструменты</span></div>
-                <div class="tab-item" data-tab="profile"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 19.2c-2.5 0-4.71-1.28-6-3.2.03-2 4-3.1 6-3.1s5.97 1.1 6 3.1c-1.29 1.92-3.5 3.2-6 3.2zM12 5a3 3 0 110 6 3 3 0 010-6zm0-3a10 10 0 100 20 10 10 0 000-20z"/></svg><span>Профиль</span></div>
+                <div class="tab-item active" data-tab="home">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    <span>Главная</span>
+                </div>
+                <div class="tab-item" data-tab="tools">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Инструменты</span>
+                </div>
+                <div class="tab-item" data-tab="profile">
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>Профиль</span>
+                </div>
             </nav>
         </div>
 
@@ -279,7 +352,8 @@
                      <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                  </div>
                  <div id="chat-title" class="title">Чат</div>
-                 <div id="chat-settings-btn" class="chat-header-btn"> <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12-.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17-.47.41l.36 2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.21.08-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                 <div id="chat-settings-btn" class="chat-header-btn">
+                    <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"> <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                  </div>
             </div>
             <div class="chat-messages" id="chat-messages-container"></div>
@@ -343,14 +417,14 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram?.WebApp || {};
-    let currentMiniAppChatHistory = [];
-    let lastMessageInfo = { sender: null, date: null };
+    let currentMiniAppChatHistory = []; // Stores history for API calls {role, parts}
+    let lastMessageInfo = { sender: null, date: null }; // For UI message grouping
     let agentsSwiper, modelsSwiper;
 
     const API_KEY = ""; // IMPORTANT: Leave empty for Canvas to inject.
 
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
-    const models = [ { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" } ]; // Simplified to one reliable model for text
+    const models = [ { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" } ];
     const tools = [
         { key: "summarizer", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
         { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." },
@@ -358,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let selectedAgentKey = agents[0].key;
-    let selectedModelKey = models[0].key; // Default to Gemini Flash
+    let selectedModelKey = models[0].key;
 
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
@@ -377,7 +451,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelSelect = document.getElementById('model-select');
     const mainContentArea = document.getElementById('main-content-area');
 
-    // Image Generator Elements
     const imageGeneratorCard = document.getElementById('image-generator-card');
     const imagePromptInput = document.getElementById('image-prompt-input');
     const generateImageBtn = document.getElementById('generate-image-btn');
@@ -385,14 +458,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const generatedImageContainer = document.getElementById('generated-image-container');
     const imageErrorMessage = document.getElementById('image-error-message');
 
-    // Summarizer Elements
-    // Note: Summarizer card click is handled in populateToolsList
     const summarizerInput = document.getElementById('summarizer-input');
     const summarizeTextBtn = document.getElementById('summarize-text-btn');
     const summarizerLoadingIndicator = document.getElementById('summarizer-loading-indicator');
     const summarizerOutput = document.getElementById('summarizer-output');
     const summarizerErrorMessage = document.getElementById('summarizer-error-message');
-
 
     function formatTime(date) { return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
@@ -400,24 +470,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         screenToShow.classList.add('active');
         if (tg.BackButton) {
-            // Show back button only if not on main screen
-            if (screenToShow !== mainScreen) {
-                tg.BackButton.show();
-            } else {
-                tg.BackButton.hide();
-            }
+            if (screenToShow !== mainScreen) { tg.BackButton.show(); }
+            else { tg.BackButton.hide(); }
         }
     }
-    // Global back button handler for Telegram
+
     if (tg.BackButton) {
         tg.BackButton.onClick(() => {
             const activeScreen = document.querySelector('.screen.active');
-            if (activeScreen && activeScreen.id !== 'main-screen') {
-                switchScreen(mainScreen); // Default back action
+            if (activeScreen && activeScreen.id === 'chat-screen') { closeChat(); }
+            else if (activeScreen && (activeScreen.id === 'image-generator-screen' || activeScreen.id === 'summarizer-screen')) {
+                switchScreen(mainScreen);
             }
         });
     }
-    // Specific back buttons within feature screens
+
     document.querySelectorAll('.back-btn[data-target-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
             const targetScreenId = btn.dataset.targetScreen;
@@ -425,7 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetScreen) switchScreen(targetScreen);
         });
     });
-
 
     function showTab(tabId) {
         document.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
@@ -438,22 +504,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveChatToLocalStorage() {
-        try { localStorage.setItem('miniAppChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); }
-        catch (e) { console.error("Error saving chat to localStorage:", e); }
+        try { localStorage.setItem('apiChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); }
+        catch (e) { console.error("Error saving API chat history to localStorage:", e); }
     }
 
     function loadChatFromLocalStorage() {
+        chatMessagesContainer.innerHTML = '';
+        lastMessageInfo = { sender: null, date: null };
+        currentMiniAppChatHistory = []; 
+
         try {
-            const savedHistory = localStorage.getItem('miniAppChatHistory_' + selectedAgentKey);
-            chatMessagesContainer.innerHTML = '';
-            lastMessageInfo = { sender: null, date: null };
-            currentMiniAppChatHistory = [];
-            if (savedHistory) {
-                const parsedHistory = JSON.parse(savedHistory);
-                parsedHistory.forEach(msg => addMessageToChat(msg.sender, msg.text, { isRestoredFromHistory: true, timestamp: msg.timestamp }));
+            const savedApiHistory = localStorage.getItem('apiChatHistory_' + selectedAgentKey);
+            if (savedApiHistory) {
+                const parsedApiHistory = JSON.parse(savedApiHistory);
+                const agentConfig = agents.find(a=>a.key === selectedAgentKey);
+                const systemPromptText = agentConfig ? agentConfig.systemPrompt : null;
+
+                const displayHistory = parsedApiHistory.filter(msg => 
+                    !(msg.role === 'user' && msg.parts[0].text === systemPromptText) && 
+                    !(msg.role === 'model' && msg.parts[0].text === "Понял. Я готов помочь.")
+                );
+
+                displayHistory.forEach(msg => {
+                    addMessageToChat(msg.role === 'user' ? 'user' : 'bot', msg.parts[0].text, { isRestoredFromHistory: true, timestamp: msg.timestamp || new Date().toISOString() });
+                });
+                currentMiniAppChatHistory = parsedApiHistory; 
             }
-        } catch (e) { console.error("Error loading chat from localStorage:", e); currentMiniAppChatHistory = []; }
+        } catch (e) {
+            console.error("Error loading API chat history from localStorage:", e);
+            currentMiniAppChatHistory = [];
+        }
     }
+
 
     function addMessageToChat(sender, text, options = {}) {
         const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestamp } = options;
@@ -501,11 +583,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveButton.className = 'save-to-bot-btn';
                 saveButton.onclick = () => {
                     let userQueryText = "Запрос не найден";
-                    const allMessages = Array.from(chatMessagesContainer.querySelectorAll('.chat-message'));
-                    const botMsgIndex = allMessages.findIndex(el => el === msgDiv);
-                    if (botMsgIndex > 0 && allMessages[botMsgIndex - 1].classList.contains('message-user')) {
-                        userQueryText = allMessages[botMsgIndex - 1].querySelector('.message-content').textContent;
-                    }
+                    const userMessages = currentMiniAppChatHistory.filter(m => m.role === 'user');
+                    if (userMessages.length > 0) userQueryText = userMessages[userMessages.length-1].parts[0].text;
+
                     tg.sendData(JSON.stringify({ action: 'save_chat_to_telegram', payload: { user_query: userQueryText, ai_response: text } }));
                     saveButton.textContent = '✅';
                     saveButton.disabled = true;
@@ -515,11 +595,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         chatMessagesContainer.appendChild(msgDiv);
+
         if (!isTyping && !isRestoredFromHistory) {
-            // Add to current session history for API context
             const role = sender === 'user' ? 'user' : 'model';
-            currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }] });
-            saveChatToLocalStorage(); // This saves the display history, not API history
+            const agentConfig = agents.find(a=>a.key === selectedAgentKey);
+            const systemPromptText = agentConfig ? agentConfig.systemPrompt : null;
+
+            if (!(role === 'user' && text === systemPromptText) && !(role === 'model' && text === "Понял. Я готов помочь.")) {
+                 currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }], timestamp: now.toISOString() });
+                 saveChatToLocalStorage();
+            }
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
@@ -528,26 +613,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function callGeminiChatAPI(promptText, agentKey) {
         const agentConfig = agents.find(a => a.key === agentKey) || agents[0];
-        let historyForAPI = [];
+        let historyForAPIRequest = [];
 
-        if (agentConfig.systemPrompt) {
-            historyForAPI.push({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
-            historyForAPI.push({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
+        const systemPromptAlreadyInCurrentHistory = currentMiniAppChatHistory.length > 0 &&
+                                           currentMiniAppChatHistory[0].role === 'user' &&
+                                           currentMiniAppChatHistory[0].parts[0].text === agentConfig.systemPrompt;
+
+        if (agentConfig.systemPrompt && !systemPromptAlreadyInCurrentHistory) {
+            historyForAPIRequest.push({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
+            historyForAPIRequest.push({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
         }
-        // Add recent chat history, excluding the system prompt part if it was just added
-        const relevantChatHistory = currentMiniAppChatHistory.slice(agentConfig.systemPrompt ? 2 : 0);
-        historyForAPI = historyForAPI.concat(relevantChatHistory);
-
-
-        // The last user message is already part of `historyForAPI` if added via addMessageToChat
-        // So, we don't need to add `promptText` separately if it's the last item.
-        // Ensure the last item is the user's current prompt if not already there.
-        if (historyForAPI.length === 0 || historyForAPI[historyForAPI.length - 1].parts[0].text !== promptText) {
-             historyForAPI.push({ role: "user", parts: [{ text: promptText }] });
+        
+        historyForAPIRequest = historyForAPIRequest.concat(currentMiniAppChatHistory.slice(systemPromptAlreadyInCurrentHistory ? 2 : 0));
+        
+        if (historyForAPIRequest.length === 0 || historyForAPIRequest[historyForAPIRequest.length -1].parts[0].text !== promptText || historyForAPIRequest[historyForAPIRequest.length -1].role !== 'user' ) {
+             historyForAPIRequest.push({ role: "user", parts: [{ text: promptText }] });
         }
 
 
-        const payload = { contents: historyForAPI };
+        const payload = { contents: historyForAPIRequest };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelKey}:generateContent?key=${API_KEY}`;
 
         try {
@@ -556,21 +640,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            if (!response.ok) {
+                let errorDetail = "";
+                let userFriendlyError = `Ошибка API чата: ${response.status} ${response.statusText}`;
+                try {
+                    const errorResult = await response.json();
+                    if (errorResult && errorResult.error && errorResult.error.message) {
+                        errorDetail = errorResult.error.message;
+                    }
+                } catch (e) {
+                    try { errorDetail = await response.text(); } catch (textErr) { /* ignore */ }
+                }
+
+                if (response.status === 401) {
+                    userFriendlyError = "Ошибка аутентификации (401) при доступе к API чата.";
+                } else if (errorDetail && !errorDetail.toLowerCase().includes("<html")) {
+                    userFriendlyError = `Ошибка API чата (${response.status}): ${errorDetail.substring(0,100)}`;
+                }
+                console.error("Gemini Chat API HTTP Error:", response.status, response.statusText, "Detail:", errorDetail);
+                return userFriendlyError;
+            }
             const result = await response.json();
             if (result.candidates && result.candidates.length > 0 &&
                 result.candidates[0].content && result.candidates[0].content.parts &&
                 result.candidates[0].content.parts.length > 0) {
                 return result.candidates[0].content.parts[0].text;
             } else if (result.error) {
-                console.error("Gemini API Error:", result.error);
+                console.error("Gemini API Error (JSON):", result.error);
                 return `Ошибка API: ${result.error.message}`;
             } else {
                 console.error("Unexpected Gemini API response structure:", result);
                 return "Не удалось получить ответ от ИИ. Попробуйте снова.";
             }
         } catch (error) {
-            console.error("Error calling Gemini API:", error);
-            return "Ошибка сети при обращении к ИИ. Проверьте ваше подключение.";
+            console.error("Error calling Gemini Chat API (catch):", error);
+            if (error instanceof SyntaxError) { return "Ошибка ответа от сервера чата (неверный формат). Попробуйте позже."; }
+            return "Ошибка сети при обращении к ИИ чата. Проверьте ваше подключение.";
         }
     }
 
@@ -579,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = chatInput.value.trim();
         if (!text) return;
 
-        addMessageToChat('user', text); // Adds to UI and historyForAPI via currentMiniAppChatHistory
+        addMessageToChat('user', text);
         chatInput.value = '';
         handleInputStyling.call(chatInput);
 
@@ -611,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
             slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
             slide.addEventListener('click', () => {
                 if (type === 'agent') selectedAgentKey = item.key;
-                else if (type === 'model') selectedModelKey = item.key; // This might be removed if only one model
+                else if (type === 'model') selectedModelKey = item.key;
                 const agentForChat = agents.find(a => a.key === (type === 'agent' ? item.key : selectedAgentKey));
                 openChat(agentForChat);
             });
@@ -664,7 +769,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const result = await response.json();
+
+            if (!response.ok) {
+                let errorDetailMessage = "";
+                try {
+                    const errorResult = await response.json(); 
+                    if (errorResult && errorResult.error && errorResult.error.message) {
+                        errorDetailMessage = errorResult.error.message;
+                    }
+                } catch (e) { 
+                    try { errorDetailMessage = await response.text(); } 
+                    catch (textErr) { console.warn("Could not parse image error response as JSON or text", textErr); }
+                }
+
+                let userFriendlyDisplayError = `Ошибка API изображений: ${response.status} ${response.statusText}`;
+                if (response.status === 401) { 
+                    userFriendlyDisplayError = "Ошибка аутентификации (401) при доступе к API изображений. Возможно, проблема с ключом API или разрешениями.";
+                     if (errorDetailMessage && !errorDetailMessage.toLowerCase().includes("<html")) { 
+                        userFriendlyDisplayError += ` Детали: ${errorDetailMessage.substring(0,100)}`;
+                    }
+                } else if (errorDetailMessage && !errorDetailMessage.toLowerCase().includes("<html")) { 
+                     userFriendlyDisplayError = `Ошибка API изображений (${response.status}): ${errorDetailMessage.substring(0, 200)}${errorDetailMessage.length > 200 ? '...' : ''}`;
+                }
+                
+                console.error("Imagen API HTTP Error:", response.status, response.statusText, "Detail from response:", errorDetailMessage);
+                imageErrorMessage.textContent = userFriendlyDisplayError;
+                imageErrorMessage.style.display = 'block';
+                return; 
+            }
+
+            const result = await response.json(); 
 
             if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
                 const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
@@ -672,18 +806,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.src = imageUrl;
                 imgElement.alt = "Сгенерированное изображение: " + prompt.substring(0, 50);
                 generatedImageContainer.appendChild(imgElement);
-            } else if (result.error) {
-                 console.error("Imagen API Error:", result.error);
-                imageErrorMessage.textContent = `Ошибка API: ${result.error.message}`;
+            } else if (result.error) { 
+                 console.error("Imagen API Error (JSON payload):", result.error);
+                imageErrorMessage.textContent = `Ошибка API (ответ): ${result.error.message}`;
+                imageErrorMessage.style.display = 'block';
+            } else { 
+                console.warn("Unexpected Imagen API success response structure:", result);
+                imageErrorMessage.textContent = "Не удалось сгенерировать изображение. Неожиданный ответ от сервера.";
                 imageErrorMessage.style.display = 'block';
             }
-            else {
-                imageErrorMessage.textContent = "Не удалось сгенерировать изображение. Попробуйте другой запрос.";
-                imageErrorMessage.style.display = 'block';
+        } catch (error) { 
+            console.error("Error in handleGenerateImage (catch block):", error);
+            if (error instanceof SyntaxError) { 
+                imageErrorMessage.textContent = "Ошибка ответа от сервера изображений (неверный формат). Попробуйте позже.";
+            } else {
+                imageErrorMessage.textContent = "Ошибка сети при генерации изображения или обработке ответа.";
             }
-        } catch (error) {
-            console.error("Error calling Imagen API:", error);
-            imageErrorMessage.textContent = "Ошибка сети при генерации изображения.";
             imageErrorMessage.style.display = 'block';
         } finally {
             imageLoadingIndicator.style.display = 'none';
@@ -711,7 +849,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prompt = `Сделай краткое содержание следующего текста:\n\n${textToSummarize}`;
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${models[0].key}:generateContent?key=${API_KEY}`; // Use default text model
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${models[0].key}:generateContent?key=${API_KEY}`;
 
         try {
             const response = await fetch(apiUrl, {
@@ -719,25 +857,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            if (!response.ok) {
+                let errorDetail = "";
+                let userFriendlyError = `Ошибка API суммаризации: ${response.status} ${response.statusText}`;
+                try {
+                    const errorResult = await response.json();
+                    if (errorResult && errorResult.error && errorResult.error.message) {
+                        errorDetail = errorResult.error.message;
+                    }
+                } catch (e) {
+                    try { errorDetail = await response.text(); } catch (textErr) { /* ignore */ }
+                }
+                if (response.status === 401) {
+                    userFriendlyError = "Ошибка аутентификации (401) при доступе к API суммаризации.";
+                } else if (errorDetail && !errorDetail.toLowerCase().includes("<html")) {
+                    userFriendlyError = `Ошибка API суммаризации (${response.status}): ${errorDetail.substring(0,100)}`;
+                }
+                console.error("Summarizer API HTTP Error:", response.status, response.statusText, "Detail:", errorDetail);
+                summarizerErrorMessage.textContent = userFriendlyError;
+                summarizerErrorMessage.style.display = 'block';
+                return;
+            }
             const result = await response.json();
-
             if (result.candidates && result.candidates.length > 0 &&
                 result.candidates[0].content && result.candidates[0].content.parts &&
                 result.candidates[0].content.parts.length > 0) {
                 summarizerOutput.textContent = result.candidates[0].content.parts[0].text;
                 summarizerOutput.style.display = 'block';
             } else if (result.error) {
-                console.error("Summarizer API Error:", result.error);
-                summarizerErrorMessage.textContent = `Ошибка API: ${result.error.message}`;
+                console.error("Summarizer API Error (JSON):", result.error);
+                summarizerErrorMessage.textContent = `Ошибка API (ответ): ${result.error.message}`;
                 summarizerErrorMessage.style.display = 'block';
             }
             else {
-                summarizerErrorMessage.textContent = "Не удалось суммировать текст.";
+                console.warn("Unexpected Summarizer API response structure:", result);
+                summarizerErrorMessage.textContent = "Не удалось суммировать текст. Неожиданный ответ от сервера.";
                 summarizerErrorMessage.style.display = 'block';
             }
         } catch (error) {
-            console.error("Error calling Summarizer API:", error);
-            summarizerErrorMessage.textContent = "Ошибка сети при суммировании текста.";
+            console.error("Error calling Summarizer API (catch):", error);
+             if (error instanceof SyntaxError) { summarizerErrorMessage.textContent = "Ошибка ответа от сервера суммаризации (неверный формат). Попробуйте позже.";}
+             else { summarizerErrorMessage.textContent = "Ошибка сети при суммировании текста.";}
             summarizerErrorMessage.style.display = 'block';
         } finally {
             summarizerLoadingIndicator.style.display = 'none';
@@ -776,9 +936,17 @@ document.addEventListener('DOMContentLoaded', () => {
         chatTitle.textContent = agent.name;
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
-        currentMiniAppChatHistory = []; // Reset API history for new chat
-        loadChatFromLocalStorage(); // Load display history
-        if (chatMessagesContainer.children.length === 0) { // If no messages loaded from storage
+        currentMiniAppChatHistory = []; 
+        loadChatFromLocalStorage(); 
+        if (chatMessagesContainer.children.length === 0) { 
+            const agentConfig = agents.find(a=>a.key === selectedAgentKey);
+            if (agentConfig && agentConfig.systemPrompt) {
+                if (!currentMiniAppChatHistory.find(m => m.role === 'user' && m.parts[0].text === agentConfig.systemPrompt)) {
+                    currentMiniAppChatHistory.unshift({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
+                    currentMiniAppChatHistory.unshift({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
+                    saveChatToLocalStorage(); 
+                }
+            }
             addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь?`);
         }
         switchScreen(chatScreen);
@@ -792,7 +960,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tg.ready) tg.ready();
         if (tg.expand) tg.expand();
         if (tg.MainButton) tg.MainButton.hide();
-        // Telegram BackButton is handled globally now
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
         populateCarousel('models-swiper-wrapper', models, 'model');
@@ -807,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
         displayProfileData();
 
         agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key))); // Only one model now
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
 
         document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
         sendBtn.addEventListener('click', handleSendMessage);
@@ -823,9 +990,9 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedAgentKey = e.target.value;
             const agent = agents.find(a=> a.key === selectedAgentKey);
             if(agent) chatTitle.textContent = agent.name;
-            currentMiniAppChatHistory = []; // Reset API history
+            currentMiniAppChatHistory = [];
             loadChatFromLocalStorage();
-            if (chatMessagesContainer.children.length === 0 && agent) {
+            if (chatMessagesContainer.children.length === 0 && agent) { 
                  addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
             }
         });
