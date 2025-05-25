@@ -103,71 +103,60 @@
         .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
         
         /* --- СТИЛИ ЧАТА (ОБЪЕДИНЕННЫЕ И ИСПРАВЛЕННЫЕ) --- */
-        .chat-message {
-            padding: 0.6rem 1rem; 
-            border-radius: 1.25rem; 
-            max-width: 85%; 
-            word-wrap: break-word; 
-            line-height: 1.4;
-            opacity: 0; 
-            transform: translateY(10px);
-            animation: pop-in 0.3s ease forwards;
-            margin-top: 0.75rem; /* Отступ по умолчанию */
-        }
+        .chat-message { padding: 0.6rem 1rem; border-radius: 1.25rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.75rem; }
         @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
-
         .message-bot { background-color: var(--bg-card); align-self: flex-start; }
         .message-user { background-color: var(--bg-user-msg); align-self: flex-end; }
-        
-        /* "Хвостики" у сообщений */
         .message-bot.tailed { border-bottom-left-radius: 0.25rem; }
         .message-user.tailed { border-bottom-right-radius: 0.25rem; }
-
-        /* Группировка: убираем верхний отступ и скругляем верхние углы */
-        .chat-message.grouped {
-             margin-top: 0.25rem; 
-             border-top-left-radius: 1.25rem !important;
-             border-top-right-radius: 1.25rem !important;
-        }
-
-        /* Убираем "хвостик" у предыдущего сообщения в группе */
-        .chat-message.no-tail {
-            border-bottom-left-radius: 1.25rem;
-            border-bottom-right-radius: 1.25rem;
-        }
-
+        .chat-message.grouped { margin-top: 0.25rem; border-top-left-radius: 1.25rem !important; border-top-right-radius: 1.25rem !important; }
+        .chat-message.no-tail { border-bottom-left-radius: 1.25rem; border-bottom-right-radius: 1.25rem; }
         .message-bot.typing { color: var(--text-secondary); font-style: italic; }
         .typing .message-content::after { content: '.'; animation: dots 1.2s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
-
-        /* Метаданные сообщения (время, статус) */
-        .message-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            float: right;
-            margin-left: 0.75rem;
-            margin-top: 0.25rem;
-            line-height: 1;
-            user-select: none;
-        }
+        .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--text-secondary); float: right; margin-left: 0.75rem; margin-top: 0.25rem; line-height: 1; user-select: none; }
         .message-meta svg { width: 1rem; height: 1rem; }
         .message-status-read svg { color: #4fc3f7; }
+        .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.8rem; font-weight: 500; padding: 0.25rem 0.75rem; border-radius: 1rem; width: fit-content; }
 
-        .chat-date-divider {
-            text-align: center;
-            margin: 1rem auto;
-            background-color: rgba(44, 44, 46, 0.8);
-            color: var(--text-primary);
-            font-size: 0.8rem;
-            font-weight: 500;
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            width: fit-content;
-        }
+        /* --- СТИЛИ ДЛЯ ОБНОВЛЕННОЙ ОБЛАСТИ ВВОДА --- */
+        .chat-input-area { align-items: flex-end; gap: 0.5rem; }
+        .chat-input-wrapper { flex-grow: 1; position: relative; }
+        #chat-input { width: 100%; background-color: var(--bg-card); border-radius: 20px; padding: 0.75rem 1rem; border: none; color: var(--text-primary); font-size: 1rem; resize: none; line-height: 1.4; min-height: calc(0.75rem * 2 + 1.4em); max-height: 120px; overflow-y: auto; }
+        #chat-input-shadow { flex-grow: 1; padding: 0.75rem 1rem; font-size: 1rem; line-height: 1.4; position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; pointer-events: none; z-index: -1; word-wrap: break-word; white-space: pre-wrap; }
+        .chat-action-btn { width: 40px; height: 40px; background-color: var(--bg-card); color: var(--text-secondary); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s ease; }
+        #attach-btn { background-color: transparent; }
+        #send-mic-btn-container { background-color: var(--gold-highlight); color: black; position: relative; transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #send-mic-btn-container > div { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transition: opacity 0.15s ease, transform 0.15s ease; }
+        #send-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); color: black; }
+        #send-mic-btn-container.has-text #mic-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+        #send-mic-btn-container.has-text #send-btn-icon { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     </style>
+</head>
+<body>
+    <div class="app-wrapper">
+        <div id="chat-screen" class="screen">
+            <div class="chat-input-area">
+                <div id="attach-btn" class="chat-action-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                </div>
+                <div class="chat-input-wrapper">
+                    <div id="chat-input-shadow"></div>
+                    <textarea id="chat-input" placeholder="Сообщение..." rows="1"></textarea>
+                </div>
+                <div id="send-mic-btn-container" class="chat-action-btn">
+                    <div id="mic-btn-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a2 2 0 0 0 2-2V6a2 2 0 0 0-4 0v6a2 2 0 0 0 2 2zm-1-10a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0V4z"/><path d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 7 7 0 0 0 6 6.93V21h-2a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2h-2v-3.07A7 7 0 0 0 19 11z"/></svg>
+                    </div>
+                    <div id="send-btn-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24"><path d="M3.49999 20.5C4.33332 21.3333 5.66666 21.1667 6.33332 20.5L21.3333 13C22.1667 12.5 22.1667 11.5 21.3333 11L6.33332 3.5C5.66666 2.83333 4.33332 2.66667 3.49999 3.5C2.66666 4.33333 2.83332 5.66667 3.49999 6.33333L16.1667 12L3.49999 17.6667C2.83332 18.3333 2.66666 19.6667 3.49999 20.5Z" fill="currentColor"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+<script>
 </head>
 <body>
     <div class="app-wrapper">
@@ -272,11 +261,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessagesContainer = document.getElementById('chat-messages-container');
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
-    const hideKeyboardBtn = document.getElementById('hide-keyboard-btn');
+    
     const settingsModal = document.getElementById('settings-modal');
     const agentSelect = document.getElementById('agent-select');
     const modelSelect = document.getElementById('model-select');
-
+    const sendMicContainer = document.getElementById('send-mic-btn-container');
     // --- ОСНОВНЫЕ ФУНКЦИИ ---
     function switchScreen(screenToShow) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -366,33 +355,39 @@ document.addEventListener('DOMContentLoaded', () => {
         tg.BackButton.show();
     }
 
-    function handleSendMessage() {
-        const text = chatInput.value.trim();
-        if (!text) return;
+     function handleSendMessage() {
+            const text = chatInput.value.trim();
+            // Отправляем, только если кнопка в режиме "Отправить"
+            if (!text || !sendMicContainer.classList.contains('has-text')) return;
 
-        addMessageToChat('user', text, { status: 'read' });
-        
-        chatInput.value = '';
-        handleInput.call(chatInput);
+            addMessageToChat('user', text, { status: 'read' });
+            
+            chatInput.value = '';
+            handleInput.call(chatInput); // Вызываем для сброса высоты и кнопки
 
-        const typingIndicator = addMessageToGhat('bot', 'Печатает', { isTyping: true });
+            const typingIndicator = addMessageToChat('bot', 'Печатает', { isTyping: true });
 
-        setTimeout(() => {
-            typingIndicator.remove();
-            addMessageToChat('bot', 'Это симуляция ответа, которая теперь выглядит совсем как в Telegram!');
-        }, 1500);
-    }
+            setTimeout(() => {
+                typingIndicator.remove();
+                addMessageToChat('bot', 'Это симуляция ответа с новым, быстрым полем ввода!');
+            }, 1500);
+        }
+
+        // ИЗМЕНЕНИЕ: Полностью переработанная функция handleInput для производительности и дизайна
+        function handleInput() {
+            const shadow = document.getElementById('chat-input-shadow');
+            
+            shadow.textContent = this.value + ' '; // Копируем текст в "двойника"
+
+            requestAnimationFrame(() => {
+                this.style.height = `${shadow.offsetHeight}px`; // Устанавливаем высоту
+            });
+
+            const hasText = this.value.trim().length > 0;
+            sendMicContainer.classList.toggle('has-text', hasText); // Переключаем класс на контейнере
+        }
     
-    function handleInput() {
-        requestAnimationFrame(() => {
-            this.style.height = 'auto';
-            this.style.height = `${this.scrollHeight}px`;
-        });
-        const hasText = this.value.trim().length > 0;
-        sendBtn.classList.toggle('visible', hasText);
-        hideKeyboardBtn.classList.toggle('hidden', hasText);
-    }
-
+    
     function updateChatTitle() {
         const agent = agents.find(a => a.key === selectedAgentKey);
         const model = models.find(m => m.key === selectedModelKey);
@@ -439,6 +434,11 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
         agentSelect.addEventListener('change', (e) => { selectedAgentKey = e.target.value; updateChatTitle(); });
         modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; updateChatTitle(); });
+
+// ИЗМЕНЕНИЕ: вешаем обработчик на новый контейнер
+            sendMicContainer.addEventListener('click', handleSendMessage);
+            chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
+            chatInput.addEventListener('input', handleInput);
         
         handleInput.call(chatInput);
     }
