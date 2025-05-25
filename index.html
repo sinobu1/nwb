@@ -14,6 +14,7 @@
         :root {
             --bg-main: #101010;
             --bg-card: #1E1E1E;
+            --bg-select: #2C2C2E;
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
             --border-color: #3A3A3C;
@@ -23,55 +24,19 @@
             --text-accent: var(--gold-highlight);
         }
         
-        html {
-            /* Блокировка "сползания" на iOS */
-            position: fixed;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        body {
-            position: fixed; 
-            inset: 0;  
-            overflow: hidden; /* Главный запрет прокрутки */
+        html, body {
+            position: fixed; inset: 0; overflow: hidden;
             font-family: var(--font-family);
             background-color: var(--bg-main);
             color: var(--text-primary);
-            display: flex;
-            justify-content: center;
-            /* Предотвращение нативного скроллинга */
+            display: flex; justify-content: center;
             overscroll-behavior-y: contain;
         }
 
-        .app-wrapper {
-            width: 100%;
-            max-width: 450px;
-            height: 100%;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .app-container {  
-            flex-grow: 1;
-            display: flex;  
-            flex-direction: column;  
-            overflow: hidden;
-        }
-
-        .scrollable-content {
-            flex-grow: 1;  
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 120px;
-        }
-
-        .content-wrapper {  
-            padding: 0 1rem;  
-        }
+        .app-wrapper { width: 100%; max-width: 450px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .app-container { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .scrollable-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 120px; }
+        .content-wrapper { padding: 0 1rem; }
         
         h1 { font-size: 1.875rem; font-weight: 800; }
         h2 { font-size: 1.25rem; font-weight: 700; }
@@ -81,14 +46,10 @@
         .swiper-container-wrapper { margin-top: 2rem; }
         .swiper-container-wrapper h2 { margin-bottom: 1rem; padding: 0 1rem; }
         .swiper { width: 100%; overflow: visible; padding: 0 1rem; box-sizing: border-box; }
-        .swiper-slide { width: 200px; height: 130px; }
+        .swiper-slide { width: 200px; height: 130px; cursor: pointer; }
         .tg-card.tg-card-selected { padding: 3px; background: var(--gold-gradient); box-shadow: 0 10px 30px rgba(216, 171, 78, 0.4); }
         .tg-card.tg-card-selected .carousel-card-inner { background-color: var(--bg-card); height: 100%; border-radius: 17px; }
-        .swiper-pagination { bottom: -30px !important; pointer-events: none; }
-        .swiper-pagination .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
-        .swiper-pagination .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
-        .tg-card { transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease; border-radius: 20px; overflow: hidden; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25); height: 100%; }
-        .tg-card:hover { transform: translateY(-6px); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .tg-card { transition: transform 0.25s, box-shadow 0.25s; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.25); height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; text-align: left; border-radius: 20px; }
         .card-icon { font-size: 1.75rem; }
         .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
@@ -101,40 +62,38 @@
         .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
         .palette-6 { background-color: #2D2D2D; }
 
-        /* Стили для больших карточек */
-        .full-screen-card-list {
-            display: grid;
-            gap: 1rem;
-            margin-top: 1.5rem;
-        }
-        .full-screen-card {
-            background-color: var(--bg-card);
-            border-radius: 20px;
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            border: 1px solid var(--border-color);
-        }
-        .full-screen-card:hover {
-            background-color: #2c2c2e;
-        }
-        .full-screen-card .icon {
-            font-size: 2.5rem;
-            flex-shrink: 0;
-        }
-        .full-screen-card .info h3 {
-            font-size: 1.125rem;
-            font-weight: 700;
-            margin: 0;
+        /* Стили для карточек */
+        .full-screen-card { background-color: var(--bg-card); border-radius: 20px; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; cursor: pointer; transition: background-color 0.2s ease; border: 1px solid var(--border-color); }
+        .full-screen-card:hover { background-color: #2c2c2e; }
+        .full-screen-card .icon { font-size: 2.5rem; flex-shrink: 0; }
+        .full-screen-card .info h3 { font-size: 1.125rem; font-weight: 700; margin: 0; color: var(--text-primary); }
+        .full-screen-card .info p { font-size: 0.9rem; color: var(--text-secondary); margin: 0.25rem 0 0 0; }
+
+        /* --- НОВЫЕ СТИЛИ ДЛЯ СТРАНИЦЫ ВЫБОРА --- */
+        .selection-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        .selection-container { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; }
+        .selection-container label { font-weight: 600; color: var(--text-secondary); font-size: 0.875rem; }
+        .select-wrapper { position: relative; margin-top: 0.75rem; }
+        .custom-select {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            width: 100%;
+            background-color: var(--bg-select);
             color: var(--text-primary);
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
         }
-        .full-screen-card .info p {
-            font-size: 0.9rem;
+        .select-wrapper::after {
+            content: '⌄';
+            font-size: 1.5rem;
             color: var(--text-secondary);
-            margin: 0.25rem 0 0 0;
+            position: absolute;
+            right: 1rem; top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
         }
 
         /* Общие стили страниц и таб-бара */
@@ -146,42 +105,36 @@
         .page { display: none; padding-top: 3rem; }
         .page.active { display: block; }
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
-        .profile-header { display: flex; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-        .profile-avatar { width: 64px; height: 64px; border-radius: 50%; margin-right: 1rem; object-fit: cover; background-color: #333; }
-        .profile-info h2 { font-size: 1.25rem; font-weight: 700; }
-        .profile-info p { font-size: 0.9rem; }
-        .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; }
-        .profile-gems .label { font-weight: 500; color: var(--text-secondary); }
-        .profile-gems .value { font-weight: 700; font-size: 1.1rem; color: var(--text-accent); }
-        #debug-info { position: absolute; top: 0; left: 0; width: 100%; background-color: #dc3545; color: white; font-size: 12px; padding: 4px; text-align: center; z-index: 9999; font-family: monospace; transition: opacity 0.5s ease-out; }
+        #debug-info { display: none; /* Скрыто по умолчанию */ }
     </style>
 </head>
 <body>
     <div class="app-wrapper">
-        <div id="debug-info" style="display: none;"></div>
+        <div id="debug-info"></div>
         <div class="app-container">
             <div class="scrollable-content">
                 
                 <div id="home-page" class="page active">
                     <div class="content-wrapper">
-                         <div class="mb-8">
-                            <h1>Панель управления</h1>
-                            <p class="subtitle">Выберите инструменты для работы с ИИ</p>
+                        <div class="mb-8">
+                            <h1>Главная</h1>
+                            <p class="subtitle">Панель управления ассистентом</p>
+                        </div>
+                         <div class="full-screen-card" id="image-generator-card">
+                            <div class="icon">🎨</div>
+                            <div class="info">
+                                <h3>Генератор изображений</h3>
+                                <p>Создание картинок по текстовому описанию.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="swiper-container-wrapper">
                         <h2>Агенты</h2>
-                        <div class="swiper" id="agents-swiper">
-                            <div class="swiper-wrapper" id="agents-swiper-wrapper"></div>
-                            <div class="swiper-pagination"></div>
-                        </div>
+                        <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
                     </div>
                     <div class="swiper-container-wrapper">
                         <h2>Модели</h2>
-                        <div class="swiper" id="models-swiper">
-                            <div class="swiper-wrapper" id="models-swiper-wrapper"></div>
-                            <div class="swiper-pagination"></div>
-                        </div>
+                        <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                     </div>
                 </div>
 
@@ -191,8 +144,7 @@
                             <h1>Инструменты</h1>
                             <p class="subtitle">Полезные функции на базе ИИ</p>
                         </div>
-                        <div id="tools-list" class="full-screen-card-list">
-                            </div>
+                        <div id="tools-list" class="full-screen-card-list"></div>
                     </div>
                 </div>
                 
@@ -202,17 +154,28 @@
                             <h1>Профиль</h1>
                             <p class="subtitle">Информация о вашем аккаунте</p>
                         </div>
-                        <div class="ios-card">
-                            <div class="profile-header">
-                                <img id="profile-avatar-img" src="https://via.placeholder.com/64" alt="Avatar" class="profile-avatar" onerror="this.src='https://via.placeholder.com/64';">
-                                <div class="profile-info">
-                                    <h2 id="profile-name">Загрузка...</h2>
-                                    <p id="profile-id">ID: Н/Д</p>
+                        <div class="ios-card"> </div>
+                    </div>
+                </div>
+
+                <div id="selection-page" class="page">
+                    <div class="content-wrapper">
+                        <div class="mb-8">
+                            <h1>Настройки</h1>
+                            <p class="subtitle">Выберите активного агента и модель</p>
+                        </div>
+                        <div class="selection-grid">
+                            <div class="selection-container">
+                                <label for="agent-select">АКТИВНЫЙ АГЕНТ</label>
+                                <div class="select-wrapper">
+                                    <select id="agent-select" class="custom-select"></select>
                                 </div>
                             </div>
-                            <div class="profile-gems">
-                                <span class="label">💎 Баланс гемов</span>
-                                <span id="gem-balance" class="value">Недоступно</span>
+                            <div class="selection-container">
+                                <label for="model-select">АКТИВНАЯ МОДЕЛЬ</label>
+                                <div class="select-wrapper">
+                                    <select id="model-select" class="custom-select"></select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -222,11 +185,11 @@
             
             <nav class="ios-tab-bar">
                 <div class="tab-item active" id="tab-home">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5,3H19V5H17V7H15V9H13V11H11V9H9V7H7V5H5V3M7,9H9V11H7V9M15,9H17V11H15V9M7,13H17V15H13V17H11V15H7V13M9,19V17H7V19H5V21H9V19M15,19V17H17V19H19V21H15V19Z"/></svg>
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 3H4C3.45 3 3 3.45 3 4v6c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zm0 11H4c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-6c0-.55-.45-1-1-1zm11-11h-6c-.55 0-1 .45-1 1v6c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V4c0-.55-.45-1-1-1zm-5 12c.55 0 1 .45 1 1v6c0 .55-.45 1-1 1h-6c-.55 0-1-.45-1-1v-6c0-.55.45-1 1-1h6z"/></svg>
                     <span>Главная</span>
                 </div>
                 <div class="tab-item" id="tab-tools">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,3L8,5.7V11.2C8,15.2 11.2,19.5 12,20.5C12.8,19.5 16,15.2 16,11.2V5.7L12,3M12,1L17,4.2V11.2C17,15.9 13.1,20.5 12,21.7C10.9,20.5 7,15.9 7,11.2V4.2L12,1Z"/></svg>
+                    <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83L19.5 9.5l1.21-2.46zM3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM5.92 19H5v-.92l9.06-9.06.92.92L5.92 19z"/></svg>
                     <span>Инструменты</span>
                 </div>
                 <div class="tab-item" id="tab-profile">
@@ -238,173 +201,142 @@
     </div>
     
 <script>
-    // Ожидаем полной загрузки DOM, чтобы скрипты работали корректно
     document.addEventListener('DOMContentLoaded', () => {
         const tg = window.Telegram.WebApp;
 
-        // --- Данные ---
-        const agents = [
-            { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
-            { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
-            { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" },
-            { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" },
-            { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" },
-            { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" },
-        ];
-        const models = [
-            { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" },
-            { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" },
-            { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" },
-            { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" },
-            { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
-        ];
-        const tools = [
-            { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности, ключевые слова и другое." },
-            { key: "image_generator", name: "Генератор изображений", icon: "🎨", desc: "Создание картинок по текстовому описанию." },
-            { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." },
-            { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
-        ];
+        // --- ДАННЫЕ ---
+        const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3" }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2" }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1" }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6" } ];
+        const models = [ { key: "google_gemini_2_0_flash", name: "Gemini 2.0", icon: "G", desc: "Базовая модель", palette: "palette-6" }, { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "G+", desc: "Продвинутая", palette: "palette-1" }, { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "G Pro", desc: "Мощная модель", palette: "palette-5" }, { key: "custom_api_grok_3", name: "Grok 3", icon: "X", desc: "Альтернатива", palette: "palette-2" }, { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" } ];
+        const tools = [ { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." }, { key: "translator_pro", name: "Про-переводчик", icon: "🌐", desc: "Контекстный перевод документов и речи." }, { key: "summarizer", name: "Суммаризатор", icon: "📑", desc: "Краткий пересказ длинных статей и видео." } ];
 
-        // --- Получение элементов DOM ---
+        // --- СОСТОЯНИЕ ПРИЛОЖЕНИЯ ---
+        let selectedAgentKey = agents[0].key;
+        let selectedModelKey = models[0].key;
+
+        // --- DOM ЭЛЕМЕНТЫ ---
         const tabHome = document.getElementById('tab-home');
         const tabTools = document.getElementById('tab-tools');
         const tabProfile = document.getElementById('tab-profile');
-        const debugInfo = document.getElementById('debug-info');
-        
-        // --- Основные функции ---
+        const agentSelect = document.getElementById('agent-select');
+        const modelSelect = document.getElementById('model-select');
+
+        // --- ОСНОВНЫЕ ФУНКЦИИ ---
         function sendDataToBot(action, target) {
             if (tg.initData) {
                 tg.sendData(JSON.stringify({ action, target }));
                 tg.HapticFeedback.notificationOccurred('success');
             }
         }
+        
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            const page = document.getElementById(pageId);
+            if(page) page.classList.add('active');
+            const tab = document.getElementById(`tab-${pageId.replace('-page','')}`);
+            if(tab) tab.classList.add('active');
+        }
+        
+        // --- ЛОГИКА СТРАНИЦЫ ВЫБОРА ---
+        function openSelectionPage() {
+            populateSelectionDropdowns();
+            showPage('selection-page');
+            tg.BackButton.show();
+        }
 
-        function populateCarousel(containerId, items, action) {
+        function closeSelectionPage() {
+            showPage('home-page');
+            updateHomeSelectionVisuals();
+            tg.BackButton.hide();
+        }
+
+        function populateSelectionDropdowns() {
+            agentSelect.innerHTML = '';
+            models.forEach(m => {
+                const option = new Option(`${m.icon} ${m.name}`, m.key);
+                modelSelect.appendChild(option);
+            });
+
+            agents.forEach(a => {
+                const option = new Option(`${a.icon} ${a.name}`, a.key);
+                agentSelect.appendChild(option);
+            });
+            
+            agentSelect.value = selectedAgentKey;
+            modelSelect.value = selectedModelKey;
+        }
+
+        function updateHomeSelectionVisuals() {
+            document.querySelectorAll('#agents-swiper .tg-card, #models-swiper .tg-card').forEach(c => c.classList.remove('tg-card-selected'));
+            
+            const selectedAgentCard = document.querySelector(`#agents-swiper .swiper-slide[data-key="${selectedAgentKey}"] .tg-card`);
+            if (selectedAgentCard) selectedAgentCard.classList.add('tg-card-selected');
+
+            const selectedModelCard = document.querySelector(`#models-swiper .swiper-slide[data-key="${selectedModelKey}"] .tg-card`);
+            if (selectedModelCard) selectedModelCard.classList.add('tg-card-selected');
+        }
+
+        // --- ФУНКЦИИ ЗАПОЛНЕНИЯ КОНТЕНТА ---
+        function populateCarousel(containerId, items, type) {
             const wrapper = document.getElementById(containerId);
             if (!wrapper) return;
             wrapper.innerHTML = '';
             items.forEach(item => {
                 const slide = document.createElement('div');
                 slide.className = 'swiper-slide';
-                slide.innerHTML = `
-                    <div class="tg-card">
-                        <div class="carousel-card-inner carousel-card ${item.palette}">
-                            <div class="card-icon">${item.icon}</div>
-                            <div>
-                                <h3 class="card-title">${item.name}</h3>
-                                <p class="card-description mt-1">${item.desc}</p>
-                            </div>
-                        </div>
-                    </div>`;
-                
+                slide.dataset.key = item.key; // Важно для обновления UI
+                slide.innerHTML = `<div class="tg-card"><div class="carousel-card-inner carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description mt-1">${item.desc}</p></div></div></div>`;
                 slide.addEventListener('click', () => {
-                    document.querySelectorAll('.tg-card').forEach(c => c.classList.remove('tg-card-selected'));
-                    slide.querySelector('.tg-card').classList.add('tg-card-selected');
-                    sendDataToBot(action, item.key);
-                    tg.showPopup({
-                        title: 'Настройка применена!',
-                        message: `Теперь бот будет использовать ${action === 'set_agent' ? 'агента' : 'модель'} "${item.name}".`
-                    });
+                    if (type === 'agent') selectedAgentKey = item.key;
+                    if (type === 'model') selectedModelKey = item.key;
+                    openSelectionPage();
                 });
                 wrapper.appendChild(slide);
             });
         }
 
-        function populateToolsList(containerId, items) {
-            const list = document.getElementById(containerId);
+        function populateToolsList() {
+            const list = document.getElementById('tools-list');
             if (!list) return;
             list.innerHTML = '';
-            items.forEach(item => {
+            tools.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'full-screen-card';
-                card.innerHTML = `
-                    <div class="icon">${item.icon}</div>
-                    <div class="info">
-                        <h3>${item.name}</h3>
-                        <p>${item.desc}</p>
-                    </div>`;
-                card.addEventListener('click', () => {
-                    tg.showPopup({
-                        title: item.name,
-                        message: `Вы выбрали инструмент "${item.name}".`,
-                        buttons: [{id: 'ok', type: 'ok', text: 'Понятно'}]
-                    });
-                    // sendDataToBot('select_tool', item.key);
-                });
+                card.innerHTML = `<div class="icon">${item.icon}</div><div class="info"><h3>${item.name}</h3><p>${item.desc}</p></div>`;
                 list.appendChild(card);
             });
-        }
-        
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-
-            const page = document.getElementById(pageId);
-            if(page) page.classList.add('active');
-            
-            const tabId = pageId.replace('-page', '');
-            const tab = document.getElementById(`tab-${tabId}`);
-            if(tab) tab.classList.add('active');
-        }
-
-        function displayProfileData() {
-            try {
-                const user = tg.initDataUnsafe?.user;
-                if (user && user.id) {
-                    document.getElementById('profile-avatar-img').src = user.photo_url || 'https://via.placeholder.com/64';
-                    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-                    document.getElementById('profile-name').textContent = fullName || 'Пользователь';
-                    document.getElementById('profile-id').textContent = `ID: ${user.id}`;
-                } else {
-                     throw new Error("User data not found in initDataUnsafe");
-                }
-            } catch (e) {
-                console.error("Profile data error:", e);
-                document.getElementById('profile-name').textContent = 'Нет данных';
-                document.getElementById('profile-id').textContent = 'ID: Н/Д';
-                debugInfo.textContent = '❌ Ошибка: запустите приложение через меню бота.';
-                debugInfo.style.backgroundColor = '#dc3545';
-                debugInfo.style.opacity = '1';
-                debugInfo.style.display = 'block';
-            }
         }
         
         // --- ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ---
         function init() {
             tg.ready();
             tg.expand();
+            tg.BackButton.onClick(closeSelectionPage);
 
-            // Блокировка "сползания" окна на уровне JS для доп. контроля
-            document.body.addEventListener('touchmove', (event) => {
-                if (event.target.closest('.scrollable-content')) {
-                    // Разрешаем скролл только внутри прокручиваемого контейнера
-                    return true;
-                }
-                event.preventDefault();
-            }, { passive: false });
+            // Заполнение контента
+            populateCarousel('agents-swiper-wrapper', agents, 'agent');
+            populateCarousel('models-swiper-wrapper', models, 'model');
+            populateToolsList();
+            updateHomeSelectionVisuals();
 
-            const mainBg = getComputedStyle(document.documentElement).getPropertyValue('--bg-main').trim();
-            tg.setHeaderColor(mainBg);
-            tg.setBackgroundColor(mainBg);
-
-            if (!tg.initData) {
-                debugInfo.textContent = '❌ Данные Telegram не получены. Откройте через меню.';
-                debugInfo.style.display = 'block';
-            }
-
-            populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-            populateCarousel('models-swiper-wrapper', models, 'set_model');
-            populateToolsList('tools-list', tools);
-
-            new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 16, pagination: { el: ".swiper-pagination", clickable: true } });
-            new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16, pagination: { el: ".swiper-pagination", clickable: true } });
+            // Swiper
+            new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 16 });
+            new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 16 });
             
+            // Навигация
             tabHome.addEventListener('click', () => showPage('home-page'));
             tabTools.addEventListener('click', () => showPage('tools-page'));
             tabProfile.addEventListener('click', () => showPage('profile-page'));
-            
-            showPage('home-page');
-            displayProfileData(); 
+
+            // Обработчики для выпадающих списков
+            agentSelect.addEventListener('change', (e) => {
+                selectedAgentKey = e.target.value;
+                sendDataToBot('set_agent', selectedAgentKey);
+            });
+            modelSelect.addEventListener('change', (e) => {
+                selectedModelKey = e.target.value;
+                sendDataToBot('set_model', selectedModelKey);
+            });
         }
 
         init();
