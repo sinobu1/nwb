@@ -570,6 +570,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
 
 async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # --- НАЧАЛО ДИАГНОСТИЧЕСКОГО БЛОКА ---
+    # Эта строка - наша "сигнальная ракета".
+    # Если вы увидите это сообщение в боте, значит обработчик ЗАПУСКАЕТСЯ.
+    if update.message and update.message.web_app_data:
+        user_id_debug = update.effective_user.id
+        data_str_debug = update.message.web_app_data.data
+        try:
+            await context.bot.send_message(
+                chat_id=user_id_debug,
+                text=f"⚙️ DEBUG: web_app_data_handler получил данные:\n\n<pre>{data_str_debug}</pre>",
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.error(f"DEBUG: Не удалось отправить отладочное сообщение: {e}")
+    # --- КОНЕЦ ДИАГНОСТИЧЕСКОГО БЛОКА ---
     if not update.message or not update.message.web_app_data:
         return
 
