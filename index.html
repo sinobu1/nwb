@@ -17,7 +17,7 @@
       --text-primary: #FFFFFF;
       --text-secondary: #A0A0A0;
       --text-accent: #00FFC2;
-      --gold-accent: #ffd700;
+      --gold-accent: #ffd700; /* Золотой акцент для рамки */
       --border-color: #3A3A3C;
       --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
     }
@@ -32,7 +32,7 @@
     .app-container { height: 100%; display: flex; flex-direction: column; }
     .scrollable-content {
       flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-      padding: 1.5rem 1.5rem 120px 1.5rem;
+      padding: 1.5rem 1.5rem 120px 1.5rem; /* Боковые отступы здесь */
     }
     
     h1 { font-size: 1.875rem; font-weight: 800; }
@@ -40,15 +40,32 @@
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
     .swiper-container-wrapper { margin-top: 2rem; position: relative; }
-    .swiper { overflow: visible; padding-bottom: 35px; /* Запас для пагинации */ }
+    
+    /* ИСПРАВЛЕНИЕ ГОРИЗОНТАЛЬНОЙ ПРОКРУТКИ */
+    .swiper {
+      overflow: visible; /* Важно для теней, но не должно вызывать прокрутку */
+      /* Убраны отрицательные margin, padding теперь задается родительскому .scrollable-content */
+    }
     
     .swiper-slide {
-      width: 200px;
-      height: 160px;
+      width: 200px !important; /* Ширина карточки */
+      height: 160px !important; /* Общая высота слайда (карточка + небольшой запас) */
     }
-    .carousel-card { height: 150px; }
+    .carousel-card {
+      height: 150px !important; /* Высота самой карточки */
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 1rem; text-align: left;
+    }
 
-    .swiper-pagination { bottom: 0px !important; position: absolute; width: 100%; }
+    /* ИСПРАВЛЕНИЕ ПОЗИЦИИ ТОЧЕК ПАГИНАЦИИ */
+    .swiper-pagination {
+        position: absolute;
+        bottom: -30px !important; /* Гарантированно выносим за пределы слайдов */
+        width: 100%;
+        left: 0;
+        pointer-events: none;
+    }
+    
     .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
     .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
     
@@ -56,13 +73,13 @@
       transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
       border-radius: 20px; overflow: hidden;
       cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-      border: 1px solid transparent;
-      height: 100%;
+      border: 1px solid transparent; /* Прозрачная рамка для плавности */
+      height: 100%; /* Чтобы карточка занимала всю высоту слайда */
     }
     .tg-card:hover { 
       transform: translateY(-6px); 
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      border-color: var(--gold-accent);
+      border-color: var(--gold-accent); /* ЗОЛОТАЯ РАМКА ВОЗВРАЩЕНА */
     }
     
     .card-icon { font-size: 1.75rem; }
@@ -76,6 +93,7 @@
     .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
     .palette-6 { background-color: #2D2D2D; }
 
+    /* Tab Bar & Profile (без изменений, кроме выравнивания) */
     .ios-tab-bar {
       position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
       width: calc(100% - 2.5rem); max-width: 400px; display: flex;
@@ -162,11 +180,11 @@
 </div>
 
 <script>
-    // Ждем, пока весь HTML-документ будет загружен и готов
+    // Обертываем весь скрипт в событие DOMContentLoaded, чтобы убедиться,
+    // что HTML полностью загружен перед тем, как скрипт начнет работу.
     document.addEventListener("DOMContentLoaded", function() {
         const tg = window.Telegram.WebApp;
 
-        // Данные для карточек
         const agents = [
           { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
           { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
@@ -183,13 +201,11 @@
           { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
         ];
 
-        // Поиск элементов DOM
         const mainContent = document.getElementById('main-content');
         const profilePage = document.getElementById('profile-page');
         const tabHome = document.getElementById('tab-home');
         const tabProfile = document.getElementById('tab-profile');
         
-        // Функции
         function sendDataToBot(action, target) {
           tg.sendData(JSON.stringify({ action, target }));
           tg.HapticFeedback.notificationOccurred('success');
@@ -197,7 +213,10 @@
 
         function populateCarousel(containerId, items, action) {
           const wrapper = document.getElementById(containerId);
-          if (!wrapper) return;
+          if (!wrapper) {
+              console.error("Не найден контейнер для карусели:", containerId);
+              return;
+          }
           items.forEach(item => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
@@ -224,29 +243,34 @@
             } else if (page === 'profile') {
                 profilePage.style.display = 'block';
                 tabProfile.classList.add('active');
+                // Данные профиля теперь загружаются только один раз, после готовности tg
             }
         }
         
-        function displayProfileData(user) {
-            if (!user) {
-                console.log("Данные пользователя еще не готовы.");
-                return;
-            }
-            const nameEl = document.getElementById('profile-name');
-            const idEl = document.getElementById('profile-id');
-            const avatarEl = document.getElementById('profile-avatar-img');
+        function displayProfileData() {
+            const user = tg.initDataUnsafe?.user;
+            if (user && user.id) { // Добавили проверку на user.id для большей надежности
+                const nameEl = document.getElementById('profile-name');
+                const idEl = document.getElementById('profile-id');
+                const avatarEl = document.getElementById('profile-avatar-img');
 
-            nameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-            idEl.textContent = `ID: ${user.id}`;
-            if (user.photo_url) {
-                avatarEl.src = user.photo_url;
+                nameEl.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                idEl.textContent = `ID: ${user.id}`;
+                if (user.photo_url) {
+                    avatarEl.src = user.photo_url;
+                    avatarEl.style.display = 'block';
+                } else {
+                    avatarEl.style.display = 'none'; 
+                }
             } else {
-                avatarEl.style.display = 'none'; // Скрываем, если нет фото
+                // Если данные так и не загрузились, можно оставить "Загрузка..." или вывести сообщение
+                 document.getElementById('profile-name').textContent = 'Данные не загружены';
+                 console.log("displayProfileData: Данные пользователя (user или user.id) отсутствуют.");
             }
         }
-
-        // Главная функция инициализации
-        function init() {
+        
+        // Инициализация приложения
+        function initApp() {
             populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
             populateCarousel('models-swiper-wrapper', models, 'set_model');
 
@@ -263,13 +287,14 @@
             
             showPage('home');
             
-            displayProfileData(tg.initDataUnsafe?.user);
+            // Попытка отобразить данные пользователя
+            displayProfileData();
             
             tg.expand();
         }
 
-        // Запускаем инициализацию только когда Telegram API будет готово
-        tg.ready(init);
+        // Самое важное: запускаем initApp только ПОСЛЕ того, как Telegram API готово.
+        tg.ready(initApp);
     });
 </script>
 </body>
