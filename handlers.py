@@ -593,6 +593,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 await firestore_service.set_user_data(user.id, {'current_ai_mode': agent_id})
                 agent_name = AI_MODES[agent_id].get('name', 'N/A')
                 response_text = f"✅ Агент изменен на: <b>{agent_name}</b>"
+                # --- ДОБАВЛЕНО: Отправка подтверждения пользователю ---
                 await context.bot.send_message(
                     chat_id=user.id,
                     text=response_text,
@@ -610,6 +611,7 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                     update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
                 await firestore_service.set_user_data(user.id, update_payload)
                 response_text = f"✅ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>"
+                # --- ДОБАВЛЕНО: Отправка подтверждения пользователю ---
                 await context.bot.send_message(
                     chat_id=user.id,
                     text=response_text,
@@ -627,14 +629,15 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 'help_submenu': BotConstants.MENU_HELP_SUBMENU,
             }
             if menu_target in submenu_map:
-                # Специальные обработчики для Лимитов, Бонуса и Помощи
+                # --- ИСПРАВЛЕНО: Вызов конкретных функций вместо простого показа меню ---
                 if menu_target == 'limits_submenu':
-                    await show_limits(None, user.id, context) # Передаем None, чтобы избежать reply
+                    # Передаем None вместо update, чтобы избежать ответа на сообщение web_app_data
+                    await show_limits(None, user.id, context)
                 elif menu_target == 'bonus_submenu':
                     await claim_news_bonus_logic(None, user.id, context)
                 elif menu_target == 'help_submenu':
                     await show_help(None, user.id, context)
-                # Для Гемов и других просто показываем меню
+                # Для Гемов просто показываем соответствующее меню
                 elif menu_target == 'gems_submenu':
                      await show_menu(None, user.id, submenu_map[menu_target], context_param=context)
             else:
@@ -648,7 +651,6 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Ошибка обработки данных от Mini App для пользователя {user.id}: {e}", exc_info=True)
         await context.bot.send_message(user.id, "Произошла ошибка при обработке вашего выбора из веб-приложения.")
-
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
