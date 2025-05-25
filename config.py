@@ -713,14 +713,15 @@ def is_menu_button_text(text: str) -> bool:
 def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     keyboard_rows: List[List[KeyboardButton]] = []
-    items = menu_config.get("items", []) # Безопасное получение items
+    items = menu_config.get("items", [])
+
     # >>> НАЧАЛО ИЗМЕНЕНИЙ: функция полностью заменяется
     def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
         text = item_config["text"]
         web_app_url = item_config.get("web_app_url")
-    if web_app_url:
-    return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
-    return KeyboardButton(text)
+        if web_app_url:
+            return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
+        return KeyboardButton(text)
 
     group_by_two_keys = [
         BotConstants.MENU_MAIN, 
@@ -737,12 +738,13 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
         for item in items:
             keyboard_rows.append([create_button(item)])
     # <<< КОНЕЦ ИЗМЕНЕНИЙ
-     if menu_config.get("is_submenu", False):
+
+    if menu_config.get("is_submenu", False):
         navigation_row = [KeyboardButton("🏠 Главное меню")]
-     if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
+        if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
         keyboard_rows.append(navigation_row)
 
-     return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
+    return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
 
 async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None):
     menu_cfg = MENU_STRUCTURE.get(menu_key)
