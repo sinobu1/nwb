@@ -467,45 +467,58 @@ function closeChat() {
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
     function init() {
-        tg.ready();
-        tg.expand();
-        tg.BackButton.onClick(closeChat);
-        
-        // ... (остальной код init без изменений) ...
-        populateCarousel('agents-swiper-wrapper', agents, 'agent');
-        populateCarousel('models-swiper-wrapper', models, 'model');
-        populateToolsList();
-        displayProfileData();
-        agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
-        agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
-        modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
-        document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-        document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
-        document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
-        document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
-        document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
-        sendMicContainer.addEventListener('click', handleSendMessage);
-        chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
-        chatInput.addEventListener('input', handleInput);
-        document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
-        document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
-        settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
-        agentSelect.addEventListener('change', (e) => { 
-            selectedAgentKey = e.target.value; 
-            updateChatTitle(); 
-            sendDataToBot({ action: 'set_agent', target: selectedAgentKey });
-        });
-        modelSelect.addEventListener('change', (e) => { 
-            selectedModelKey = e.target.value; 
-            updateChatTitle();
-            sendDataToBot({ action: 'set_model', target: selectedModelKey });
-        });
-        handleInput.call(chatInput);
-    }
+    tg.ready();
+    tg.expand();
+    // tg.MainButton.setText("Новая Кнопка").show().onClick(() => tg.showAlert("Клик!")); // Пример главной кнопки
+    tg.MainButton.hide(); 
+    tg.BackButton.onClick(closeChat);
+    
+    // Важно: При инициализации приложения не загружаем историю глобально,
+    // а делаем это при открытии конкретного чата в openChat()
+    // loadChatFromLocalStorage(); 
 
-    init();
-});
+    populateCarousel('agents-swiper-wrapper', agents, 'agent');
+    populateCarousel('models-swiper-wrapper', models, 'model');
+    populateToolsList();
+    displayProfileData();
+    agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
+    models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+    // ... (создание Swiper-ов и привязка остальных событий)
+    agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
+    modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 12, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
+    document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+    document.getElementById('agents-nav-prev').addEventListener('click', () => agentsSwiper.slidePrev());
+    document.getElementById('agents-nav-next').addEventListener('click', () => agentsSwiper.slideNext());
+    document.getElementById('models-nav-prev').addEventListener('click', () => modelsSwiper.slidePrev());
+    document.getElementById('models-nav-next').addEventListener('click', () => modelsSwiper.slideNext());
+    sendMicContainer.addEventListener('click', handleSendMessage);
+    chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } });
+    chatInput.addEventListener('input', handleInput);
+    document.getElementById('chat-settings-btn').addEventListener('click', openSettingsModal);
+    document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
+    settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
+    agentSelect.addEventListener('change', (e) => { 
+        selectedAgentKey = e.target.value; 
+        updateChatTitle(); 
+        // Теперь настройки тоже можно отправлять через fetch для консистентности, 
+        // но sendData тоже будет работать (с сервисным сообщением)
+        tg.sendData(JSON.stringify({ action: 'set_agent', target: selectedAgentKey }));
+        // Обновляем историю чата для нового агента
+        loadChatFromLocalStorage(); 
+        if (currentMiniAppChatHistory.length === 0) {
+             const agent = agents.find(a => a.key === selectedAgentKey);
+             addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
+        }
+    });
+    modelSelect.addEventListener('change', (e) => { 
+        selectedModelKey = e.target.value; 
+        updateChatTitle();
+        tg.sendData(JSON.stringify({ action: 'set_model', target: selectedModelKey }));
+    });
+    handleInput.call(chatInput);
+}
+
+init();
 </script>
 </body>
 </html>
