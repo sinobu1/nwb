@@ -111,6 +111,30 @@
         #send-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); color: black; }
         #send-mic-btn-container.has-text #mic-btn-icon { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
         #send-mic-btn-container.has-text #send-btn-icon { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* PATCHED: Performance & Visual Feedback Improvements */
+        .chat-action-btn {
+          transition: transform 0.1s ease-in-out, background-color 0.2s;
+        }
+        .chat-action-btn:active {
+          transform: scale(0.95);
+        }
+
+        #send-mic-btn-container.has-text #mic-btn-icon {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.5);
+          transition: all 0.2s ease;
+        }
+        #send-mic-btn-container.has-text #send-btn-icon {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+          transition: all 0.2s ease;
+        }
+
+        @keyframes pop-in {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -190,6 +214,19 @@
 // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ЛОГИКИ ЧАТА ---
 let lastMessageInfo = { sender: null, date: null };
 
+    let lastHeight = 0;
+function handleInput() {
+    const shadow = document.getElementById('chat-input-shadow');
+    shadow.textContent = this.value + ' ';
+    requestAnimationFrame(() => {
+        const newHeight = shadow.offsetHeight;
+        if (newHeight !== lastHeight) {
+            this.style.height = `${newHeight}px`;
+            lastHeight = newHeight;
+        }
+    });
+    sendMicContainer.classList.toggle('has-text', this.value.trim().length > 0);
+}
 // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 function formatTime(date) {
     return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
