@@ -12,29 +12,20 @@
   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css"/>
   <style>
     :root {
-      /* Новая дизайн-система */
       --bg-main: #101010;
       --bg-card: #1E1E1E;
-      --bg-tab-bar: rgba(20, 20, 20, 0.7);
-      
       --text-primary: #FFFFFF;
       --text-secondary: #A0A0A0;
-      --text-accent: #00FFC2; /* Яркий, молодежный мятный */
-
+      --text-accent: #00FFC2;
       --border-color: #3A3A3C;
-
-      /* Шрифты */
-      --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+      --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
     }
     
     html, body {
-      position: fixed; inset: 0;
-      overflow: hidden; /* Главное правило против скролла всей страницы */
+      position: fixed; inset: 0; overflow: hidden;
       font-family: var(--font-family);
       background-color: var(--bg-main);
       color: var(--text-primary);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
     .app-container { height: 100%; display: flex; flex-direction: column; }
@@ -49,49 +40,63 @@
     h2 { font-size: 1.25rem; font-weight: 700; }
     p.subtitle { font-size: 1rem; color: var(--text-secondary); }
 
-    /* Карусель и карточки */
+    /* >>> НАЧАЛО ИЗМЕНЕНИЙ: Точная верстка карусели <<< */
     .swiper-container-wrapper {
-        margin-top: 2rem; /* Увеличенный отступ от заголовка */
-        padding-bottom: 30px;
+        margin-top: 2rem;
+        position: relative;
     }
     .swiper {
-        /* Убираем отрицательные отступы, чтобы избежать горизонтального скролла */
         padding: 0 1.5rem;
         margin-left: -1.5rem;
         margin-right: -1.5rem;
+        overflow: visible;
     }
-    .swiper-slide { width: 150px; /* Фиксированная ширина для единообразия */ }
-    .swiper-pagination { bottom: -8px !important; pointer-events: none; }
+    .swiper-slide {
+      width: 160px; /* Вернули размер карточек как было */
+      height: 170px;
+    }
+    .swiper-pagination {
+        position: absolute;
+        bottom: -30px !important; /* Гарантированно выносим за пределы слайдов */
+        width: 100%;
+        left: 0;
+        pointer-events: none;
+    }
+    /* >>> КОНЕЦ ИЗМЕНЕНИЙ <<< */
+    
     .swiper-pagination-bullet { background: var(--text-secondary) !important; opacity: 0.4 !important; pointer-events: auto; }
     .swiper-pagination-bullet-active { background: var(--text-accent) !important; opacity: 1 !important; }
     
     .tg-card {
-      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+      transition: transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.25s ease;
       border-radius: 20px; overflow: hidden;
       cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      height: 100%;
     }
-    .tg-card:hover { transform: translateY(-6px); }
+    .tg-card:hover { 
+      transform: translateY(-6px); 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
     .carousel-card {
-      height: 160px; display: flex; flex-direction: column; justify-content: space-between;
+      height: 100%; display: flex; flex-direction: column; justify-content: space-between;
       padding: 1rem; text-align: left;
     }
     .card-icon { font-size: 1.75rem; }
-    .card-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); line-height: 1.3; }
+    .card-title { font-size: 1rem; font-weight: 700; line-height: 1.3; }
     .card-description { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.4; }
     
-    /* Свежая, молодежная палитра */
-    .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); } /* Коралл/Красный */
-    .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); } /* Яркий градиент */
-    .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); } /* Синий/Зеленый */
-    .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); } /* Оранжевый/Желтый */
-    .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); } /* Фиолетовый */
-    .palette-6 { background-color: #2D2D2D; } /* Темно-серый, почти черный */
+    .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
+    .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
+    .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
+    .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
+    .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
+    .palette-6 { background-color: #2D2D2D; }
 
-    /* Tab Bar */
+    /* Tab Bar & Profile */
     .ios-tab-bar {
       position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
       width: calc(100% - 2.5rem); max-width: 400px; display: flex;
-      background: var(--bg-tab-bar); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       border-radius: 24px; padding: 0.5rem; z-index: 100; border: 1px solid rgba(255,255,255,0.1);
     }
     .tab-item {
@@ -102,13 +107,8 @@
     .tab-item.active { color: var(--text-accent); }
     .tab-item svg { width: 28px; height: 28px; margin-bottom: 2px; }
     .tab-item span { font-size: 0.625rem; font-weight: 500; }
-
-    /* Профиль */
     #profile-page { display: none; }
-    .ios-card {
-      background-color: var(--bg-card); border-radius: 1rem;
-      padding: 1rem; margin-top: 1.5rem;
-    }
+    .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1.5rem; }
     .profile-header {
       display: flex; align-items: center; border-bottom: 1px solid var(--border-color);
       padding-bottom: 1rem;
@@ -157,13 +157,13 @@
           <div class="profile-header">
             <img id="profile-avatar-img" src="" alt="Avatar" class="profile-avatar">
             <div class="profile-info">
-              <h2 id="profile-name"></h2>
+              <h2 id="profile-name">Загрузка...</h2>
               <p id="profile-id"></p>
             </div>
           </div>
           <div class="profile-gems">
             <span class="label">💎 Баланс гемов</span>
-            <span id="gem-balance" class="value">Загрузка...</span>
+            <span id="gem-balance" class="value">Недоступно</span>
           </div>
         </div>
     </div>
@@ -183,8 +183,7 @@
 
 <script>
     const tg = window.Telegram.WebApp;
-    
-    // --- ДАННЫЕ С НОВОЙ ПАЛИТРОЙ ---
+
     const agents = [
       { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5" },
       { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4" },
@@ -201,13 +200,11 @@
       { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "O", desc: "Быстрая и недорогая", palette: "palette-3" }
     ];
 
-    // --- DOM Элементы ---
     const mainContent = document.getElementById('main-content');
     const profilePage = document.getElementById('profile-page');
     const tabHome = document.getElementById('tab-home');
     const tabProfile = document.getElementById('tab-profile');
     
-    // --- Функции ---
     function sendDataToBot(action, target) {
       tg.sendData(JSON.stringify({ action, target }));
       tg.HapticFeedback.notificationOccurred('success');
@@ -235,50 +232,78 @@
         profilePage.style.display = 'none';
         tabHome.classList.remove('active');
         tabProfile.classList.remove('active');
-
         if (page === 'home') {
             mainContent.style.display = 'block';
             tabHome.classList.add('active');
         } else if (page === 'profile') {
             profilePage.style.display = 'block';
             tabProfile.classList.add('active');
-            loadProfileData();
+        }
+    }
+
+    // >>> НАЧАЛО ИЗМЕНЕНИЙ: Надежная загрузка данных профиля <<<
+    function safeDisplayProfileData() {
+        try {
+            const user = tg.initDataUnsafe?.user;
+            if (user && user.id) {
+                document.getElementById('profile-avatar-img').src = user.photo_url || '';
+                document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
+                document.getElementById('profile-id').textContent = `ID: ${user.id}`;
+            } else {
+                 document.getElementById('profile-name').textContent = 'Не удалось загрузить';
+            }
+        } catch (e) {
+            console.error("Ошибка при отображении данных профиля:", e);
+            document.getElementById('profile-name').textContent = 'Ошибка загрузки';
         }
     }
 
     function loadProfileData() {
-        // Проверяем, доступны ли данные пользователя
-        if (tg.initDataUnsafe?.user) {
-            const user = tg.initDataUnsafe.user;
-            document.getElementById('profile-avatar-img').src = user.photo_url || '';
-            document.getElementById('profile-name').textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Пользователь';
-            document.getElementById('profile-id').textContent = `ID: ${user.id}`;
-        } else {
-             // Если данные еще не загрузились, пробуем еще раз через мгновение
-            setTimeout(loadProfileData, 100);
-        }
-        document.getElementById('gem-balance').textContent = 'Недоступно';
+      // Пытаемся отобразить данные сразу
+      safeDisplayProfileData();
+
+      // Если данных нет, делаем несколько попыток с интервалом
+      if (!tg.initDataUnsafe?.user?.id) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (tg.initDataUnsafe?.user?.id) {
+            safeDisplayProfileData();
+            clearInterval(interval);
+          } else if (attempts > 10) { // Прекращаем попытки после 1 секунды
+            clearInterval(interval);
+          }
+        }, 100);
+      }
+    }
+    // >>> КОНЕЦ ИЗМЕНЕНИЙ <<<
+    
+    // Инициализация
+    function init() {
+        tg.ready();
+        tg.expand();
+
+        populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
+        populateCarousel('models-swiper-wrapper', models, 'set_model');
+
+        const swiperOptions = {
+          slidesPerView: 'auto',
+          spaceBetween: 16,
+          pagination: { el: ".swiper-pagination", clickable: true },
+        };
+        new Swiper("#agents-swiper", swiperOptions);
+        new Swiper("#models-swiper", swiperOptions);
+        
+        tabHome.addEventListener('click', () => showPage('home'));
+        tabProfile.addEventListener('click', () => {
+            showPage('profile');
+            loadProfileData(); // Загружаем данные при каждом клике на вкладку
+        });
+        
+        showPage('home');
     }
 
-    // --- Инициализация ---
-    tg.ready();
-    tg.expand();
-
-    populateCarousel('agents-swiper-wrapper', agents, 'set_agent');
-    populateCarousel('models-swiper-wrapper', models, 'set_model');
-
-    const swiperOptions = {
-      slidesPerView: 'auto',
-      spaceBetween: 16,
-      pagination: { el: ".swiper-pagination", clickable: true },
-    };
-    new Swiper("#agents-swiper", swiperOptions);
-    new Swiper("#models-swiper", swiperOptions);
-    
-    tabHome.addEventListener('click', () => showPage('home'));
-    tabProfile.addEventListener('click', () => showPage('profile'));
-    
-    showPage('home');
+    init();
 </script>
 </body>
 </html>
