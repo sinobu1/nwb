@@ -1,7 +1,8 @@
 # main.py
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, status
+from fastapi import FastAPI, Request, Response, status, Form, File, UploadFile # Added Form, File, UploadFile
+from typing import Optional # Added Optional
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -10,11 +11,9 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     filters,
 )
-# Импорт CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 
-# Импортируем genai, чтобы сконфигурировать его
 from config import CONFIG, logger, BotConstants, firestore_service, genai
 
 try:
@@ -23,16 +22,13 @@ except ImportError:
     logger.error("Не удалось импортировать bot_logic.py. Убедитесь, что вы переименовали handlers.py в bot_logic.py")
     import handlers as bot_logic
 
-from pydantic import BaseModel # Убедитесь, что BaseModel импортирован
-from datetime import datetime, timezone # Для timestamp
+from pydantic import BaseModel 
+from datetime import datetime, timezone 
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Код, который выполнится при старте сервера
     logger.info("Application startup...")
-    
-    # --- >> ВАЖНОЕ ДОБАВЛЕНИЕ: КОНФИГУРАЦИЯ GOOGLE GEMINI API << ---
     if CONFIG.GOOGLE_GEMINI_API_KEY and "YOUR_" not in CONFIG.GOOGLE_GEMINI_API_KEY:
         try:
             genai.configure(api_key=CONFIG.GOOGLE_GEMINI_API_KEY)
@@ -41,7 +37,6 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to configure Google Gemini API: {e}", exc_info=True)
     else:
         logger.warning("Google Gemini API key is not configured or is missing.")
-    # --- КОНЕЦ ДОБАВЛЕНИЯ ---
     
     await ptb_app.initialize()
     
@@ -57,49 +52,34 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Код при остановке сервера
     logger.info("Application shutdown...")
     await ptb_app.shutdown()
 
-# Модель для запроса от MiniApp к нашему новому эндпоинту
+# Updated model to include optional image fields
 class AppChatMessageRequest(BaseModel):
-    text: str
+    text: Optional[str] = None # Text is now optional if an image is sent
     agentKey: str
     modelKey: str
-    # В будущем можно добавить userId, если будете передавать и валидировать initData
-    # userId: int 
+    image_base64: Optional[str] = None
+    image_mime_type: Optional[str] = None
 
-# Инициализация FastAPI 
-app = FastAPI(title="Telegram Bot API Server", version="1.4.0", lifespan=lifespan)
 
-# --- >> ДОБАВЛЕНИЕ CORSMiddleware << ---
-# Укажите здесь источник вашего Mini App.
-# Для разработки можно использовать ["*"] (любой источник),
-# но для продакшена лучше указать конкретный URL вашего Mini App.
-# Frontend URL из вашего index.html указывает на github.io, но может быть и другой, если вы используете кастомный домен для Mini App.
-# Судя по MENU_STRUCTURE в config.py, ваш Mini App доступен по URL "https://sinobu1.github.io/nwb/"
-# Значит, origin будет "https://sinobu1.github.io"
+app = FastAPI(title="Telegram Bot API Server", version="1.5.0", lifespan=lifespan) # Incremented version
+
 origins = [
-    "https://sinobu1.github.io", # URL вашего Mini App
-    # "http://localhost", # Если тестируете локально
-    # "http://localhost:8080", # Пример другого локального порта
-    # "*" # Можно использовать для отладки, но НЕ рекомендуется для продакшена
+    "https://sinobu1.github.io", 
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Разрешенные источники
-    allow_credentials=True, # Разрешить куки и заголовки авторизации
-    allow_methods=["*"],    # Разрешить все методы (GET, POST, OPTIONS, etc.)
-    allow_headers=["*"],    # Разрешить все заголовки
+    allow_origins=origins,  
+    allow_credentials=True, 
+    allow_methods=["*"],    
+    allow_headers=["*"],    
 )
-# --- КОНЕЦ ДОБАВЛЕНИЯ CORSMiddleware ---
-
 
 ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
-# Полная регистрация всех обработчиков
-# (Этот блок кода остается без изменений)
 ptb_app.add_handler(CommandHandler("start", bot_logic.start), group=0)
 ptb_app.add_handler(CommandHandler("menu", bot_logic.open_menu_command), group=0)
 ptb_app.add_handler(CommandHandler("usage", bot_logic.usage_command), group=0)
@@ -115,8 +95,6 @@ ptb_app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, bot_logic.success
 ptb_app.add_error_handler(bot_logic.error_handler)
 
 
-# Эндпоинты FastAPI
-# (Этот блок кода остается без изменений)
 @app.post("/telegram")
 async def telegram_webhook(request: Request):
     secret = CONFIG.TELEGRAM_TOKEN.split(":")[-1]
@@ -142,26 +120,43 @@ async def get_app_updates(user_id: int):
         logger.error(f"API /get_updates error for user {user_id}: {e}", exc_info=True)
         return {"status": "error", "messages": [], "error": str(e)}
 
-# >>> НОВЫЙ ЭНДПОИНТ ДЛЯ ПРИЕМА СООБЩЕНИЙ ОТ MINI APP <<<
-@app.post("/api/process_app_message/{user_id_unsafe}") # user_id_unsafe для демонстрации
-async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageRequest):
-    """
-    Принимает сообщение от Mini App, обрабатывает через ИИ,
-    сохраняет ответ в Firestore для опроса и дублирует в основной чат.
-    ВАЖНО: user_id_unsafe здесь используется для примера. В продакшене
-    нужно получать user_id из валидированных initData, передаваемых Mini App.
-    """
-    user_id = user_id_unsafe # ИСПОЛЬЗУЕМ ID ИЗ ПУТИ ДЛЯ ПРОСТОТЫ ПРИМЕРА
+@app.post("/api/process_app_message/{user_id_unsafe}")
+async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageRequest): # Request model updated
+    user_id = user_id_unsafe 
 
-    logger.info(f"Received message from MiniApp for user {user_id}. Agent: {request_data.agentKey}, Model: {request_data.modelKey}, Text: '{request_data.text}'")
+    logger.info(f"Received message from MiniApp for user {user_id}. Agent: {request_data.agentKey}, Model: {request_data.modelKey}, Text: '{request_data.text}', HasImage: {bool(request_data.image_base64)}")
 
-    # 1. Отправляем копию сообщения пользователя в основной чат для истории
+    # Prepare image_data if present
+    image_data_for_logic = None
+    if request_data.image_base64 and request_data.image_mime_type:
+        try:
+            # No need to decode base64 here if bot_logic expects base64 string directly.
+            # If bot_logic expects bytes, then:
+            # import base64
+            # image_bytes = base64.b64decode(request_data.image_base64)
+            # image_data_for_logic = {"mime_type": request_data.image_mime_type, "data": image_bytes}
+            # For now, let's assume bot_logic will handle the base64 string if needed, or we adjust it there.
+            # The Gemini API client usually takes bytes, so decoding here might be better.
+            # Let's assume for now that bot_logic.py's GoogleGenAIService will handle it or we pass bytes.
+            # For simplicity, let's pass base64 and mime type and let bot_logic decide.
+            image_data_for_logic = {
+                "base64": request_data.image_base64, # Sending as base64 string
+                "mime_type": request_data.image_mime_type
+            }
+            logger.info(f"Image data prepared for agent {request_data.agentKey}")
+        except Exception as e:
+            logger.error(f"Error processing base64 image for user {user_id}: {e}")
+            # Continue without image if processing fails
+            image_data_for_logic = None
+
+
+    # 1. Отправляем копию сообщения пользователя/инфо о фото в основной чат для истории
     try:
-        await ptb_app.bot.send_message(chat_id=user_id, text=f"(Из MiniApp): {request_data.text}")
+        message_to_log_in_chat = f"(Из MiniApp - {request_data.agentKey}): {request_data.text or '[Фото отправлено]'}"
+        await ptb_app.bot.send_message(chat_id=user_id, text=message_to_log_in_chat)
     except Exception as e:
         logger.error(f"Failed to send user message copy to main chat for {user_id}: {e}")
 
-    # 2. Обработка через ИИ (логика похожа на ту, что была в web_app_data_handler)
     user_data_cache = await firestore_service.get_user_data(user_id)
     bot_data_cache = await firestore_service.get_bot_data()
     
@@ -169,20 +164,32 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
         user_id, request_data.modelKey, user_data_cache, bot_data_cache, request_data.agentKey
     )
 
-    ai_response_text = "Ошибка обработки вашего запроса." # Ответ по умолчанию
+    ai_response_text = "Ошибка обработки вашего запроса." 
 
     if not can_proceed:
         ai_response_text = limit_message
         logger.warning(f"Request from MiniApp for user {user_id} denied: {limit_message}")
     else:
         try:
-            # Можно временно отправить "печатает" в основной чат, если хотите
-            # await ptb_app.bot.send_chat_action(chat_id=user_id, action='typing')
-            
             ai_service = bot_logic.get_ai_service(request_data.modelKey)
-            system_prompt = bot_logic.AI_MODES.get(request_data.agentKey, {}).get("prompt", bot_logic.AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
+            system_prompt_key = request_data.agentKey
+            # Handle case where agentKey might not be in AI_MODES directly (e.g. photo_dietitian_analyzer)
+            if request_data.agentKey == "photo_dietitian_analyzer" and "photo_dietitian_analyzer" not in bot_logic.AI_MODES:
+                 # Use a specific prompt for dietitian if it's handled as a special case
+                 # Or ensure "photo_dietitian_analyzer" is in AI_MODES with its prompt in config.py
+                 # For now, let's assume it's in AI_MODES or we use a default.
+                 # This part depends on how photo_dietitian_analyzer is defined in your config.py's AI_MODES
+                system_prompt = bot_logic.AI_MODES.get("photo_dietitian_analyzer", {}).get("prompt", bot_logic.AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
+            else:
+                system_prompt = bot_logic.AI_MODES.get(system_prompt_key, {}).get("prompt", bot_logic.AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]["prompt"])
+
             
-            raw_ai_response = await ai_service.generate_response(system_prompt, request_data.text, image_data=None)
+            # Pass image_data_for_logic to generate_response
+            raw_ai_response = await ai_service.generate_response(
+                system_prompt, 
+                request_data.text or "Анализ изображения", # Provide default text if only image
+                image_data=image_data_for_logic # Pass the prepared image data
+            )
             logger.info(f"Raw AI response (from /api/process_app_message for user {user_id}): '{raw_ai_response}'")
             ai_response_text, _ = bot_logic.smart_truncate(raw_ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
             
@@ -191,13 +198,11 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
             logger.error(f"AI service error in /api/process_app_message for user {user_id}: {e}", exc_info=True)
             ai_response_text = "Произошла внутренняя ошибка при обращении к ИИ."
             
-    # 3. Отправляем ответ ИИ в основной чат для истории
     try:
         await ptb_app.bot.send_message(chat_id=user_id, text=ai_response_text, disable_web_page_preview=True)
     except Exception as e:
         logger.error(f"Failed to send AI response to main chat for {user_id}: {e}")
 
-    # 4. Сохраняем ответ ИИ в Firestore ("почтовый ящик") для Mini App
     bot_message_for_app = [{"sender": "bot", "text": ai_response_text, "timestamp": datetime.now(timezone.utc).isoformat()}]
     messages_ref = firestore_service._db.collection(BotConstants.FS_APP_MESSAGES_COLLECTION).document(str(user_id))
     try:
