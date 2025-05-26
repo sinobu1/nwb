@@ -10,6 +10,9 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     filters,
 )
+# Импорт CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Импортируем genai, чтобы сконфигурировать его
 from config import CONFIG, logger, BotConstants, firestore_service, genai
@@ -66,8 +69,33 @@ class AppChatMessageRequest(BaseModel):
     # В будущем можно добавить userId, если будете передавать и валидировать initData
     # userId: int 
 
-# Инициализация FastAPI и PTB
+# Инициализация FastAPI 
 app = FastAPI(title="Telegram Bot API Server", version="1.4.0", lifespan=lifespan)
+
+# --- >> ДОБАВЛЕНИЕ CORSMiddleware << ---
+# Укажите здесь источник вашего Mini App.
+# Для разработки можно использовать ["*"] (любой источник),
+# но для продакшена лучше указать конкретный URL вашего Mini App.
+# Frontend URL из вашего index.html указывает на github.io, но может быть и другой, если вы используете кастомный домен для Mini App.
+# Судя по MENU_STRUCTURE в config.py, ваш Mini App доступен по URL "https://sinobu1.github.io/nwb/"
+# Значит, origin будет "https://sinobu1.github.io"
+origins = [
+    "https://sinobu1.github.io", # URL вашего Mini App
+    # "http://localhost", # Если тестируете локально
+    # "http://localhost:8080", # Пример другого локального порта
+    # "*" # Можно использовать для отладки, но НЕ рекомендуется для продакшена
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Разрешенные источники
+    allow_credentials=True, # Разрешить куки и заголовки авторизации
+    allow_methods=["*"],    # Разрешить все методы (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],    # Разрешить все заголовки
+)
+# --- КОНЕЦ ДОБАВЛЕНИЯ CORSMiddleware ---
+
+
 ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
 # Полная регистрация всех обработчиков
