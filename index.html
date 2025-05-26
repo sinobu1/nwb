@@ -253,23 +253,20 @@
             justify-content: center; 
             text-align: center;
             overflow: hidden; 
-            /* Adjusted padding for when only one button is present */
-            padding-left: 38px; /* Space for back button */
-            padding-right: 0; /* No padding if only one button on right */
+            padding-left: 38px; 
+            padding-right: 0; 
         }
-         /* When both settings and clear history are visible */
         .chat-title-container.has-two-right-buttons {
-            padding-right: calc(38px + 0.5rem + 38px); /* width of btn + gap + width of btn */
+            padding-right: calc(38px + 0.5rem + 38px); 
         }
-        /* When only one right button (e.g., clear history for dietitian) */
         .chat-title-container.has-one-right-button {
              padding-right: 38px; 
         }
 
-
         #chat-agent-name {
-            font-size: 1.0rem; 
-            font-weight: 600;
+            /* font-size: 1.0rem;  Original size */
+            font-size: 0.875rem; /* Slightly smaller like model name */
+            font-weight: 500; /* Adjusted to be less prominent or match model name */
             color: var(--text-primary);
             line-height: 1.2;
             display: block; 
@@ -277,7 +274,14 @@
             overflow: hidden;
             text-overflow: ellipsis; 
             max-width: 100%; 
+            margin-bottom: 0.1rem; /* Add a small margin if both agent and model are shown */
         }
+        #chat-screen.dietitian-chat-active #chat-agent-name {
+            font-size: 1.0rem; /* Keep original size for dietitian if it's the only title */
+            font-weight: 600;
+            margin-bottom: 0; /* No margin if it's the only title element */
+        }
+
         #chat-model-name {
             font-size: 0.75rem; 
             font-weight: 400;
@@ -290,10 +294,10 @@
             max-width: 100%;
         }
         
-        .chat-header-btn-group { /* New container for right-side buttons */
+        .chat-header-btn-group { 
             display: flex;
             align-items: center;
-            gap: 0.5rem; /* Space between buttons */
+            gap: 0.5rem; 
         }
         .chat-header-btn { 
             width: 38px; 
@@ -842,7 +846,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const chatBackButton = document.getElementById('chat-back-btn'); 
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
-    const chatClearHistoryBtn = document.getElementById('chat-clear-history-btn'); // New button
+    const chatClearHistoryBtn = document.getElementById('chat-clear-history-btn'); 
     const settingsModal = document.getElementById('settings-modal');
     const agentSelect = document.getElementById('agent-select'); 
     const modelSelect = document.getElementById('model-select'); 
@@ -1383,7 +1387,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             chatModelNameEl.style.display = 'none';
             chatSettingsBtn.style.display = 'none';
-            chatClearHistoryBtn.style.display = 'flex'; // Show clear history
+            chatClearHistoryBtn.style.display = 'flex'; 
             chatAttachFileBtn.style.display = 'flex'; 
             titleContainer.classList.remove('has-two-right-buttons');
             titleContainer.classList.add('has-one-right-button');
@@ -1396,7 +1400,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chatModelNameEl.style.display = 'block';
             chatSettingsBtn.style.display = 'flex'; 
-            chatClearHistoryBtn.style.display = 'flex'; // Show clear history
+            chatClearHistoryBtn.style.display = 'flex'; 
             chatAttachFileBtn.style.display = 'none'; 
             titleContainer.classList.add('has-two-right-buttons');
             titleContainer.classList.remove('has-one-right-button');
@@ -1429,10 +1433,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMiniAppChatHistory = [];
                 lastMessageInfo = { sender: null, date: null };
                 pendingDietitianImage = null;
-                clearImagePreview(); // Also clear any image preview in input area
+                clearImagePreview(); 
                 logger.info(`Chat history cleared for agent/tool: ${selectedAgentKey}`);
 
-                // Re-add welcome message
                 let currentConfig = generalAgents.find(a => a.key === selectedAgentKey) || toolConfigs[selectedAgentKey];
                 if (currentConfig) {
                     let welcomeMessageText = `Привет! Я ${currentConfig.name}. Чем могу помочь?`;
@@ -1504,7 +1507,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatBackButton?.addEventListener('click', closeChat); 
         chatSettingsBtn?.addEventListener('click', openSettingsModal); 
-        chatClearHistoryBtn?.addEventListener('click', clearCurrentChatHistory); // Listener for new button
+        chatClearHistoryBtn?.addEventListener('click', clearCurrentChatHistory); 
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
 
