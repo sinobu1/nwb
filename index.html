@@ -747,6 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let agentsSwiper, modelsSwiper;
     let selectedFileBase64 = null; 
     let selectedFileMimeType = null; 
+    let pendingDietitianImage = null; // To store dietitian image between steps
 
     const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
     const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; 
@@ -863,7 +864,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (activeScreenId !== 'main-screen') { // Fallback for any other screen
                 switchScreen(mainScreen);
             }
-            // No action if already on mainScreen, as BackButton should be hidden by switchScreen
         });
     }
 
@@ -950,30 +950,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Function to apply basic Markdown-like formatting to HTML
     function formatTextToHtml(text) {
         if (!text) return '';
         let html = text;
-        // Escape HTML to prevent XSS, then apply formatting
         html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-        // Bold: **text** or __text__
         html = html.replace(/\*\*(.*?)\*\*|__(.*?)__/g, '<b>$1$2</b>');
-        // Italic: *text* or _text_
         html = html.replace(/\*(.*?)\*|_(.*?)_/g, '<i>$1$2</i>');
-        // Strikethrough: ~~text~~
         html = html.replace(/~~(.*?)~~/g, '<s>$1</s>');
-        // Inline code: `text`
         html = html.replace(/`(.*?)`/g, '<code>$1</code>');
-        
-        // Convert newlines to <br> (important: do this after other replacements that might use \n)
         html = html.replace(/\n/g, '<br/>');
-
-        // Basic list handling (must be done carefully after newline conversion or before if logic is more complex)
-        // This is a simplified version. For robust Markdown, a proper parser is needed.
-        // For now, we rely on pre-wrap and <br> for multi-line.
-        // If you need actual <ul><li>, the backend should ideally send structured HTML or a clear list marker.
-        
         return html;
     }
 
@@ -984,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let textContent = '';
         let imageDataUrl = null;
 
-        if (typeof content === 'string') { // For older simple text messages
+        if (typeof content === 'string') { 
             textContent = content;
         } else if (typeof content === 'object' && content !== null) {
             textContent = content.text || '';
@@ -1032,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const contentSpan = document.createElement('span');
             contentSpan.className = 'message-content-text'; 
             if (sender === 'bot' && !isTyping) {
-                contentSpan.innerHTML = formatTextToHtml(textContent); // Apply formatting for bot messages
+                contentSpan.innerHTML = formatTextToHtml(textContent); 
             } else {
                 contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); 
             }
@@ -1056,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isTyping && !isRestoredFromHistory) {
             const historyEntryParts = [];
-            if (textContent) historyEntryParts.push({ text: textContent }); // Store raw text for backend
+            if (textContent) historyEntryParts.push({ text: textContent }); 
             currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: historyEntryParts });
             saveChatToLocalStorage(); 
         }
@@ -1112,42 +1097,83 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleSendMessage() {
-        const text = chatPromptInput.value.trim(); 
-        if (!text && !selectedFileBase64) { 
-            if (selectedAgentKey === "photo_dietitian_analyzer") { 
-                tg.showAlert("Пожалуйста, прикрепите фото или введите текстовый запрос.");
-            }
+        const text = chatPromptInput.value.trim();
+        let imageToSendBase64 = selectedFileBase64; 
+        let mimeTypeToSend = selectedFileMimeType;
+        let imageDataUrlForUi = null;
+
+        if (imageToSendBase64 && mimeTypeToSend) {
+            imageDataUrlForUi = `data:${mimeTypeToSend};base64,${imageToSendBase64}`;
+        }
+
+        if (!text && !imageToSendBase64 && selectedAgentKey !== "photo_dietitian_analyzer") {
+            return; 
+        }
+        if (!text && !imageToSendBase64 && selectedAgentKey === "photo_dietitian_analyzer" && !pendingDietitianImage) {
+             tg.showAlert("Пожалуйста, прикрепите фото или введите текстовый запрос для Диетолога.");
             return;
         }
 
-        let messageContentForChat = { text: text }; 
-        if (selectedFileBase64 && selectedFileMimeType) {
-            const imageDataUrl = `data:${selectedFileMimeType};base64,${selectedFileBase64}`;
-            messageContentForChat.imageDataUrl = imageDataUrl; 
+        let agentKeyForBackend = selectedAgentKey;
+        let modelKeyForBackend = selectedModelKey; 
+
+        if (selectedAgentKey === "photo_dietitian_analyzer") {
+            const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
+            if (dietitianConfig?.forced_model_key) {
+                modelKeyForBackend = dietitianConfig.forced_model_key;
+            }
+
+            if (imageToSendBase64) { 
+                pendingDietitianImage = { 
+                    base64: imageToSendBase64, 
+                    mimeType: mimeTypeToSend,
+                    dataUrl: imageDataUrlForUi 
+                };
+            } else if (pendingDietitianImage) { 
+                imageToSendBase64 = pendingDietitianImage.base64; 
+                mimeTypeToSend = pendingDietitianImage.mimeType;
+                imageDataUrlForUi = null; // Don't re-show image in user's weight message bubble
+            } else if (!text) { 
+                 tg.showAlert("Диетолог: Пожалуйста, прикрепите фото или введите текстовый запрос.");
+                return;
+            }
         }
-        addMessageToChat('user', messageContentForChat); 
         
-        const imageToSend = selectedFileBase64; 
-        const mimeTypeToSend = selectedFileMimeType; 
+        let messageContentForChat = { text: text };
+        if (imageDataUrlForUi) { // Only add image to UI if it's a *new* image being sent with this action
+             messageContentForChat.imageDataUrl = imageDataUrlForUi;
+        }
+        
+        addMessageToChat('user', messageContentForChat);
+        
+        const finalImageBase64 = imageToSendBase64;
+        const finalMimeType = mimeTypeToSend;
 
         chatPromptInput.value = ''; 
         autoResizeTextarea.call(chatPromptInput); 
-        clearImagePreview(); 
+        
+        if (selectedFileBase64) { 
+            clearImagePreview(); 
+        }
+
         chatSendMessageBtn.disabled = true; 
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true }); 
         
-        let modelKeyForBackend = selectedModelKey; 
-        if (selectedAgentKey === "photo_dietitian_analyzer") {
-            const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
-            if (dietitianConfig?.forced_model_key) {
-                modelKeyForBackend = dietitianConfig.forced_model_key;
-            }
+        await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, finalImageBase64, finalMimeType);
+
+        if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && finalImageBase64 === pendingDietitianImage.base64 ) {
+            // If text (weight) was sent and it used the pending image, clear pending image.
+            // This check ensures we only clear it after the *second* step (weight submission).
+            // The `!imageToSendBase64` before was problematic because imageToSendBase64 was reassigned.
+            // The reliable check is if `text` is present (meaning this is likely the weight message) AND `pendingDietitianImage` was used.
+             logger.info("Dietitian: Weight/comment processed with pending image. Clearing pending image.");
+            pendingDietitianImage = null;
         }
-        await submitMessageToBackend(text, selectedAgentKey, modelKeyForBackend, imageToSend, mimeTypeToSend);
     }
+
 
     function autoResizeTextarea() {
         this.style.height = 'auto'; 
@@ -1156,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (newHeight > maxHeight) { newHeight = maxHeight; this.style.overflowY = 'auto';  } 
         else { this.style.overflowY = 'hidden'; }
         this.style.height = newHeight + 'px';
-        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64; 
+        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage) ; 
     }
     chatPromptInput.addEventListener('input', autoResizeTextarea);
 
@@ -1190,6 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedFileMimeType = file.type;
                 displayImagePreview(e.target.result, file.name);
                 chatSendMessageBtn.disabled = false; 
+                autoResizeTextarea.call(chatPromptInput); // Re-evaluate send button state
             };
             reader.onerror = () => { tg.showAlert("Не удалось прочитать файл."); clearImagePreview(); };
             reader.readAsDataURL(file);
@@ -1210,7 +1237,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearImagePreview() {
         selectedFileBase64 = null; selectedFileMimeType = null;
         imagePreviewContainer.innerHTML = ''; imagePreviewContainer.style.display = 'none';
-        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0; 
+        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage); 
+        autoResizeTextarea.call(chatPromptInput); // Re-evaluate send button state
     }
 
     async function fetchUpdates() {
@@ -1325,6 +1353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedAgentKey = config.key; 
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
+        pendingDietitianImage = null; // Reset pending image when opening any chat
 
         if (config.key === "photo_dietitian_analyzer") { 
             chatScreen.classList.add('dietitian-chat-active'); 
@@ -1370,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeChat() { 
         stopPolling();
         clearImagePreview();
+        pendingDietitianImage = null; // Clear pending dietitian image on chat close
         switchScreen(mainScreen); 
      }
     function openSettingsModal() { 
@@ -1439,6 +1469,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatModelNameEl.style.display = 'block';
                 chatSettingsBtn.style.display = 'flex';
                 chatAttachFileBtn.style.display = 'none';
+                pendingDietitianImage = null; // Clear dietitian pending image
 
                 clearImagePreview();
                 loadChatFromLocalStorage(); 
