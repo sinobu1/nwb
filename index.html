@@ -253,7 +253,20 @@
             justify-content: center; 
             text-align: center;
             overflow: hidden; 
+            /* Adjusted padding for when only one button is present */
+            padding-left: 38px; /* Space for back button */
+            padding-right: 0; /* No padding if only one button on right */
         }
+         /* When both settings and clear history are visible */
+        .chat-title-container.has-two-right-buttons {
+            padding-right: calc(38px + 0.5rem + 38px); /* width of btn + gap + width of btn */
+        }
+        /* When only one right button (e.g., clear history for dietitian) */
+        .chat-title-container.has-one-right-button {
+             padding-right: 38px; 
+        }
+
+
         #chat-agent-name {
             font-size: 1.0rem; 
             font-weight: 600;
@@ -277,6 +290,11 @@
             max-width: 100%;
         }
         
+        .chat-header-btn-group { /* New container for right-side buttons */
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Space between buttons */
+        }
         .chat-header-btn { 
             width: 38px; 
             height: 38px; 
@@ -414,7 +432,6 @@
             padding: 0.5rem 0.9rem; 
             border-radius: 1.1rem; 
             max-width: 85%; 
-            /* word-wrap: break-word; Removed to allow pre-wrap on child */
             line-height: 1.4; 
             opacity: 0; 
             transform: translateY(10px); 
@@ -434,11 +451,11 @@
             cursor: pointer; 
         }
         .message-content-text { 
-            white-space: pre-wrap; /* Allows \n to work as line breaks */
-            word-wrap: break-word; /* Ensures long words still wrap */
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
         }
         .message-content-text ul, .message-content-text ol {
-            padding-left: 1.5em; /* Indent lists */
+            padding-left: 1.5em; 
             margin-top: 0.5em;
             margin-bottom: 0.5em;
         }
@@ -668,12 +685,22 @@
                  </div>
                  <div class="chat-title-container">
                     <span id="chat-agent-name">Агент</span>
-                    <span id="chat-model-name">Модель</span> </div>
-                 <div id="chat-settings-btn" class="chat-header-btn">
-                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54 1.85l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                    <span id="chat-model-name">Модель</span> 
+                 </div>
+                 <div class="chat-header-btn-group"> <div id="chat-clear-history-btn" class="chat-header-btn" title="Очистить историю">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div id="chat-settings-btn" class="chat-header-btn" title="Настройки чата">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54 1.85l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                     </div>
                  </div>
             </div>
             <div class="chat-messages" id="chat-messages-container"></div>
@@ -747,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let agentsSwiper, modelsSwiper;
     let selectedFileBase64 = null; 
     let selectedFileMimeType = null; 
-    let pendingDietitianImage = null; // To store dietitian image between steps
+    let pendingDietitianImage = null; 
 
     const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
     const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; 
@@ -813,8 +840,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatAgentNameEl = document.getElementById('chat-agent-name');
     const chatModelNameEl = document.getElementById('chat-model-name');
 
-    const chatBackButton = document.getElementById('chat-back-btn'); // In-app back button
+    const chatBackButton = document.getElementById('chat-back-btn'); 
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
+    const chatClearHistoryBtn = document.getElementById('chat-clear-history-btn'); // New button
     const settingsModal = document.getElementById('settings-modal');
     const agentSelect = document.getElementById('agent-select'); 
     const modelSelect = document.getElementById('model-select'); 
@@ -861,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeChat(); 
             } else if (activeScreenId === 'image-generator-screen' || activeScreenId === 'summarizer-screen') {
                 switchScreen(mainScreen);
-            } else if (activeScreenId !== 'main-screen') { // Fallback for any other screen
+            } else if (activeScreenId !== 'main-screen') { 
                 switchScreen(mainScreen);
             }
         });
@@ -916,7 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
                 const parsedUiHistory = JSON.parse(savedUiHistory);
-                if (parsedUiHistory.length === 0) return; 
+                if (parsedUiHistory.length === 0) return false; // Indicate history was empty
 
                 parsedUiHistory.forEach(msg => {
                     if (msg.content && (msg.content.text || msg.content.imageDataUrl)) {
@@ -929,9 +957,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: historyEntryParts});
                     }
                 });
+                return true; // Indicate history was loaded
             }
+            return false; // Indicate no history found
         } catch (e) {
             console.error("Error loading UI chat history:", e);
+            return false; // Indicate error during load
         }
     }
     
@@ -1155,8 +1186,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, imageBase64ForBackend, mimeTypeForBackend);
 
-        // Clear pendingDietitianImage only if text was sent *after* an image was already pending (i.e., this was the weight/comment submission)
-        // And NOT if a new image was just sent (because that sets a new pending image)
         if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && !selectedFileBase64 && imageBase64ForBackend === pendingDietitianImage.base64) {
             logger.info("Dietitian: Text (weight/comment) processed with pending image. Clearing pending image.");
             pendingDietitianImage = null;
@@ -1343,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
         pendingDietitianImage = null; 
+        const titleContainer = document.querySelector('.chat-title-container');
 
         if (config.key === "photo_dietitian_analyzer") { 
             chatScreen.classList.add('dietitian-chat-active'); 
@@ -1353,7 +1383,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             chatModelNameEl.style.display = 'none';
             chatSettingsBtn.style.display = 'none';
+            chatClearHistoryBtn.style.display = 'flex'; // Show clear history
             chatAttachFileBtn.style.display = 'flex'; 
+            titleContainer.classList.remove('has-two-right-buttons');
+            titleContainer.classList.add('has-one-right-button');
         } else { 
             chatScreen.classList.remove('dietitian-chat-active');
             chatPromptInput.placeholder = "Сообщение...";
@@ -1363,7 +1396,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chatModelNameEl.style.display = 'block';
             chatSettingsBtn.style.display = 'flex'; 
+            chatClearHistoryBtn.style.display = 'flex'; // Show clear history
             chatAttachFileBtn.style.display = 'none'; 
+            titleContainer.classList.add('has-two-right-buttons');
+            titleContainer.classList.remove('has-one-right-button');
         }
         if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay; 
         
@@ -1371,9 +1407,9 @@ document.addEventListener('DOMContentLoaded', () => {
         modelSelect.value = currentModelForBackend; 
 
         clearImagePreview();
-        loadChatFromLocalStorage(); 
+        const historyLoaded = loadChatFromLocalStorage(); 
 
-        if (chatMessagesContainer.children.length === 0) { 
+        if (!historyLoaded && chatMessagesContainer.children.length === 0) { 
             let welcomeMessageText = `Привет! Я ${config.name}. Чем могу помочь?`;
             if (config.key === "photo_dietitian_analyzer") {
                 welcomeMessageText = `Привет! Я ${config.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
@@ -1384,6 +1420,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         switchScreen(chatScreen);
     }
+    
+    function clearCurrentChatHistory() {
+        tg.showConfirm("Вы уверены, что хотите очистить историю этого чата?", (confirmed) => {
+            if (confirmed) {
+                chatMessagesContainer.innerHTML = '';
+                localStorage.removeItem('uiChatHistory_' + selectedAgentKey);
+                currentMiniAppChatHistory = [];
+                lastMessageInfo = { sender: null, date: null };
+                pendingDietitianImage = null;
+                clearImagePreview(); // Also clear any image preview in input area
+                logger.info(`Chat history cleared for agent/tool: ${selectedAgentKey}`);
+
+                // Re-add welcome message
+                let currentConfig = generalAgents.find(a => a.key === selectedAgentKey) || toolConfigs[selectedAgentKey];
+                if (currentConfig) {
+                    let welcomeMessageText = `Привет! Я ${currentConfig.name}. Чем могу помочь?`;
+                     if (currentConfig.key === "photo_dietitian_analyzer") {
+                        welcomeMessageText = `Привет! Я ${currentConfig.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
+                    }
+                    if (welcomeMessageText) {
+                         addMessageToChat('bot', { text: welcomeMessageText });
+                    }
+                }
+                 chatPromptInput.focus();
+            }
+        });
+    }
+
 
     function closeChat() { 
         stopPolling();
@@ -1440,6 +1504,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatBackButton?.addEventListener('click', closeChat); 
         chatSettingsBtn?.addEventListener('click', openSettingsModal); 
+        chatClearHistoryBtn?.addEventListener('click', clearCurrentChatHistory); // Listener for new button
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
 
@@ -1457,12 +1522,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatPromptInput.placeholder = "Сообщение...";
                 chatModelNameEl.style.display = 'block';
                 chatSettingsBtn.style.display = 'flex';
+                chatClearHistoryBtn.style.display = 'flex';
                 chatAttachFileBtn.style.display = 'none';
                 pendingDietitianImage = null; 
 
                 clearImagePreview();
-                loadChatFromLocalStorage(); 
-                if (chatMessagesContainer.children.length === 0) {
+                const historyWasLoaded = loadChatFromLocalStorage(); 
+                if (!historyWasLoaded && chatMessagesContainer.children.length === 0) {
                     addMessageToChat('bot', { text: `Агент изменен на ${agentConfig.name}. Чем могу помочь?` });
                 }
             }
