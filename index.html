@@ -27,26 +27,26 @@
             --ios-tab-bar-bg: rgba(28, 28, 30, 0.85); /* Semi-transparent dark for tab bar */
         }
         html {
-            height: 100%; /* Ensure html takes full viewport height */
+            height: 100%; 
         }
         body {
-            height: 100%; /* Ensure body takes full html height */
-            overflow: hidden; /* Prevent body scrollbars */
+            height: 100%; 
+            overflow: hidden; 
             font-family: var(--font-family);
             background-color: var(--bg-main);
             color: var(--text-primary);
             display: flex;
             justify-content: center;
-            overscroll-behavior-y: contain; /* Keep this to prevent pull-to-refresh type behaviors */
+            overscroll-behavior-y: contain; 
             margin: 0;
             padding: 0;
         }
         .app-wrapper {
             width: 100%;
             max-width: 450px; 
-            height: 100%; /* Takes full height of the body */
-            position: relative; /* For absolute positioning of screens */
-            overflow: hidden; /* Clip content of screens */
+            height: 100%; 
+            position: relative; 
+            overflow: hidden; 
             display: flex;
             flex-direction: column;
             border-left: 1px solid var(--app-wrapper-border); 
@@ -1104,10 +1104,64 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSettingsModal() { agentSelect.value = selectedAgentKey; modelSelect.value = selectedModelKey; settingsModal.style.display = 'flex'; }
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
+    // --- START: Viewport Changed Handler ---
+    function viewportChangedHandler() {
+        const appWrapper = document.querySelector('.app-wrapper');
+        if (!appWrapper) return;
+
+        // Use tg.WebApp.viewportStableHeight as the base height when keyboard is closed
+        // and tg.WebApp.viewportHeight when keyboard might be open or other resizes occur.
+        let targetHeight = tg.WebApp.viewportStableHeight; // Height without keyboard
+        
+        // If viewportHeight is significantly smaller, keyboard is likely open.
+        // viewportHeight is the current visible area.
+        if (tg.WebApp.viewportHeight < tg.WebApp.viewportStableHeight - 100) { // 100px threshold for keyboard
+             targetHeight = tg.WebApp.viewportHeight;
+        }
+        
+        appWrapper.style.height = targetHeight + 'px';
+        // logger.debug(`Viewport changed. App wrapper height set to: ${targetHeight}px. Stable: ${tg.WebApp.viewportStableHeight}, Current: ${tg.WebApp.viewportHeight}`);
+
+
+        // Scroll to bottom only if chat is active and viewport state is stable
+        // isStateStable is true when the viewport resizing animation is complete.
+        if (tg.WebApp.isStateStable && document.getElementById('chat-screen').classList.contains('active')) {
+            const chatMessagesContainer = document.getElementById('chat-messages-container');
+            setTimeout(() => {
+                chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
+                // logger.debug("Scrolled to bottom of chat after viewport change.");
+            }, 150); 
+        }
+    }
+    // --- END: Viewport Changed Handler ---
+
+
     function init() {
         if (tg.ready) tg.ready();
-        if (tg.expand) tg.expand();
+        if (tg.expand) tg.expand(); // Expand the Web App to full height
         if (tg.MainButton) tg.MainButton.hide();
+
+        // --- START: Viewport event listener and initial call ---
+        if (tg.onEvent) {
+            tg.onEvent('viewportChanged', viewportChangedHandler);
+            logger.info("Viewport changed event listener attached.");
+        }
+        
+        // Initial adjustment of app wrapper height
+        // Check if viewportStableHeight is available (usually after WebApp is ready and expanded)
+        setTimeout(() => {
+            if (tg.WebApp.viewportStableHeight && tg.WebApp.viewportStableHeight > 0) {
+                 viewportChangedHandler(); // Call handler to set initial height based on stable height
+                 logger.info(`Initial app wrapper height set using viewportStableHeight: ${tg.WebApp.viewportStableHeight}px`);
+            } else if (tg.WebApp.viewportHeight && tg.WebApp.viewportHeight > 0) {
+                 viewportChangedHandler(); // Fallback to current viewport height
+                 logger.info(`Initial app wrapper height set using viewportHeight: ${tg.WebApp.viewportHeight}px`);
+            } else {
+                logger.warn("Initial viewport height not available from Telegram WebApp API.");
+            }
+        }, 100); // Delay to ensure WebApp is ready
+        // --- END: Viewport event listener and initial call ---
+
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
         populateCarousel('models-swiper-wrapper', models, 'model');
