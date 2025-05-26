@@ -276,13 +276,12 @@
             text-overflow: ellipsis;
             max-width: 100%;
         }
-        /* .dietitian-chat-active styles are now applied via JS for explicit control */
         
         .chat-header-btn { 
             width: 38px; 
             height: 38px; 
             border-radius: 50%; 
-            display: flex; /* Ensures SVG is centered */
+            display: flex; 
             align-items: center; 
             justify-content: center; 
             cursor: pointer; 
@@ -290,13 +289,13 @@
             color: var(--text-secondary); 
             flex-shrink: 0; 
         }
-        .chat-header-btn svg { /* Ensure SVG scales well within button */
-            width: 20px; /* Adjusted for better visual fit */
-            height: 20px; /* Adjusted for better visual fit */
+        .chat-header-btn svg { 
+            width: 20px; 
+            height: 20px; 
         }
 
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
-        .chat-header-btn#chat-back-btn svg { width: 22px; height: 22px; } /* Specific size for back arrow if needed */
+        .chat-header-btn#chat-back-btn svg { width: 22px; height: 22px; } 
         .chat-header-btn:hover { background-color: var(--bg-card); }
         
         .chat-messages { 
@@ -340,7 +339,6 @@
         #chat-attach-file-btn:hover {
             color: var(--text-primary);
         }
-        /* Hiding attach button is now done via JS in openChat */
 
         .image-preview-container {
             display: none; 
@@ -416,7 +414,7 @@
             padding: 0.5rem 0.9rem; 
             border-radius: 1.1rem; 
             max-width: 85%; 
-            word-wrap: break-word; 
+            /* word-wrap: break-word; Removed to allow pre-wrap on child */
             line-height: 1.4; 
             opacity: 0; 
             transform: translateY(10px); 
@@ -436,8 +434,18 @@
             cursor: pointer; 
         }
         .message-content-text { 
-            word-wrap: break-word; 
+            white-space: pre-wrap; /* Allows \n to work as line breaks */
+            word-wrap: break-word; /* Ensures long words still wrap */
         }
+        .message-content-text ul, .message-content-text ol {
+            padding-left: 1.5em; /* Indent lists */
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }
+        .message-content-text li {
+            margin-bottom: 0.25em;
+        }
+
 
         @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
         .message-bot { background-color: var(--bg-card); align-self: flex-start; color: var(--text-primary); }
@@ -755,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-grad-2", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
         { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", palette: "palette-grad-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
         { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "�", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." }
     ];
 
@@ -852,11 +860,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeChat(); 
             } else if (activeScreenId === 'image-generator-screen' || activeScreenId === 'summarizer-screen') {
                 switchScreen(mainScreen);
-            } else if (activeScreenId !== 'main-screen') {
+            } else if (activeScreenId !== 'main-screen') { // Fallback for any other screen
                 switchScreen(mainScreen);
             }
+            // No action if already on mainScreen, as BackButton should be hidden by switchScreen
         });
     }
+
 
     document.querySelectorAll('.back-btn[data-target-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -939,6 +949,34 @@ document.addEventListener('DOMContentLoaded', () => {
             fullscreenImage.src = '';
         }
     });
+    
+    // Function to apply basic Markdown-like formatting to HTML
+    function formatTextToHtml(text) {
+        if (!text) return '';
+        let html = text;
+        // Escape HTML to prevent XSS, then apply formatting
+        html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        // Bold: **text** or __text__
+        html = html.replace(/\*\*(.*?)\*\*|__(.*?)__/g, '<b>$1$2</b>');
+        // Italic: *text* or _text_
+        html = html.replace(/\*(.*?)\*|_(.*?)_/g, '<i>$1$2</i>');
+        // Strikethrough: ~~text~~
+        html = html.replace(/~~(.*?)~~/g, '<s>$1</s>');
+        // Inline code: `text`
+        html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+        
+        // Convert newlines to <br> (important: do this after other replacements that might use \n)
+        html = html.replace(/\n/g, '<br/>');
+
+        // Basic list handling (must be done carefully after newline conversion or before if logic is more complex)
+        // This is a simplified version. For robust Markdown, a proper parser is needed.
+        // For now, we rely on pre-wrap and <br> for multi-line.
+        // If you need actual <ul><li>, the backend should ideally send structured HTML or a clear list marker.
+        
+        return html;
+    }
+
 
     function addMessageToChat(sender, content, options = {}) {
         const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestampStr } = options;
@@ -946,7 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let textContent = '';
         let imageDataUrl = null;
 
-        if (typeof content === 'string') {
+        if (typeof content === 'string') { // For older simple text messages
             textContent = content;
         } else if (typeof content === 'object' && content !== null) {
             textContent = content.text || '';
@@ -993,7 +1031,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (textContent || isTyping) { 
             const contentSpan = document.createElement('span');
             contentSpan.className = 'message-content-text'; 
-            contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); 
+            if (sender === 'bot' && !isTyping) {
+                contentSpan.innerHTML = formatTextToHtml(textContent); // Apply formatting for bot messages
+            } else {
+                contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); 
+            }
             msgDiv.appendChild(contentSpan);
             if (isTyping) { 
                  contentSpan.classList.add('message-content'); 
@@ -1014,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isTyping && !isRestoredFromHistory) {
             const historyEntryParts = [];
-            if (textContent) historyEntryParts.push({ text: textContent });
+            if (textContent) historyEntryParts.push({ text: textContent }); // Store raw text for backend
             currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: historyEntryParts });
             saveChatToLocalStorage(); 
         }
@@ -1284,17 +1326,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
 
-        // Explicitly manage visibility of chat header elements based on chat type
         if (config.key === "photo_dietitian_analyzer") { 
-            chatScreen.classList.add('dietitian-chat-active'); // Used for attach button visibility
-            chatPromptInput.placeholder = "Фото: вес, детали..."; // Shortened placeholder
+            chatScreen.classList.add('dietitian-chat-active'); 
+            chatPromptInput.placeholder = "Фото: вес, детали..."; 
             currentModelForBackend = config.forced_model_key || models[0].key;
             const dietitianModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = dietitianModelDetails?.name || currentModelForBackend;
             
             chatModelNameEl.style.display = 'none';
             chatSettingsBtn.style.display = 'none';
-            chatAttachFileBtn.style.display = 'flex'; // Show attach for dietitian
+            chatAttachFileBtn.style.display = 'flex'; 
         } else { 
             chatScreen.classList.remove('dietitian-chat-active');
             chatPromptInput.placeholder = "Сообщение...";
@@ -1303,10 +1344,10 @@ document.addEventListener('DOMContentLoaded', () => {
             modelToDisplay = generalAgentModelDetails?.name || currentModelForBackend;
 
             chatModelNameEl.style.display = 'block';
-            chatSettingsBtn.style.display = 'flex'; // Ensure it's flex for proper centering
-            chatAttachFileBtn.style.display = 'none'; // Hide attach for general agents
+            chatSettingsBtn.style.display = 'flex'; 
+            chatAttachFileBtn.style.display = 'none'; 
         }
-        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay; // This will be hidden for dietitian by style.display
+        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay; 
         
         agentSelect.value = selectedAgentKey; 
         modelSelect.value = currentModelForBackend; 
@@ -1328,13 +1369,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeChat() { 
         stopPolling();
-        // No need to remove dietitian-chat-active here, openChat will set it correctly.
         clearImagePreview();
         switchScreen(mainScreen); 
      }
     function openSettingsModal() { 
-        // This modal is only for general agent chats.
-        // Ensure agentSelect reflects the current general agent and modelSelect the global model.
         if (!chatScreen.classList.contains('dietitian-chat-active')) {
             agentSelect.value = selectedAgentKey; 
             modelSelect.value = selectedModelKey;
@@ -1381,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } 
         });
 
-        chatBackButton?.addEventListener('click', closeChat); // This is the in-app back button
+        chatBackButton?.addEventListener('click', closeChat); 
         chatSettingsBtn?.addEventListener('click', openSettingsModal); 
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
@@ -1392,11 +1430,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (agentConfig) { 
                 selectedAgentKey = newAgentKey; 
                 if (chatAgentNameEl) chatAgentNameEl.textContent = agentConfig.name;
-                const modelDetails = models.find(m => m.key === selectedModelKey); // Use current global selectedModelKey
+                const modelDetails = models.find(m => m.key === selectedModelKey); 
                 if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; 
                 modelSelect.value = selectedModelKey; 
                 
-                // Ensure chat is configured as general agent chat
                 chatScreen.classList.remove('dietitian-chat-active'); 
                 chatPromptInput.placeholder = "Сообщение...";
                 chatModelNameEl.style.display = 'block';
