@@ -160,7 +160,6 @@
         .palette-grad-8 { background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%); }
         .palette-grad-default { background-color: #2D2D2D; } 
 
-
         .full-screen-card-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
         .full-screen-card { 
             background-color: var(--bg-card); 
@@ -283,7 +282,6 @@
             display: none;
         }
 
-
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); flex-shrink: 0; }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
         .chat-header-btn:hover { background-color: var(--bg-card); }
@@ -310,18 +308,17 @@
             gap: 0.75rem; 
             z-index: 15; 
         }
-        /* New: Attachment button style */
         #chat-attach-file-btn {
             flex-shrink: 0;
             background-color: transparent;
             border: none;
             color: var(--text-secondary);
-            padding: 0.5rem; /* Adjust padding for touch target */
+            padding: 0.5rem; 
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 0.25rem; /* Space before text input */
+            margin-right: 0.25rem; 
         }
         #chat-attach-file-btn svg {
             width: 24px;
@@ -330,13 +327,12 @@
         #chat-attach-file-btn:hover {
             color: var(--text-primary);
         }
-        /* Hide attach button if not dietitian */
         #chat-screen:not(.dietitian-chat-active) #chat-attach-file-btn {
             display: none;
         }
         .image-preview-container {
-            display: none; /* Hidden by default */
-            padding: 0.5rem 0.75rem 0; /* Padding above the input area */
+            display: none; 
+            padding: 0.5rem 0.75rem 0; 
             flex-shrink: 0;
         }
         .image-preview-item {
@@ -363,7 +359,6 @@
             font-size: 1.2rem;
             padding: 0.25rem;
         }
-
 
         #chat-prompt-input { 
             flex-grow: 1; 
@@ -405,8 +400,30 @@
             opacity: 0.7;
         }
 
+        .chat-message { 
+            padding: 0.5rem 0.9rem; 
+            border-radius: 1.1rem; 
+            max-width: 85%; 
+            word-wrap: break-word; 
+            line-height: 1.4; 
+            opacity: 0; 
+            transform: translateY(10px); 
+            animation: pop-in 0.3s ease forwards; 
+            margin-top: 0.65rem; 
+            will-change: transform, opacity; 
+            font-size: 0.9rem; 
+            display: flex; /* Added for flex layout of content */
+            flex-direction: column; /* Stack image and text vertically */
+        }
+        .chat-message img.message-image { /* Style for images in chat messages */
+            max-width: 100%;
+            max-height: 200px; /* Limit image height */
+            border-radius: 0.75rem; /* Rounded corners for the image */
+            margin-bottom: 0.5rem; /* Space between image and text if both exist */
+            object-fit: cover;
+            cursor: pointer; /* Indicate it's clickable */
+        }
 
-        .chat-message { padding: 0.5rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.65rem; will-change: transform, opacity; font-size: 0.9rem; }
         @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
         .message-bot { background-color: var(--bg-card); align-self: flex-start; color: var(--text-primary); }
         .message-user { background-color: var(--bg-user-msg); align-self: flex-end; color: var(--text-primary); }
@@ -419,7 +436,6 @@
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60% { content: '...'; } 80%, 100% { content: '...'; } }
         .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-secondary); float: right; margin-left: 0.5rem; margin-top: 0.2rem; line-height: 1; user-select: none; }
         .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 1rem; width: fit-content; }
-
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
@@ -465,6 +481,45 @@
         }
         .summarizer-output { margin-top: 1rem; padding: 1rem; background-color: var(--bg-card); border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; color: var(--text-primary); font-size: 0.9rem; }
         .error-message { color: var(--error-red); text-align: center; margin-top: 1rem; }
+
+        /* Fullscreen image viewer */
+        #fullscreen-image-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.85);
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            z-index: 2000; /* Above everything */
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        #fullscreen-image-viewer img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        #fullscreen-image-viewer .close-fullscreen-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
 
         ::-webkit-scrollbar {
             width: 6px; 
@@ -577,7 +632,7 @@
                  </div>
                  <div id="chat-settings-btn" class="chat-header-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54-1.85l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54 1.85l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>
                     </svg>
                  </div>
             </div>
@@ -639,6 +694,10 @@
             </div>
         </div>
     </div>
+    <div id="fullscreen-image-viewer">
+        <button class="close-fullscreen-btn">&times;</button>
+        <img src="" alt="Просмотр изображения">
+    </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -646,8 +705,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentMiniAppChatHistory = []; 
     let lastMessageInfo = { sender: null, date: null }; 
     let agentsSwiper, modelsSwiper;
-    let selectedFileBase64 = null; // To store the selected image Base64
-    let selectedFileMimeType = null; // To store the MIME type
+    let selectedFileBase64 = null; 
+    let selectedFileMimeType = null; 
 
     const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
     const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; 
@@ -698,7 +757,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatFileInput = document.getElementById('chat-file-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
 
-
     const chatAgentNameEl = document.getElementById('chat-agent-name');
     const chatModelNameEl = document.getElementById('chat-model-name');
 
@@ -721,6 +779,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarizerLoadingIndicator = document.getElementById('summarizer-loading-indicator');
     const summarizerOutput = document.getElementById('summarizer-output');
     const summarizerErrorMessage = document.getElementById('summarizer-error-message');
+    
+    const fullscreenImageViewer = document.getElementById('fullscreen-image-viewer');
+    const fullscreenImage = fullscreenImageViewer.querySelector('img');
+    const closeFullscreenBtn = fullscreenImageViewer.querySelector('.close-fullscreen-btn');
+
 
     let pollingInterval = null;
 
@@ -776,9 +839,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 .filter(el => el.classList.contains('chat-message') && !el.classList.contains('typing'))
                 .map(msgEl => {
                     const sender = msgEl.classList.contains('message-user') ? 'user' : 'bot';
-                    const text = msgEl.querySelector('.message-content')?.textContent || '';
+                    const textContent = msgEl.querySelector('.message-content-text')?.textContent || '';
+                    const imageEl = msgEl.querySelector('.message-image');
+                    const imageDataUrl = imageEl ? imageEl.src : null;
                     let timestamp = msgEl.dataset.timestamp || new Date().toISOString();
-                    return { sender, text, timestamp }; 
+                    
+                    // Return an object that matches the structure expected by addMessageToChat's content parameter
+                    return { 
+                        sender, 
+                        content: { // Store content as an object
+                            text: textContent, 
+                            imageDataUrl: imageDataUrl 
+                        },
+                        timestamp 
+                    }; 
                 });
             setTimeout(() => {
                 localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
@@ -797,11 +871,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (savedUiHistory) {
                 const parsedUiHistory = JSON.parse(savedUiHistory);
                 parsedUiHistory.forEach(msg => {
-                    addMessageToChat(msg.sender, msg.text, { 
+                    // Pass the content object directly
+                    addMessageToChat(msg.sender, msg.content, { 
                         isRestoredFromHistory: true, 
                         timestamp: msg.timestamp 
                     });
-                    currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: [{text: msg.text}]});
+                    // Reconstruct for currentMiniAppChatHistory (simplified for backend, backend handles image separately)
+                    const historyEntryParts = [];
+                    if (msg.content.text) historyEntryParts.push({text: msg.content.text});
+                    // Note: Backend receives image as base64, not dataURL. This history is for UI.
+                    currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: historyEntryParts});
                 });
                 logger.info("UI Chat history loaded from localStorage for agent:", selectedAgentKey);
             }
@@ -809,12 +888,34 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Error loading UI chat history from localStorage:", e);
         }
     }
+    
+    // --- START: Fullscreen Image Viewer Logic ---
+    function openFullscreenImage(src) {
+        fullscreenImage.src = src;
+        fullscreenImageViewer.style.display = 'flex';
+    }
 
-    function addMessageToChat(sender, text, options = {}) {
+    closeFullscreenBtn.addEventListener('click', () => {
+        fullscreenImageViewer.style.display = 'none';
+        fullscreenImage.src = ''; // Clear src
+    });
+
+    fullscreenImageViewer.addEventListener('click', (e) => { // Close on backdrop click
+        if (e.target === fullscreenImageViewer) {
+            fullscreenImageViewer.style.display = 'none';
+            fullscreenImage.src = '';
+        }
+    });
+    // --- END: Fullscreen Image Viewer Logic ---
+
+
+    // Updated addMessageToChat function
+    function addMessageToChat(sender, content, options = {}) {
         const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestampStr } = options;
         const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date(); 
         const currentDate = now.toDateString();
 
+        // Date Divider Logic (remains the same)
         if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
             const divider = document.createElement('div');
             divider.className = 'chat-date-divider';
@@ -835,13 +936,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message message-${sender} tailed`;
         msgDiv.dataset.timestamp = now.toISOString(); 
-        const contentSpan = document.createElement('span');
-        contentSpan.className = 'message-content';
-        contentSpan.textContent = text;
-        msgDiv.appendChild(contentSpan);
 
+        // Handle content: could be string (old bot messages) or object (new user/bot messages with images)
+        let textContent = '';
+        let imageDataUrl = null;
+
+        if (typeof content === 'string') {
+            textContent = content;
+        } else if (typeof content === 'object' && content !== null) {
+            textContent = content.text || '';
+            imageDataUrl = content.imageDataUrl || null;
+        }
+        
+        // Add image if imageDataUrl is present
+        if (imageDataUrl) {
+            const imgElement = document.createElement('img');
+            imgElement.src = imageDataUrl;
+            imgElement.alt = "Изображение в чате";
+            imgElement.className = 'message-image';
+            imgElement.addEventListener('click', () => openFullscreenImage(imageDataUrl));
+            msgDiv.appendChild(imgElement);
+        }
+
+        // Add text content if present
+        if (textContent || isTyping) { // Ensure typing indicator text is added
+            const contentSpan = document.createElement('span');
+            contentSpan.className = 'message-content-text'; // New class for text part
+            contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); // Use typing text if applicable
+            msgDiv.appendChild(contentSpan);
+        }
+        
         if (isTyping) {
             msgDiv.classList.add('typing');
+            // Typing animation is handled by CSS on .message-content-text if it exists or a general one
+            const textSpanForTyping = msgDiv.querySelector('.message-content-text');
+            if(textSpanForTyping) textSpanForTyping.classList.add('message-content'); // Add original class for CSS animation
         } else {
             const metaDiv = document.createElement('div');
             metaDiv.className = 'message-meta';
@@ -853,20 +982,26 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessagesContainer.appendChild(msgDiv);
 
         if (!isTyping && !isRestoredFromHistory) {
-            currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: [{ text: text }] });
-            saveChatToLocalStorage(); 
+            // Store in currentMiniAppChatHistory (simplified, backend gets raw image)
+            const historyEntryParts = [];
+            if (textContent) historyEntryParts.push({ text: textContent });
+            // Note: We don't store full imageDataUrl in currentMiniAppChatHistory for sending to backend,
+            // as backend expects base64. This history is primarily for UI state.
+            currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: historyEntryParts });
+            saveChatToLocalStorage(); // This will now save imageDataUrl for UI restoration
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
         return msgDiv;
     }
 
+
     async function submitMessageToBackend(userText, agentKey, modelKeyToSubmit, imageBase64, imageMimeType) { 
         let userId = tg.initDataUnsafe?.user?.id;
 
         if (!userId) {
             logger.error("submitMessageToBackend: Telegram User ID missing.");
-            addMessageToChat('bot', "Ошибка: ID пользователя Telegram не найден.");
+            addMessageToChat('bot', { text: "Ошибка: ID пользователя Telegram не найден." });
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
             if (typingIndicator) typingIndicator.remove();
             return;
@@ -888,7 +1023,6 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.info(`Sending message to backend (text only). Agent: ${agentKey}, Model: ${modelKeyToSubmit}`);
         }
 
-
         try {
             const response = await fetch(backendProcessUrl, {
                 method: 'POST',
@@ -903,53 +1037,55 @@ document.addEventListener('DOMContentLoaded', () => {
                     errorText = errorResult.message || (errorResult.detail ? JSON.stringify(errorResult.detail) : errorText);
                 } catch (e) { logger.warn("Could not parse backend error response as JSON", e); }
                 logger.error("Error submitting message to backend:", errorText);
-                addMessageToChat('bot', errorText);
+                addMessageToChat('bot', { text: errorText });
             } else {
                  const result = await response.json();
                  logger.info("Message submitted to backend successfully:", result);
             }
         } catch (error) {
             logger.error("Network error submitting message to backend:", error);
-            addMessageToChat('bot', "Сетевая ошибка при отправке сообщения на бэкенд.");
+            addMessageToChat('bot', { text: "Сетевая ошибка при отправке сообщения на бэкенд." });
         } finally {
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
             if (typingIndicator) typingIndicator.remove();
         }
     }
 
+    // Updated handleSendMessage
     async function handleSendMessage() {
         const text = chatPromptInput.value.trim(); 
-        if (!text && !selectedFileBase64) { // Don't send if both text and image are empty
+        if (!text && !selectedFileBase64) { 
             if (selectedAgentKey === "photo_dietitian_analyzer") {
                 tg.showAlert("Пожалуйста, прикрепите фото или введите текстовый запрос.");
             }
             return;
         }
 
+        let messageContentForChat = { text: text }; // Default to text only
 
-        // If there's an image, add a placeholder message for it
-        if (selectedFileBase64) {
-             addMessageToChat('user', `Фото отправлено${text ? ': ' + text : ''}`);
-        } else if (text) { // Only add text message if no image or if text exists with image
-            addMessageToChat('user', text);
+        if (selectedFileBase64 && selectedFileMimeType) {
+            const imageDataUrl = `data:${selectedFileMimeType};base64,${selectedFileBase64}`;
+            messageContentForChat.imageDataUrl = imageDataUrl; // Add image to the content
         }
         
-        const imageToSend = selectedFileBase64;
-        const mimeTypeToSend = selectedFileMimeType;
+        addMessageToChat('user', messageContentForChat); // Add combined message to chat
+        
+        const imageToSend = selectedFileBase64; // Keep for backend
+        const mimeTypeToSend = selectedFileMimeType; // Keep for backend
 
-        // Clear inputs after preparing data to send
         chatPromptInput.value = ''; 
         autoResizeTextarea.call(chatPromptInput); 
-        clearImagePreview(); // Clear stored image data and preview
+        clearImagePreview(); 
 
         chatSendMessageBtn.disabled = true; 
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
-        addMessageToChat('bot', 'Печатает...', { isTyping: true });
+        addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true }); // Pass content object for typing
         
         await submitMessageToBackend(text, selectedAgentKey, selectedModelKey, imageToSend, mimeTypeToSend);
     }
+
 
     function autoResizeTextarea() {
         this.style.height = 'auto'; 
@@ -962,12 +1098,11 @@ document.addEventListener('DOMContentLoaded', () => {
             this.style.overflowY = 'hidden'; 
         }
         this.style.height = newHeight + 'px';
-        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64; // Enable if text OR image
+        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64; 
     }
     
     chatPromptInput.addEventListener('input', autoResizeTextarea);
 
-    // --- START: Keyboard Hide Logic ---
     let isInputRecentlyFocused = false; 
 
     function hideKeyboardIfFocused() {
@@ -985,6 +1120,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     chatMessagesContainer.addEventListener('click', (event) => {
+        // Prevent hiding keyboard if clicking on an image within a message
+        if (event.target.classList.contains('message-image')) {
+            return;
+        }
         if (event.target !== chatPromptInput && event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target) && event.target !== chatAttachFileBtn && !chatAttachFileBtn.contains(event.target)) {
             hideKeyboardIfFocused();
         }
@@ -1000,11 +1139,9 @@ document.addEventListener('DOMContentLoaded', () => {
             hideKeyboardIfFocused();
         }, 150); 
     });
-    // --- END: Keyboard Hide Logic ---
 
-    // --- START: File Attachment Logic ---
     chatAttachFileBtn.addEventListener('click', () => {
-        chatFileInput.click(); // Trigger hidden file input
+        chatFileInput.click(); 
     });
 
     chatFileInput.addEventListener('change', (event) => {
@@ -1012,11 +1149,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file && file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                selectedFileBase64 = e.target.result.split(',')[1]; // Get Base64 part
+                selectedFileBase64 = e.target.result.split(',')[1]; 
                 selectedFileMimeType = file.type;
                 logger.info(`Image selected: ${file.name}, Type: ${selectedFileMimeType}`);
                 displayImagePreview(e.target.result, file.name);
-                chatSendMessageBtn.disabled = false; // Enable send button
+                chatSendMessageBtn.disabled = false; 
             };
             reader.onerror = (error) => {
                 logger.error("Error reading file:", error);
@@ -1028,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tg.showAlert("Пожалуйста, выберите файл изображения (например, JPG, PNG).");
             clearImagePreview();
         }
-        chatFileInput.value = ''; // Reset file input to allow selecting the same file again
+        chatFileInput.value = ''; 
     });
 
     function displayImagePreview(imageDataUrl, fileName) {
@@ -1048,11 +1185,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedFileMimeType = null;
         imagePreviewContainer.innerHTML = '';
         imagePreviewContainer.style.display = 'none';
-        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0; // Re-evaluate send button state
+        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0; 
         logger.info("Image preview cleared.");
     }
-    // --- END: File Attachment Logic ---
-
 
     async function fetchUpdates() {
         let userId = tg.initDataUnsafe?.user?.id;
@@ -1077,7 +1212,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typingIndicator) typingIndicator.remove();
                 
                 data.messages.forEach(msg => {
-                    addMessageToChat(msg.sender, msg.text, { timestamp: msg.timestamp });
+                    // Bot messages from backend are text only, pass as object for consistency
+                    addMessageToChat(msg.sender, { text: msg.text }, { timestamp: msg.timestamp });
                 });
             }
         } catch (error) {
@@ -1099,7 +1235,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     function populateCarousel(containerId, items, type) {
         const wrapper = document.getElementById(containerId);
         if (!wrapper) return;
@@ -1115,7 +1250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      openChat(agentForChat); 
                 } else if (type === 'model') {
                     selectedModelKey = item.key; 
-                    const currentAgent = agents.find(a => a.key === selectedAgentKey) || AI_MODES_FRONTEND_MIRROR.find(a => a.key === selectedAgentKey); // Check mirror for dietitian
+                    const currentAgent = agents.find(a => a.key === selectedAgentKey) || AI_MODES_FRONTEND_MIRROR.find(a => a.key === selectedAgentKey); 
                     if (currentAgent) {
                         openChat(currentAgent); 
                     } else {
@@ -1161,7 +1296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
     async function handleGenerateImage() {
         const prompt = imagePromptInputEl.value.trim(); 
         if (!prompt) {
@@ -1178,7 +1312,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1} };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
         logger.info(`Image Generation: Calling API directly at ${apiUrl.split('?key=')[0]}...`);
-
 
         try {
             const response = await fetch(apiUrl, {
@@ -1198,36 +1331,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     try { errorDetailMessage = await response.text(); } 
                     catch (textErr) { console.warn("Could not parse image error response as JSON or text", textErr); }
                 }
-
                 let userFriendlyDisplayError = `Ошибка API изображений: ${response.status} ${response.statusText}`;
                 if (response.status === 401) { 
                     userFriendlyDisplayError = "Ошибка аутентификации (401) при доступе к API изображений.";
                 } else if (errorDetailMessage && !errorDetailMessage.toLowerCase().includes("<html")) { 
                      userFriendlyDisplayError = `Ошибка API изображений (${response.status}): ${errorDetailMessage.substring(0, 200)}${errorDetailMessage.length > 200 ? '...' : ''}`;
                 }
-                
                 console.error("Imagen API HTTP Error:", response.status, response.statusText, "Detail:", errorDetailMessage);
                 imageErrorMessage.textContent = userFriendlyDisplayError;
                 imageErrorMessage.style.display = 'block';
                 return; 
             }
-
             const result = await response.json(); 
-
             if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
                 const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
                 const imgElement = document.createElement('img');
                 imgElement.src = imageUrl;
                 imgElement.alt = "Сгенерированное изображение: " + prompt.substring(0, 50);
                 generatedImageContainer.appendChild(imgElement);
-
                 const saveBtn = document.createElement('button');
                 saveBtn.textContent = 'Сохранить изображение';
                 saveBtn.className = 'feature-submit-btn'; 
                 saveBtn.style.marginTop = '0.75rem';
                 saveBtn.style.backgroundColor = 'var(--bg-select)'; 
                 saveBtn.style.color = 'var(--text-primary)';
-
                 saveBtn.onclick = () => {
                     const link = document.createElement('a');
                     link.href = imageUrl; 
@@ -1238,7 +1365,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(tg.showAlert) tg.showAlert('Изображение инициировано к сохранению!');
                 };
                 generatedImageContainer.appendChild(saveBtn);
-
             } else if (result.error) { 
                  console.error("Imagen API Error (JSON payload):", result.error);
                 imageErrorMessage.textContent = `Ошибка API (ответ): ${result.error.message}`;
@@ -1262,7 +1388,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') handleGenerateImage();
     });
 
-
     async function handleSummarizeText() {
         const textToSummarize = summarizerInput.value.trim();
         if (!textToSummarize) {
@@ -1282,7 +1407,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUseForSummarizer}:generateContent?key=${API_KEY}`;
         logger.info(`Summarizer: Calling API using model ${modelToUseForSummarizer}...`);
 
-
         try {
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -1296,7 +1420,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const errorResult = await response.json();
                      errorDetail = errorResult?.error?.message || "";
                 } catch (e) { /* ignore */ }
-
                 if (response.status === 401) {
                     userFriendlyError = "Ошибка аутентификации (401) API суммаризации.";
                 } else if (errorDetail && !errorDetail.toLowerCase().includes("<html")) {
@@ -1332,14 +1455,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     summarizeTextBtn?.addEventListener('click', handleSummarizeText);
 
-
     function displayProfileData() {
         try {
             const user = tg.initDataUnsafe?.user;
             const avatarImg = document.getElementById('profile-avatar-img');
             avatarImg.innerHTML = ''; 
             avatarImg.style.backgroundImage = ''; 
-
             if (user && user.id) {
                 if (user.photo_url) {
                     avatarImg.style.backgroundImage = `url(${user.photo_url})`;
@@ -1392,15 +1513,15 @@ document.addEventListener('DOMContentLoaded', () => {
             chatScreen.classList.remove('dietitian-chat-active');
             chatPromptInput.placeholder = "Сообщение...";
         }
-        clearImagePreview(); // Clear any previous image when opening/switching chat
+        clearImagePreview(); 
 
         loadChatFromLocalStorage(); 
         if (chatMessagesContainer.children.length === 0) { 
-            let welcomeMessage = `Привет! Я ${agentConfig.name}. Чем могу помочь?`;
+            let welcomeMessageText = `Привет! Я ${agentConfig.name}. Чем могу помочь?`;
             if (agentConfig.key === "photo_dietitian_analyzer") {
-                welcomeMessage = `Привет! Я ${agentConfig.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
+                welcomeMessageText = `Привет! Я ${agentConfig.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
             }
-            addMessageToChat('bot', welcomeMessage);
+            addMessageToChat('bot', { text: welcomeMessageText }); // Pass as object
         }
         switchScreen(chatScreen); 
     }
@@ -1425,7 +1546,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     function init() {
         if (tg.ready) tg.ready();
         if (tg.expand) tg.expand(); 
@@ -1440,7 +1560,6 @@ document.addEventListener('DOMContentLoaded', () => {
             viewportChangedHandler();
             logger.info(`Initial call to viewportChangedHandler. Stable: ${tg.WebApp.viewportStableHeight}, Current: ${tg.WebApp.viewportHeight}`);
         }, 200); 
-
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
         populateCarousel('models-swiper-wrapper', models, 'model');
@@ -1505,11 +1624,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agentConfig) { 
-                 let welcomeMessage = `Агент изменен на ${agentConfig.name}. Чем могу помочь?`;
+                 let welcomeMessageText = `Агент изменен на ${agentConfig.name}. Чем могу помочь?`;
                  if (agentConfig.key === "photo_dietitian_analyzer") {
-                    welcomeMessage = `Агент изменен на ${agentConfig.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
+                    welcomeMessageText = `Агент изменен на ${agentConfig.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
                  }
-                 addMessageToChat('bot', welcomeMessage);
+                 addMessageToChat('bot', { text: welcomeMessageText }); // Pass as object
             }
         });
         modelSelect.addEventListener('change', (e) => { 
@@ -1520,7 +1639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const currentAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a => a.key === selectedAgentKey);
              if (chatScreen.classList.contains('active') && currentAgentConfig) {
-                addMessageToChat('bot', `Модель изменена на ${modelDetails?.name || selectedModelKey}.`);
+                addMessageToChat('bot', { text: `Модель изменена на ${modelDetails?.name || selectedModelKey}.`}); // Pass as object
              }
         });
 
@@ -1533,14 +1652,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (initialAgent && chatAgentNameEl) chatAgentNameEl.textContent = initialAgent.name;
         if (initialModel && chatModelNameEl) chatModelNameEl.textContent = initialModel.name;
 
-
         logger.info(`Initial selected agent: ${selectedAgentKey}`);
         logger.info(`Initial selected model: ${selectedModelKey}`);
     }
 
     const AI_MODES_FRONTEND_MIRROR = [ 
         { key: "universal_ai_basic", name: "Универсальный", icon: "🌐", desc: "Ответы на любые темы", forced_model_key: null }, 
-        { key: "idea_generator", name: "Генератор идей", icon: "�", desc: "Помощь в поиске идей", forced_model_key: null },
+        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", forced_model_key: null },
         { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", forced_model_key: null },
         { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", forced_model_key: null },
         { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", forced_model_key: null },
