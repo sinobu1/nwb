@@ -170,6 +170,10 @@
         /* Chat Screen Specific Styles */
         #chat-screen .chat-header { 
             flex-shrink: 0;
+            /* Ensure it's sticky if input area is part of normal flow below it */
+             position: sticky; 
+             top: 0;
+             background: rgba(18,18,18,0.95); /* More opaque for sticky header */
         }
         .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
@@ -180,11 +184,12 @@
             flex-shrink: 0;
             padding: 0.75rem 1rem; 
             border-bottom: 1px solid var(--border-color); 
-            background-color: var(--bg-main);
+            background-color: var(--bg-main); /* Match screen bg */
             display: flex;
             flex-direction: column; 
             gap: 0.75rem; 
-            z-index: 15; 
+            z-index: 15; /* Below header if header is sticky, above messages */
+            /* No longer sticky at the bottom */
         }
         #chat-prompt-input { 
             width: 100%;
@@ -457,6 +462,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let agentsSwiper, modelsSwiper;
 
     const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
+    const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; // Your backend URL
+
+    // Simple console logger for Mini App
+    const logger = {
+        info: (message, ...optionalParams) => console.log(`[INFO] ${new Date().toISOString()}: ${message}`, ...optionalParams),
+        warn: (message, ...optionalParams) => console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, ...optionalParams),
+        error: (message, ...optionalParams) => console.error(`[ERROR] ${new Date().toISOString()}: ${message}`, ...optionalParams),
+        debug: (message, ...optionalParams) => console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...optionalParams),
+    };
+
 
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
     const models = [ 
@@ -492,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentArea = document.getElementById('main-content-area');
 
     const imageGeneratorCard = document.getElementById('image-generator-card');
-    const imagePromptInput = document.getElementById('image-prompt-input');
+    const imagePromptInputEl = document.getElementById('image-prompt-input'); // Renamed to avoid conflict
     const generateImageBtn = document.getElementById('generate-image-btn');
     const imageLoadingIndicator = document.getElementById('image-loading-indicator');
     const generatedImageContainer = document.getElementById('generated-image-container');
@@ -504,6 +519,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarizerOutput = document.getElementById('summarizer-output');
     const summarizerErrorMessage = document.getElementById('summarizer-error-message');
 
+    let pollingInterval = null;
+
     function formatTime(date) { return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 
     function switchScreen(screenToShow) {
@@ -512,6 +529,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tg.BackButton) {
             if (screenToShow !== mainScreen) { tg.BackButton.show(); }
             else { tg.BackButton.hide(); }
+        }
+
+        if (screenToShow === chatScreen) {
+            startPolling();
+        } else {
+            stopPolling();
         }
     }
 
@@ -543,47 +566,50 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentArea.scrollTop = 0;
     }
 
-    function saveChatToLocalStorage() {
+    function saveChatToLocalStorage() { // Saves UI-displayable history
         try { 
-            setTimeout(() => { 
-                localStorage.setItem('apiChatHistory_' + selectedAgentKey, JSON.stringify(currentMiniAppChatHistory)); 
-            }, 0);
+            const displayHistory = Array.from(chatMessagesContainer.children)
+                .filter(el => el.classList.contains('chat-message') && !el.classList.contains('typing'))
+                .map(msgEl => {
+                    const sender = msgEl.classList.contains('message-user') ? 'user' : 'bot';
+                    const text = msgEl.querySelector('.message-content')?.textContent || '';
+                    const time = msgEl.querySelector('.message-meta span')?.textContent || formatTime(new Date());
+                    // Attempt to reconstruct a sortable timestamp if possible, or use current
+                    // This part is tricky without original timestamps on UI elements
+                    return { sender, text, timestamp: new Date().toISOString() }; // Placeholder timestamp logic
+                });
+            setTimeout(() => {
+                localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
+                 logger.info("UI Chat history saved to localStorage.");
+            },0);
         }
-        catch (e) { console.error("Error saving API chat history to localStorage:", e); }
+        catch (e) { console.error("Error saving UI chat history to localStorage:", e); }
     }
 
-    function loadChatFromLocalStorage() {
+    function loadChatFromLocalStorage() { // Loads UI-displayable history
         chatMessagesContainer.innerHTML = '';
         lastMessageInfo = { sender: null, date: null };
-        currentMiniAppChatHistory = []; 
-
+        // currentMiniAppChatHistory is for API context, not directly reloaded here for UI display logic
         try {
-            const savedApiHistory = localStorage.getItem('apiChatHistory_' + selectedAgentKey);
-            if (savedApiHistory) {
-                const parsedApiHistory = JSON.parse(savedApiHistory);
-                const agentConfig = agents.find(a=>a.key === selectedAgentKey);
-                const systemPromptText = agentConfig ? agentConfig.systemPrompt : null;
-
-                const displayHistory = parsedApiHistory.filter(msg => 
-                    !(msg.role === 'user' && msg.parts[0].text === systemPromptText) && 
-                    !(msg.role === 'model' && msg.parts[0].text === "Понял. Я готов помочь.")
-                );
-
-                displayHistory.forEach(msg => {
-                    addMessageToChat(msg.role === 'user' ? 'user' : 'bot', msg.parts[0].text, { isRestoredFromHistory: true, timestamp: msg.timestamp || new Date().toISOString() });
+            const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
+            if (savedUiHistory) {
+                const parsedUiHistory = JSON.parse(savedUiHistory);
+                parsedUiHistory.forEach(msg => {
+                    addMessageToChat(msg.sender, msg.text, { 
+                        isRestoredFromHistory: true, 
+                        timestamp: msg.timestamp // Use stored timestamp
+                    });
                 });
-                currentMiniAppChatHistory = parsedApiHistory; 
+                logger.info("UI Chat history loaded from localStorage.");
             }
         } catch (e) {
-            console.error("Error loading API chat history from localStorage:", e);
-            currentMiniAppChatHistory = [];
+            console.error("Error loading UI chat history from localStorage:", e);
         }
     }
 
-
     function addMessageToChat(sender, text, options = {}) {
-        const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestamp } = options;
-        const now = msgTimestamp ? new Date(msgTimestamp) : new Date();
+        const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestampStr } = options;
+        const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date(); // Use provided timestamp if available
         const currentDate = now.toDateString();
 
         if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
@@ -622,14 +648,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (sender === 'bot' && !isRestoredFromHistory && tg.sendData) {
                 const saveButton = document.createElement('button');
-                saveButton.innerHTML = '💾';
+                saveButton.innerHTML = '�';
                 saveButton.title = 'Сохранить в основной чат';
                 saveButton.className = 'save-to-bot-btn';
                 saveButton.onclick = () => {
                     let userQueryText = "Запрос не найден";
-                    const userMessages = currentMiniAppChatHistory.filter(m => m.role === 'user');
-                    if (userMessages.length > 0) userQueryText = userMessages[userMessages.length-1].parts[0].text;
-
+                     const userMessagesElements = Array.from(chatMessagesContainer.querySelectorAll('.message-user .message-content'));
+                    if (userMessagesElements.length > 0) {
+                         userQueryText = userMessagesElements[userMessagesElements.length -1].textContent;
+                    }
                     tg.sendData(JSON.stringify({ action: 'save_chat_to_telegram', payload: { user_query: userQueryText, ai_response: text } }));
                     saveButton.textContent = '✅';
                     saveButton.disabled = true;
@@ -641,102 +668,64 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessagesContainer.appendChild(msgDiv);
 
         if (!isTyping && !isRestoredFromHistory) {
-            const role = sender === 'user' ? 'user' : 'model';
-            const agentConfig = agents.find(a=>a.key === selectedAgentKey);
-            const systemPromptText = agentConfig ? agentConfig.systemPrompt : null;
-
-            // Only add to API history if it's not a system message being restored
-            if (!(role === 'user' && text === systemPromptText) && !(role === 'model' && text === "Понял. Я готов помочь.")) {
-                 // Create a clean object for API history, excluding timestamp
-                 currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }] }); 
-                 saveChatToLocalStorage(); 
-            }
+            saveChatToLocalStorage(); // Save UI history after adding a new message
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
         return msgDiv;
     }
 
-    async function callGeminiChatAPI(promptText, agentKey) {
-        const agentConfig = agents.find(a => a.key === agentKey) || agents[0];
-        let historyForAPIRequest = [];
-
-        // Prepare history for API: map currentMiniAppChatHistory to exclude timestamp
-        const preparedHistory = currentMiniAppChatHistory.map(msg => ({
-            role: msg.role,
-            parts: msg.parts
-        }));
-
-        const systemPromptAlreadyInCurrentHistory = preparedHistory.length > 0 &&
-                                           preparedHistory[0].role === 'user' &&
-                                           preparedHistory[0].parts[0].text === agentConfig.systemPrompt;
-
-        if (agentConfig.systemPrompt && !systemPromptAlreadyInCurrentHistory) {
-            historyForAPIRequest.push({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
-            historyForAPIRequest.push({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
+    async function submitMessageToBackend(userText, agentKey, modelKey) {
+        const userId = tg.initDataUnsafe?.user?.id;
+        if (!userId) {
+            addMessageToChat('bot', "Ошибка: Не удалось определить ID пользователя Telegram для отправки на бэкенд.");
+            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+            if (typingIndicator) typingIndicator.remove();
+            return;
         }
-        
-        historyForAPIRequest = historyForAPIRequest.concat(preparedHistory.slice(systemPromptAlreadyInCurrentHistory ? 2 : 0));
-        
-        // The current user prompt (promptText) is added to currentMiniAppChatHistory by addMessageToChat,
-        // so it will be included in historyForAPIRequest via preparedHistory.
-        // No need to add it separately here unless it's missing from currentMiniAppChatHistory,
-        // which shouldn't happen with the current flow.
 
-        const payload = { contents: historyForAPIRequest };
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelKey}:generateContent?key=${API_KEY}`;
+        const backendProcessUrl = `${APP_BACKEND_URL}/api/process_app_message/${userId}`;
+        logger.info(`Sending message to backend: ${backendProcessUrl} with agent ${agentKey}, model ${modelKey}`);
 
         try {
-            const response = await fetch(apiUrl, {
+            const response = await fetch(backendProcessUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKey })
             });
+
             if (!response.ok) {
-                let errorDetail = "";
-                let userFriendlyError = `Ошибка API чата: ${response.status} ${response.statusText}`;
+                let errorText = `Ошибка бэкенда: ${response.status} ${response.statusText}`;
                 try {
                     const errorResult = await response.json();
-                    if (errorResult && errorResult.error && errorResult.error.message) {
-                        errorDetail = errorResult.error.message;
+                    if (errorResult && errorResult.message) {
+                        errorText = `Ошибка бэкенда: ${errorResult.message}`;
+                    } else if (errorResult && errorResult.detail) { 
+                        errorText = `Ошибка бэкенда (детали): ${JSON.stringify(errorResult.detail)}`;
                     }
-                } catch (e) {
-                    try { errorDetail = await response.text(); } catch (textErr) { /* ignore */ }
-                }
-
-                if (response.status === 401) {
-                    userFriendlyError = "Ошибка аутентификации (401) при доступе к API чата.";
-                } else if (errorDetail && !errorDetail.toLowerCase().includes("<html")) {
-                    userFriendlyError = `Ошибка API чата (${response.status}): ${errorDetail.substring(0,100)}`;
-                }
-                console.error("Gemini Chat API HTTP Error:", response.status, response.statusText, "Detail:", errorDetail);
-                return userFriendlyError;
+                } catch (e) { logger.warn("Could not parse backend error response as JSON", e); }
+                logger.error("Error submitting message to backend:", errorText);
+                addMessageToChat('bot', errorText);
+                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                if (typingIndicator) typingIndicator.remove();
+                return;
             }
             const result = await response.json();
-            if (result.candidates && result.candidates.length > 0 &&
-                result.candidates[0].content && result.candidates[0].content.parts &&
-                result.candidates[0].content.parts.length > 0) {
-                return result.candidates[0].content.parts[0].text;
-            } else if (result.error) {
-                console.error("Gemini API Error (JSON):", result.error);
-                return `Ошибка API: ${result.error.message}`;
-            } else {
-                console.error("Unexpected Gemini API response structure:", result);
-                return "Не удалось получить ответ от ИИ. Попробуйте снова.";
-            }
+            logger.info("Message submitted to backend successfully:", result);
+            // AI response handled by polling
         } catch (error) {
-            console.error("Error calling Gemini Chat API (catch):", error);
-            if (error instanceof SyntaxError) { return "Ошибка ответа от сервера чата (неверный формат). Попробуйте позже."; }
-            return "Ошибка сети при обращении к ИИ чата. Проверьте ваше подключение.";
+            logger.error("Network error submitting message to backend:", error);
+            addMessageToChat('bot', "Сетевая ошибка при отправке сообщения на бэкенд.");
+            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+            if (typingIndicator) typingIndicator.remove();
         }
     }
-
 
     async function handleSendMessage() {
         const text = chatPromptInput.value.trim(); 
         if (!text) return;
 
-        addMessageToChat('user', text);
+        addMessageToChat('user', text); // Adds to UI and triggers saveChatToLocalStorage
         chatPromptInput.value = ''; 
         chatSendMessageBtn.disabled = true; 
 
@@ -744,15 +733,53 @@ document.addEventListener('DOMContentLoaded', () => {
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', 'Печатает...', { isTyping: true });
 
-        const botResponseText = await callGeminiChatAPI(text, selectedAgentKey);
-
-        const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-        if (typingIndicator) typingIndicator.remove();
-        addMessageToChat('bot', botResponseText);
+        // Send to backend, backend handles AI call and saving for polling
+        await submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
     }
 
     function handleChatInput() {
         chatSendMessageBtn.disabled = this.value.trim().length === 0;
+    }
+    
+    async function fetchUpdates() {
+        const userId = tg.initDataUnsafe?.user?.id;
+        if (!userId || !chatScreen.classList.contains('active')) { 
+            return;
+        }
+
+        const backendGetUpdatesUrl = `${APP_BACKEND_URL}/api/get_updates/${userId}`;
+        try {
+            const response = await fetch(backendGetUpdatesUrl);
+            if (!response.ok) {
+                logger.error("Polling error from backend:", response.status, response.statusText);
+                return;
+            }
+            const data = await response.json();
+            if (data && data.status === 'ok' && data.messages && data.messages.length > 0) {
+                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+                if (typingIndicator) typingIndicator.remove();
+                
+                data.messages.forEach(msg => {
+                    addMessageToChat(msg.sender, msg.text, { timestamp: msg.timestamp });
+                });
+            }
+        } catch (error) {
+            logger.error("Network error during polling:", error);
+        }
+    }
+
+    function startPolling() {
+        stopPolling(); 
+        logger.info("Starting polling for chat updates.");
+        fetchUpdates(); 
+        pollingInterval = setInterval(fetchUpdates, 3000); 
+    }
+    function stopPolling() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            logger.info("Polling stopped.");
+        }
     }
 
 
@@ -798,7 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function handleGenerateImage() {
-        const prompt = imagePromptInput.value.trim();
+        const prompt = imagePromptInputEl.value.trim(); // Use imagePromptInputEl
         if (!prompt) {
             imageErrorMessage.textContent = "Пожалуйста, введите описание изображения.";
             imageErrorMessage.style.display = 'block';
@@ -810,8 +837,12 @@ document.addEventListener('DOMContentLoaded', () => {
         generateImageBtn.disabled = true;
         generatedImageContainer.innerHTML = ''; 
 
+        // IMPORTANT: This still calls Google API directly from client.
+        // For location/billing issues, this should ideally be proxied via your backend.
         const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1} };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
+        logger.info(`Image Generation: Calling API directly at ${apiUrl.split('?key=')[0]}...`);
+
 
         try {
             const response = await fetch(apiUrl, {
@@ -898,7 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     generateImageBtn?.addEventListener('click', handleGenerateImage);
-    imagePromptInput?.addEventListener('keydown', (e) => {
+    imagePromptInputEl?.addEventListener('keydown', (e) => { // Use imagePromptInputEl
         if (e.key === 'Enter') handleGenerateImage();
     });
 
@@ -916,9 +947,12 @@ document.addEventListener('DOMContentLoaded', () => {
         summarizeTextBtn.disabled = true;
         summarizerOutput.style.display = 'none';
 
+        // IMPORTANT: This still calls Google API directly from client.
         const prompt = `Сделай краткое содержание следующего текста:\n\n${textToSummarize}`;
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${models[0].key}:generateContent?key=${API_KEY}`;
+        logger.info(`Summarizer: Calling API directly at ${apiUrl.split('?key=')[0]}...`);
+
 
         try {
             const response = await fetch(apiUrl, {
@@ -1015,23 +1049,18 @@ document.addEventListener('DOMContentLoaded', () => {
         chatTitle.textContent = agent.name;
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
-        currentMiniAppChatHistory = []; 
-        loadChatFromLocalStorage(); 
+        // currentMiniAppChatHistory is not used for API calls now when using backend
+        loadChatFromLocalStorage(); // Load UI history
         if (chatMessagesContainer.children.length === 0) { 
-            const agentConfig = agents.find(a=>a.key === selectedAgentKey);
-            if (agentConfig && agentConfig.systemPrompt) {
-                if (!currentMiniAppChatHistory.find(m => m.role === 'user' && m.parts[0].text === agentConfig.systemPrompt)) {
-                    currentMiniAppChatHistory.unshift({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
-                    currentMiniAppChatHistory.unshift({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
-                    saveChatToLocalStorage(); 
-                }
-            }
             addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь?`);
         }
-        switchScreen(chatScreen);
+        switchScreen(chatScreen); // This will also call startPolling()
     }
 
-    function closeChat() { switchScreen(mainScreen); }
+    function closeChat() { 
+        stopPolling();
+        switchScreen(mainScreen); 
+    }
     function openSettingsModal() { agentSelect.value = selectedAgentKey; modelSelect.value = selectedModelKey; settingsModal.style.display = 'flex'; }
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
@@ -1075,8 +1104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedAgentKey = e.target.value;
             const agent = agents.find(a=> a.key === selectedAgentKey);
             if(agent) chatTitle.textContent = agent.name;
-            currentMiniAppChatHistory = [];
-            loadChatFromLocalStorage();
+            loadChatFromLocalStorage(); // Reload UI history for new agent
             if (chatMessagesContainer.children.length === 0 && agent) { 
                  addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
             }
