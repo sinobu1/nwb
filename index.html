@@ -218,6 +218,8 @@
             flex-direction: column; 
             gap: 0.25rem; 
             -webkit-overflow-scrolling: touch; 
+            /* Added for tap-to-hide keyboard */
+            cursor: default; 
         }
         
         .chat-input-area { 
@@ -465,7 +467,7 @@
             <div class="fixed-header">
                  <div class="back-btn" data-target-screen="main-screen">
                     <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                </div>
+                 </div>
                 <h1>Суммаризатор текста ✨</h1>
             </div>
             <div class="feature-content-area">
@@ -772,6 +774,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     chatPromptInput.addEventListener('input', autoResizeTextarea);
+
+    // --- START: Keyboard Hide on Tap Outside ---
+    chatMessagesContainer.addEventListener('click', (event) => {
+        // Check if the click target is not the input field itself or the send button
+        if (document.activeElement === chatPromptInput && event.target !== chatPromptInput && event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target)) {
+            chatPromptInput.blur(); // Remove focus from input to hide keyboard
+            logger.debug("Keyboard hidden by tapping chat messages container.");
+        }
+    });
+    // --- END: Keyboard Hide on Tap Outside ---
 
 
     async function fetchUpdates() {
@@ -1104,63 +1116,48 @@ document.addEventListener('DOMContentLoaded', () => {
     function openSettingsModal() { agentSelect.value = selectedAgentKey; modelSelect.value = selectedModelKey; settingsModal.style.display = 'flex'; }
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
-    // --- START: Viewport Changed Handler ---
     function viewportChangedHandler() {
         const appWrapper = document.querySelector('.app-wrapper');
         if (!appWrapper) return;
 
-        // Use tg.WebApp.viewportStableHeight as the base height when keyboard is closed
-        // and tg.WebApp.viewportHeight when keyboard might be open or other resizes occur.
-        let targetHeight = tg.WebApp.viewportStableHeight; // Height without keyboard
+        let targetHeight = tg.WebApp.viewportStableHeight; 
         
-        // If viewportHeight is significantly smaller, keyboard is likely open.
-        // viewportHeight is the current visible area.
-        if (tg.WebApp.viewportHeight < tg.WebApp.viewportStableHeight - 100) { // 100px threshold for keyboard
+        if (tg.WebApp.viewportHeight < tg.WebApp.viewportStableHeight - 100) { 
              targetHeight = tg.WebApp.viewportHeight;
         }
         
         appWrapper.style.height = targetHeight + 'px';
-        // logger.debug(`Viewport changed. App wrapper height set to: ${targetHeight}px. Stable: ${tg.WebApp.viewportStableHeight}, Current: ${tg.WebApp.viewportHeight}`);
 
-
-        // Scroll to bottom only if chat is active and viewport state is stable
-        // isStateStable is true when the viewport resizing animation is complete.
         if (tg.WebApp.isStateStable && document.getElementById('chat-screen').classList.contains('active')) {
             const chatMessagesContainer = document.getElementById('chat-messages-container');
             setTimeout(() => {
                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-                // logger.debug("Scrolled to bottom of chat after viewport change.");
             }, 150); 
         }
     }
-    // --- END: Viewport Changed Handler ---
 
 
     function init() {
         if (tg.ready) tg.ready();
-        if (tg.expand) tg.expand(); // Expand the Web App to full height
+        if (tg.expand) tg.expand(); 
         if (tg.MainButton) tg.MainButton.hide();
 
-        // --- START: Viewport event listener and initial call ---
         if (tg.onEvent) {
             tg.onEvent('viewportChanged', viewportChangedHandler);
             logger.info("Viewport changed event listener attached.");
         }
         
-        // Initial adjustment of app wrapper height
-        // Check if viewportStableHeight is available (usually after WebApp is ready and expanded)
         setTimeout(() => {
             if (tg.WebApp.viewportStableHeight && tg.WebApp.viewportStableHeight > 0) {
-                 viewportChangedHandler(); // Call handler to set initial height based on stable height
+                 viewportChangedHandler(); 
                  logger.info(`Initial app wrapper height set using viewportStableHeight: ${tg.WebApp.viewportStableHeight}px`);
             } else if (tg.WebApp.viewportHeight && tg.WebApp.viewportHeight > 0) {
-                 viewportChangedHandler(); // Fallback to current viewport height
+                 viewportChangedHandler(); 
                  logger.info(`Initial app wrapper height set using viewportHeight: ${tg.WebApp.viewportHeight}px`);
             } else {
                 logger.warn("Initial viewport height not available from Telegram WebApp API.");
             }
-        }, 100); // Delay to ensure WebApp is ready
-        // --- END: Viewport event listener and initial call ---
+        }, 100); 
 
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
