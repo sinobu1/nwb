@@ -24,7 +24,7 @@
             --gold-highlight: #d8ab4e; 
             --success-green: #4CAF50;
             --error-red: #F44336;
-            --ios-tab-bar-bg: rgba(28, 28, 30, 0.85); /* Semi-transparent dark for tab bar */
+            --ios-tab-bar-bg: rgba(28, 28, 30, 0.85); 
         }
         html {
             height: 100%; 
@@ -44,7 +44,7 @@
         .app-wrapper {
             width: 100%;
             max-width: 450px; 
-            height: 100%; /* Takes full height of the body, which adapts to viewport */
+            height: 100%; 
             position: relative; 
             overflow: hidden; 
             display: flex;
@@ -87,6 +87,7 @@
             position: sticky; 
             top: 0;
             flex-shrink: 0;
+            min-height: 56px; /* Ensure header has a minimum height for two lines */
         }
         .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } 
         .fixed-header .back-btn {
@@ -200,13 +201,35 @@
         #chat-screen { display: flex; flex-direction: column; }
 
         #chat-screen .chat-header { 
-            flex-shrink: 0;
-             position: sticky; 
-             top: 0;
-             background: rgba(18,18,18,0.95); 
+            /* Styles from .fixed-header are inherited */
+            /* Additional alignment for two-line title */
+            justify-content: space-between; /* Distribute space for back, title, settings */
         }
-        .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
-        .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
+        .chat-title-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center title block horizontally */
+            justify-content: center; /* Center title block vertically */
+            text-align: center;
+            padding: 0 0.5rem; /* Add some padding if back/settings buttons are too close */
+        }
+        #chat-agent-name {
+            font-size: 1.0rem; /* Slightly smaller for agent name */
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.2;
+            display: block; /* Ensure it takes its own line */
+        }
+        #chat-model-name {
+            font-size: 0.75rem; /* Smaller for model name */
+            font-weight: 400;
+            color: var(--text-secondary);
+            line-height: 1.1;
+            display: block; /* Ensure it takes its own line */
+        }
+
+        .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); flex-shrink: 0; }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
         .chat-header-btn:hover { background-color: var(--bg-card); }
         
@@ -433,9 +456,14 @@
                 <div id="chat-back-btn" class="chat-header-btn">
                      <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                  </div>
-                 <div id="chat-title" class="title">Чат</div>
+                 <div class="chat-title-container">
+                    <span id="chat-agent-name">Агент</span>
+                    <span id="chat-model-name">Модель</span>
+                 </div>
                  <div id="chat-settings-btn" class="chat-header-btn">
-                    <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"> <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54-1.85l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>
+                    </svg>
                  </div>
             </div>
             <div class="chat-messages" id="chat-messages-container"></div>
@@ -511,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
         { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
         { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Репетитор", icon: "�", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
     ];
 
@@ -541,7 +569,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatPromptInput = document.getElementById('chat-prompt-input'); 
     const chatSendMessageBtn = document.getElementById('chat-send-message-btn'); 
 
-    const chatTitle = document.getElementById('chat-title');
+    // Updated chat title elements
+    const chatAgentNameEl = document.getElementById('chat-agent-name');
+    const chatModelNameEl = document.getElementById('chat-model-name');
+
     const chatBackButton = document.getElementById('chat-back-btn');
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
     const settingsModal = document.getElementById('settings-modal');
@@ -804,8 +835,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
-            // Consider hiding only if scrolling significantly, or always hide if not recently focused.
-            // For simplicity now, if not recently focused, any scroll (after debounce) will hide.
             hideKeyboardIfFocused();
         }, 150); 
     });
@@ -1116,21 +1145,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openChat(agent) {
         selectedAgentKey = agent.key;
-        chatTitle.textContent = agent.name;
+        // Update chat header with agent and model names
+        if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name;
         
         const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a => a.key === agent.key); 
+        let currentModelName = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey;
+
         if (backendAgentConfig && backendAgentConfig.forced_model_key) {
             selectedModelKey = backendAgentConfig.forced_model_key;
+            currentModelName = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Update model name if forced
             logger.info(`Agent ${agent.name} forces model to ${selectedModelKey}.`);
         }
+        if (chatModelNameEl) chatModelNameEl.textContent = currentModelName;
+
 
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
         
         loadChatFromLocalStorage(); 
         if (chatMessagesContainer.children.length === 0) { 
-            const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
-            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь? (Модель: ${modelForDisplay})`);
+            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь?`);
         }
         switchScreen(chatScreen); 
     }
@@ -1143,15 +1177,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
     function viewportChangedHandler() {
-        // Relying on CSS height: 100% for html, body, .app-wrapper
-        // This handler now primarily ensures chat scrolls to bottom when viewport is stable.
         logger.debug(`Viewport changed. Current: ${tg.WebApp.viewportHeight}px, Stable: ${tg.WebApp.viewportStableHeight}px, IsStable: ${tg.WebApp.isStateStable}`);
-
+        // No direct height manipulation of .app-wrapper, relying on CSS 100% height and viewport units.
+        // This handler now primarily ensures chat scrolls to bottom when viewport is stable.
         if (tg.WebApp.isStateStable && document.getElementById('chat-screen').classList.contains('active')) {
             const chatMessagesContainer = document.getElementById('chat-messages-container');
             setTimeout(() => {
                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-            }, 50); 
+                 logger.debug("Chat scrolled to bottom after viewport stable.");
+            }, 50); // Short delay to ensure layout is final
         }
     }
 
@@ -1166,14 +1200,12 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.info("Viewport changed event listener attached.");
         }
         
+        // Call viewportChangedHandler once initially after a short delay
+        // to allow Telegram WebApp to settle its viewport properties.
         setTimeout(() => {
-            if (tg.WebApp.isStateStable) { 
-                 viewportChangedHandler();
-                 logger.info(`Initial viewportStableHeight: ${tg.WebApp.viewportStableHeight}px. Called viewportChangedHandler.`);
-            } else {
-                 logger.info(`Initial viewport not stable. Current: ${tg.WebApp.viewportHeight}, Stable: ${tg.WebApp.viewportStableHeight}`);
-            }
-        }, 100); 
+            viewportChangedHandler();
+            logger.info(`Initial call to viewportChangedHandler. Stable: ${tg.WebApp.viewportStableHeight}, Current: ${tg.WebApp.viewportHeight}`);
+        }, 200); // Increased delay slightly
 
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
@@ -1210,27 +1242,32 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedAgentKey = e.target.value;
             const agent = agents.find(a=> a.key === selectedAgentKey);
             if(agent) {
-                chatTitle.textContent = agent.name;
+                if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name; // Update agent name in header
                 const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a_cfg => a_cfg.key === agent.key);
+                let modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Default to current model
+
                 if (backendAgentConfig && backendAgentConfig.forced_model_key) {
                     selectedModelKey = backendAgentConfig.forced_model_key;
                     modelSelect.value = selectedModelKey; 
+                    modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Update if forced
                     logger.info(`Agent ${agent.name} selected, forces model to ${selectedModelKey}.`);
                 }
+                 if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; // Update model name in header
             }
             loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agent) { 
-                 const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
-                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь? (Модель: ${modelForDisplay})`);
+                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
             }
         });
         modelSelect.addEventListener('change', (e) => { 
             selectedModelKey = e.target.value; 
+            const modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey;
+            if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; // Update model name in header
             logger.info(`Model changed to ${selectedModelKey} via dropdown.`);
+            
             const currentAgent = agents.find(a => a.key === selectedAgentKey);
              if (chatScreen.classList.contains('active') && currentAgent) {
-                 const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
-                addMessageToChat('bot', `Модель изменена на ${modelForDisplay}.`);
+                addMessageToChat('bot', `Модель изменена на ${modelNameToDisplay}.`);
              }
         });
 
