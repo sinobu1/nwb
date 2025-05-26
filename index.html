@@ -276,18 +276,27 @@
             text-overflow: ellipsis;
             max-width: 100%;
         }
-        #chat-screen.dietitian-chat-active #chat-model-name,
-        #chat-screen.dietitian-chat-active #chat-settings-btn {
-            display: none;
+        /* .dietitian-chat-active styles are now applied via JS for explicit control */
+        
+        .chat-header-btn { 
+            width: 38px; 
+            height: 38px; 
+            border-radius: 50%; 
+            display: flex; /* Ensures SVG is centered */
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            transition: background-color 0.2s; 
+            color: var(--text-secondary); 
+            flex-shrink: 0; 
         }
-        #chat-screen.dietitian-chat-active .chat-title-container {
-            padding-left: 38px; 
-            padding-right: 38px; 
+        .chat-header-btn svg { /* Ensure SVG scales well within button */
+            width: 20px; /* Adjusted for better visual fit */
+            height: 20px; /* Adjusted for better visual fit */
         }
 
-
-        .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); flex-shrink: 0; }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
+        .chat-header-btn#chat-back-btn svg { width: 22px; height: 22px; } /* Specific size for back arrow if needed */
         .chat-header-btn:hover { background-color: var(--bg-card); }
         
         .chat-messages { 
@@ -331,9 +340,8 @@
         #chat-attach-file-btn:hover {
             color: var(--text-primary);
         }
-        #chat-screen:not(.dietitian-chat-active) #chat-attach-file-btn {
-            display: none;
-        }
+        /* Hiding attach button is now done via JS in openChat */
+
         .image-preview-container {
             display: none; 
             padding: 0.5rem 0.75rem 0; 
@@ -654,9 +662,9 @@
                     <span id="chat-agent-name">Агент</span>
                     <span id="chat-model-name">Модель</span> </div>
                  <div id="chat-settings-btn" class="chat-header-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54 1.85l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                        <circle cx="12" cy="12" r="3"/>
                     </svg>
                  </div>
             </div>
@@ -747,7 +755,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-grad-2", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
         { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", palette: "palette-grad-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
         { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "�", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." }
     ];
 
@@ -796,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatAgentNameEl = document.getElementById('chat-agent-name');
     const chatModelNameEl = document.getElementById('chat-model-name');
 
-    const chatBackButton = document.getElementById('chat-back-btn');
+    const chatBackButton = document.getElementById('chat-back-btn'); // In-app back button
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
     const settingsModal = document.getElementById('settings-modal');
     const agentSelect = document.getElementById('agent-select'); 
@@ -834,12 +842,10 @@ document.addEventListener('DOMContentLoaded', () => {
         else { stopPolling(); }
     }
 
-    // Updated BackButton logic
     if (tg.BackButton) {
         tg.BackButton.onClick(() => {
             const activeScreenEl = document.querySelector('.screen.active');
             if (!activeScreenEl) return; 
-
             const activeScreenId = activeScreenEl.id;
 
             if (activeScreenId === 'chat-screen') {
@@ -848,11 +854,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 switchScreen(mainScreen);
             } else if (activeScreenId !== 'main-screen') {
                 switchScreen(mainScreen);
-                logger.info(`Back button: Unknown screen ${activeScreenId}, going to main.`);
             }
         });
     }
-
 
     document.querySelectorAll('.back-btn[data-target-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -889,7 +893,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             setTimeout(() => {
                 localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
-                logger.info("UI Chat history saved for agent/tool:", selectedAgentKey);
             },0);
         }
         catch (e) { console.error("Error saving UI chat history:", e); }
@@ -916,7 +919,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: historyEntryParts});
                     }
                 });
-                logger.info("UI Chat history loaded for agent/tool:", selectedAgentKey);
             }
         } catch (e) {
             console.error("Error loading UI chat history:", e);
@@ -952,7 +954,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!isTyping && !textContent && !imageDataUrl) {
-            logger.warn("Attempted to add an empty message. Skipping.");
             return null; 
         }
 
@@ -1025,7 +1026,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType) { 
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
-            logger.error("submitMessageToBackend: Telegram User ID missing.");
             addMessageToChat('bot', { text: "Ошибка: ID пользователя Telegram не найден." });
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
             if (typingIndicator) typingIndicator.remove();
@@ -1055,7 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const errorResult = await response.json();
                     errorText = errorResult.message || (errorResult.detail ? JSON.stringify(errorResult.detail) : errorText);
-                } catch (e) { logger.warn("Could not parse backend error response as JSON", e); }
+                } catch (e) { /* ignore */ }
                 addMessageToChat('bot', { text: errorText });
             } else {
                  const result = await response.json();
@@ -1120,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isInputRecentlyFocused = false; 
     function hideKeyboardIfFocused() {
-        if (document.activeElement === chatPromptInput) { chatPromptInput.blur(); logger.debug("Keyboard hidden."); }
+        if (document.activeElement === chatPromptInput) { chatPromptInput.blur(); }
     }
     chatPromptInput.addEventListener('focus', () => { isInputRecentlyFocused = true; setTimeout(() => { isInputRecentlyFocused = false; }, 300); });
     chatMessagesContainer.addEventListener('click', (event) => {
@@ -1177,14 +1177,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const backendGetUpdatesUrl = `${APP_BACKEND_URL}/api/get_updates/${userId}`;
         try {
             const response = await fetch(backendGetUpdatesUrl);
-            if (!response.ok) { logger.error("Polling error:", response.status); return; }
+            if (!response.ok) { return; }
             const data = await response.json();
             if (data?.status === 'ok' && data.messages?.length > 0) {
                 const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
                 if (typingIndicator) typingIndicator.remove();
                 data.messages.forEach(msg => addMessageToChat(msg.sender, { text: msg.text }, { timestamp: msg.timestamp }));
             }
-        } catch (error) { logger.error("Polling network error:", error); }
+        } catch (error) { /* ignore */ }
     }
     function startPolling() { stopPolling(); fetchUpdates(); pollingInterval = setInterval(fetchUpdates, 3000); }
     function stopPolling() { if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; } }
@@ -1240,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dietitianAgentCard?.addEventListener('click', () => {
         const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
         if (dietitianConfig) openChat(dietitianConfig); 
-        else { logger.warn("Dietitian tool config not found."); tg.showAlert?.('Диетолог не настроен.'); }
+        else { tg.showAlert?.('Диетолог не настроен.'); }
     });
 
     async function handleGenerateImage() { /* ... same as before ... */ }
@@ -1284,20 +1284,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
 
+        // Explicitly manage visibility of chat header elements based on chat type
         if (config.key === "photo_dietitian_analyzer") { 
-            chatScreen.classList.add('dietitian-chat-active');
-            chatPromptInput.placeholder = "Вес (г), коммент..."; // Shortened placeholder
+            chatScreen.classList.add('dietitian-chat-active'); // Used for attach button visibility
+            chatPromptInput.placeholder = "Фото: вес, детали..."; // Shortened placeholder
             currentModelForBackend = config.forced_model_key || models[0].key;
             const dietitianModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = dietitianModelDetails?.name || currentModelForBackend;
+            
+            chatModelNameEl.style.display = 'none';
+            chatSettingsBtn.style.display = 'none';
+            chatAttachFileBtn.style.display = 'flex'; // Show attach for dietitian
         } else { 
             chatScreen.classList.remove('dietitian-chat-active');
             chatPromptInput.placeholder = "Сообщение...";
             currentModelForBackend = selectedModelKey; 
             const generalAgentModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = generalAgentModelDetails?.name || currentModelForBackend;
+
+            chatModelNameEl.style.display = 'block';
+            chatSettingsBtn.style.display = 'flex'; // Ensure it's flex for proper centering
+            chatAttachFileBtn.style.display = 'none'; // Hide attach for general agents
         }
-        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay;
+        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay; // This will be hidden for dietitian by style.display
+        
         agentSelect.value = selectedAgentKey; 
         modelSelect.value = currentModelForBackend; 
 
@@ -1318,12 +1328,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function closeChat() { 
         stopPolling();
-        chatScreen.classList.remove('dietitian-chat-active'); 
+        // No need to remove dietitian-chat-active here, openChat will set it correctly.
         clearImagePreview();
         switchScreen(mainScreen); 
      }
-    function openSettingsModal() { /* ... same as before ... */ }
-    function closeSettingsModal() { /* ... same as before ... */ }
+    function openSettingsModal() { 
+        // This modal is only for general agent chats.
+        // Ensure agentSelect reflects the current general agent and modelSelect the global model.
+        if (!chatScreen.classList.contains('dietitian-chat-active')) {
+            agentSelect.value = selectedAgentKey; 
+            modelSelect.value = selectedModelKey;
+            settingsModal.style.display = 'flex';
+        }
+    }
+    function closeSettingsModal() { settingsModal.style.display = 'none'; }
     function viewportChangedHandler() { /* ... same as before ... */ }
 
     function init() {
@@ -1363,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } 
         });
 
-        chatBackButton?.addEventListener('click', closeChat);
+        chatBackButton?.addEventListener('click', closeChat); // This is the in-app back button
         chatSettingsBtn?.addEventListener('click', openSettingsModal); 
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
@@ -1374,11 +1392,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (agentConfig) { 
                 selectedAgentKey = newAgentKey; 
                 if (chatAgentNameEl) chatAgentNameEl.textContent = agentConfig.name;
-                const modelDetails = models.find(m => m.key === selectedModelKey);
-                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; // This should be chatModelNameEl, not chatAgentNameEl again
+                const modelDetails = models.find(m => m.key === selectedModelKey); // Use current global selectedModelKey
+                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; 
                 modelSelect.value = selectedModelKey; 
+                
+                // Ensure chat is configured as general agent chat
                 chatScreen.classList.remove('dietitian-chat-active'); 
                 chatPromptInput.placeholder = "Сообщение...";
+                chatModelNameEl.style.display = 'block';
+                chatSettingsBtn.style.display = 'flex';
+                chatAttachFileBtn.style.display = 'none';
+
                 clearImagePreview();
                 loadChatFromLocalStorage(); 
                 if (chatMessagesContainer.children.length === 0) {
