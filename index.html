@@ -44,7 +44,7 @@
         .app-wrapper {
             width: 100%;
             max-width: 450px; 
-            height: 100%; 
+            height: 100%; /* Takes full height of the body, which adapts to viewport */
             position: relative; 
             overflow: hidden; 
             display: flex;
@@ -511,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
         { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
         { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "tutor_assistant", name: "Репетитор", icon: "�", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
     ];
 
@@ -775,12 +775,21 @@ document.addEventListener('DOMContentLoaded', () => {
     chatPromptInput.addEventListener('input', autoResizeTextarea);
 
     // --- START: Keyboard Hide Logic ---
+    let isInputRecentlyFocused = false; 
+
     function hideKeyboardIfFocused() {
         if (document.activeElement === chatPromptInput) {
             chatPromptInput.blur();
             logger.debug("Keyboard hidden by interaction (scroll/tap).");
         }
     }
+
+    chatPromptInput.addEventListener('focus', () => {
+        isInputRecentlyFocused = true;
+        setTimeout(() => {
+            isInputRecentlyFocused = false;
+        }, 300); 
+    });
 
     chatMessagesContainer.addEventListener('click', (event) => {
         if (event.target !== chatPromptInput && event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target)) {
@@ -790,14 +799,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let scrollTimeout;
     chatMessagesContainer.addEventListener('scroll', () => {
+        if (isInputRecentlyFocused) { 
+            return;
+        }
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
-            // Only hide keyboard if scrolling is significant enough to assume user intent
-            // This is a simple check, can be made more sophisticated
-            if (chatMessagesContainer.scrollTop > 0) { // Check if not at the very top
-                 hideKeyboardIfFocused();
-            }
-        }, 150); // Debounce scroll event
+            // Consider hiding only if scrolling significantly, or always hide if not recently focused.
+            // For simplicity now, if not recently focused, any scroll (after debounce) will hide.
+            hideKeyboardIfFocused();
+        }, 150); 
     });
     // --- END: Keyboard Hide Logic ---
 
@@ -1133,22 +1143,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeSettingsModal() { settingsModal.style.display = 'none'; }
 
     function viewportChangedHandler() {
-        const appWrapper = document.querySelector('.app-wrapper');
-        if (!appWrapper) return;
-
-        let targetHeight = tg.WebApp.viewportStableHeight; 
-        
-        if (tg.WebApp.viewportHeight < tg.WebApp.viewportStableHeight - 100) { 
-             targetHeight = tg.WebApp.viewportHeight;
-        }
-        
-        appWrapper.style.height = targetHeight + 'px';
+        // Relying on CSS height: 100% for html, body, .app-wrapper
+        // This handler now primarily ensures chat scrolls to bottom when viewport is stable.
+        logger.debug(`Viewport changed. Current: ${tg.WebApp.viewportHeight}px, Stable: ${tg.WebApp.viewportStableHeight}px, IsStable: ${tg.WebApp.isStateStable}`);
 
         if (tg.WebApp.isStateStable && document.getElementById('chat-screen').classList.contains('active')) {
             const chatMessagesContainer = document.getElementById('chat-messages-container');
             setTimeout(() => {
                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
-            }, 150); 
+            }, 50); 
         }
     }
 
@@ -1164,14 +1167,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         setTimeout(() => {
-            if (tg.WebApp.viewportStableHeight && tg.WebApp.viewportStableHeight > 0) {
-                 viewportChangedHandler(); 
-                 logger.info(`Initial app wrapper height set using viewportStableHeight: ${tg.WebApp.viewportStableHeight}px`);
-            } else if (tg.WebApp.viewportHeight && tg.WebApp.viewportHeight > 0) {
-                 viewportChangedHandler(); 
-                 logger.info(`Initial app wrapper height set using viewportHeight: ${tg.WebApp.viewportHeight}px`);
+            if (tg.WebApp.isStateStable) { 
+                 viewportChangedHandler();
+                 logger.info(`Initial viewportStableHeight: ${tg.WebApp.viewportStableHeight}px. Called viewportChangedHandler.`);
             } else {
-                logger.warn("Initial viewport height not available from Telegram WebApp API.");
+                 logger.info(`Initial viewport not stable. Current: ${tg.WebApp.viewportHeight}, Stable: ${tg.WebApp.viewportStableHeight}`);
             }
         }, 100); 
 
