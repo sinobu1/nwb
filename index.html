@@ -252,7 +252,6 @@
             align-items: center; 
             justify-content: center; 
             text-align: center;
-            /* padding: 0 0.5rem; Removed to allow full centering if one element */
             overflow: hidden; 
         }
         #chat-agent-name {
@@ -281,10 +280,9 @@
         #chat-screen.dietitian-chat-active #chat-settings-btn {
             display: none;
         }
-         /* Ensure dietitian title is centered when model name/settings are hidden */
         #chat-screen.dietitian-chat-active .chat-title-container {
-            padding-left: 38px; /* Space for back button */
-            padding-right: 38px; /* Space for (hidden) settings button to keep balance */
+            padding-left: 38px; 
+            padding-right: 38px; 
         }
 
 
@@ -429,8 +427,8 @@
             object-fit: cover;
             cursor: pointer; 
         }
-        .message-content-text { /* Class for the text part of the message */
-            word-wrap: break-word; /* Ensure text wraps */
+        .message-content-text { 
+            word-wrap: break-word; 
         }
 
         @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
@@ -441,7 +439,7 @@
         .chat-message.grouped { margin-top: 0.25rem; }
         .chat-message.no-tail { border-bottom-left-radius: 1.1rem; border-bottom-right-radius: 1.1rem; }
         
-        .message-bot.typing .message-content-text::after { /* Typing animation on text span */
+        .message-bot.typing .message-content-text::after { 
             content: '.'; 
             animation: dots 1.2s steps(5, end) infinite; 
         }
@@ -452,14 +450,14 @@
             color: var(--text-secondary); 
             line-height: 1; 
             user-select: none; 
-            margin-top: 0.2rem; /* Space between content and meta */
-            text-align: right; /* Align time to the right */
+            margin-top: 0.2rem; 
+            text-align: right; 
         }
-        .message-user .message-meta { /* Specific alignment for user messages */
+        .message-user .message-meta { 
             align-self: flex-end;
         }
-        .message-bot .message-meta { /* Specific alignment for bot messages */
-            align-self: flex-end; /* Also align to end for consistency within bubble */
+        .message-bot .message-meta { 
+            align-self: flex-end; 
         }
 
 
@@ -655,8 +653,10 @@
                  <div class="chat-title-container">
                     <span id="chat-agent-name">Агент</span>
                     <span id="chat-model-name">Модель</span> </div>
-                 <div id="chat-settings-btn" class="chat-header-btn"> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 .54 1.85v.19a2 2 0 0 1-.54 1.85l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-.54-1.85v-.19a2 2 0 0 1 .54 1.85l.15-.1a2 2 0 0 0 .73 2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle>
+                 <div id="chat-settings-btn" class="chat-header-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                  </div>
             </div>
@@ -834,15 +834,25 @@ document.addEventListener('DOMContentLoaded', () => {
         else { stopPolling(); }
     }
 
+    // Updated BackButton logic
     if (tg.BackButton) {
         tg.BackButton.onClick(() => {
-            const activeScreen = document.querySelector('.screen.active');
-            if (activeScreen?.id === 'chat-screen') { closeChat(); }
-            else if (activeScreen && (activeScreen.id === 'image-generator-screen' || activeScreen.id === 'summarizer-screen')) {
+            const activeScreenEl = document.querySelector('.screen.active');
+            if (!activeScreenEl) return; 
+
+            const activeScreenId = activeScreenEl.id;
+
+            if (activeScreenId === 'chat-screen') {
+                closeChat(); 
+            } else if (activeScreenId === 'image-generator-screen' || activeScreenId === 'summarizer-screen') {
                 switchScreen(mainScreen);
+            } else if (activeScreenId !== 'main-screen') {
+                switchScreen(mainScreen);
+                logger.info(`Back button: Unknown screen ${activeScreenId}, going to main.`);
             }
         });
     }
+
 
     document.querySelectorAll('.back-btn[data-target-screen]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -860,7 +870,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pane) pane.classList.add('active');
         if (tab) tab.classList.add('active');
         mainContentArea.scrollTop = 0;
-        if (tabId === 'profile') { // Fetch profile data when tab is shown
+        if (tabId === 'profile') { 
             displayProfileData(); 
         }
     }
@@ -893,10 +903,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
                 const parsedUiHistory = JSON.parse(savedUiHistory);
-                if (parsedUiHistory.length === 0) return; // No history, do nothing, allow welcome message
+                if (parsedUiHistory.length === 0) return; 
 
                 parsedUiHistory.forEach(msg => {
-                    // Ensure content exists and is not just an empty object or string
                     if (msg.content && (msg.content.text || msg.content.imageDataUrl)) {
                         addMessageToChat(msg.sender, msg.content, { 
                             isRestoredFromHistory: true, 
@@ -942,7 +951,6 @@ document.addEventListener('DOMContentLoaded', () => {
             imageDataUrl = content.imageDataUrl || null;
         }
 
-        // Do not add message if it's not typing and has no text and no image
         if (!isTyping && !textContent && !imageDataUrl) {
             logger.warn("Attempted to add an empty message. Skipping.");
             return null; 
@@ -986,8 +994,8 @@ document.addEventListener('DOMContentLoaded', () => {
             contentSpan.className = 'message-content-text'; 
             contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); 
             msgDiv.appendChild(contentSpan);
-            if (isTyping) { // Add typing class to the text span itself for the animation
-                 contentSpan.classList.add('message-content'); // For CSS ::after pseudo-element
+            if (isTyping) { 
+                 contentSpan.classList.add('message-content'); 
             }
         }
         
@@ -1034,10 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (imageBase64 && imageMimeType) {
             payload.image_base64 = imageBase64;
             payload.image_mime_type = imageMimeType;
-            logger.info(`Sending message to backend with image. Agent: ${agentKeyForBackend}, Model: ${modelKeyToSubmit}`);
-        } else {
-            logger.info(`Sending message to backend (text only). Agent: ${agentKeyForBackend}, Model: ${modelKeyToSubmit}`);
-        }
+        } 
 
         try {
             const response = await fetch(backendProcessUrl, {
@@ -1051,14 +1056,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const errorResult = await response.json();
                     errorText = errorResult.message || (errorResult.detail ? JSON.stringify(errorResult.detail) : errorText);
                 } catch (e) { logger.warn("Could not parse backend error response as JSON", e); }
-                logger.error("Error submitting message to backend:", errorText);
                 addMessageToChat('bot', { text: errorText });
             } else {
                  const result = await response.json();
                  logger.info("Message submitted to backend successfully:", result);
             }
         } catch (error) {
-            logger.error("Network error submitting message to backend:", error);
             addMessageToChat('bot', { text: "Сетевая ошибка при отправке сообщения на бэкенд." });
         } finally {
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
@@ -1206,7 +1209,6 @@ document.addEventListener('DOMContentLoaded', () => {
                          addMessageToChat('bot', {text: `Модель изменена на ${modelDetails?.name || selectedModelKey}.`});
                          modelSelect.value = selectedModelKey;
                     } else { tg.showPopup?.({message: `Модель ${item.name} выбрана.`}); }
-                    logger.info(`Model selected via carousel: ${selectedModelKey}`);
                 }
             });
             wrapper.appendChild(slide);
@@ -1247,7 +1249,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleSummarizeText() { /* ... same as before ... */ }
     summarizeTextBtn?.addEventListener('click', handleSummarizeText);
 
-    // Updated to use tg.initDataUnsafe.user and provide fallbacks
     function displayProfileData() {
         const user = tg.initDataUnsafe?.user;
         const avatarImg = document.getElementById('profile-avatar-img');
@@ -1261,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 avatarImg.innerHTML = ''; 
             } else {
                 avatarImg.style.backgroundImage = '';
-                avatarImg.style.backgroundColor = '#444'; // Fallback color
+                avatarImg.style.backgroundColor = '#444'; 
                 avatarImg.innerHTML = (user.first_name || 'U').charAt(0).toUpperCase();
             }
             profileNameEl.textContent = `${user.first_name || 'Пользователь'} ${user.last_name || ''}`.trim();
@@ -1272,12 +1273,8 @@ document.addEventListener('DOMContentLoaded', () => {
             avatarImg.innerHTML = '?'; 
             profileNameEl.textContent = 'Нет данных';
             profileIdEl.textContent = 'ID: Н/Д';
-            logger.warn("User data not available in tg.initDataUnsafe for profile display.");
         }
-        // TODO: Implement fetching actual gem balance from backend
-        // For now, it shows "Загрузка..." or a static value.
-        // Example: fetchUserProfile(user.id).then(data => gemBalanceEl.textContent = data.gems);
-        gemBalanceEl.textContent = "0.0"; // Placeholder, replace with actual fetch
+        gemBalanceEl.textContent = "0.0"; // Placeholder
     }
 
     function updateNavArrows(swiperInstance, prefix) { /* ... same as before ... */ }
@@ -1289,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (config.key === "photo_dietitian_analyzer") { 
             chatScreen.classList.add('dietitian-chat-active');
-            chatPromptInput.placeholder = "Вес порции (г) или комментарий...";
+            chatPromptInput.placeholder = "Вес (г), коммент..."; // Shortened placeholder
             currentModelForBackend = config.forced_model_key || models[0].key;
             const dietitianModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = dietitianModelDetails?.name || currentModelForBackend;
@@ -1307,12 +1304,11 @@ document.addEventListener('DOMContentLoaded', () => {
         clearImagePreview();
         loadChatFromLocalStorage(); 
 
-        if (chatMessagesContainer.children.length === 0) { // Only add welcome if chat is truly empty
+        if (chatMessagesContainer.children.length === 0) { 
             let welcomeMessageText = `Привет! Я ${config.name}. Чем могу помочь?`;
             if (config.key === "photo_dietitian_analyzer") {
                 welcomeMessageText = `Привет! Я ${config.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
             }
-             // Ensure this doesn't add an "empty" message if welcomeMessageText is somehow empty
             if (welcomeMessageText) {
                 addMessageToChat('bot', { text: welcomeMessageText });
             }
@@ -1320,7 +1316,12 @@ document.addEventListener('DOMContentLoaded', () => {
         switchScreen(chatScreen);
     }
 
-    function closeChat() { /* ... same as before ... */ }
+    function closeChat() { 
+        stopPolling();
+        chatScreen.classList.remove('dietitian-chat-active'); 
+        clearImagePreview();
+        switchScreen(mainScreen); 
+     }
     function openSettingsModal() { /* ... same as before ... */ }
     function closeSettingsModal() { /* ... same as before ... */ }
     function viewportChangedHandler() { /* ... same as before ... */ }
@@ -1343,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('models-nav-next')?.addEventListener('click', () => modelsSwiper?.slideNext());
 
         populateToolsList(); 
-        displayProfileData(); // Call once at init, and then on tab switch
+        displayProfileData(); 
 
         agentSelect.innerHTML = ''; 
         generalAgents.forEach(a => { 
@@ -1374,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedAgentKey = newAgentKey; 
                 if (chatAgentNameEl) chatAgentNameEl.textContent = agentConfig.name;
                 const modelDetails = models.find(m => m.key === selectedModelKey);
-                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey;
+                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; // This should be chatModelNameEl, not chatAgentNameEl again
                 modelSelect.value = selectedModelKey; 
                 chatScreen.classList.remove('dietitian-chat-active'); 
                 chatPromptInput.placeholder = "Сообщение...";
