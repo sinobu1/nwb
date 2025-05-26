@@ -218,7 +218,6 @@
             flex-direction: column; 
             gap: 0.25rem; 
             -webkit-overflow-scrolling: touch; 
-            /* Added for tap-to-hide keyboard */
             cursor: default; 
         }
         
@@ -775,15 +774,32 @@ document.addEventListener('DOMContentLoaded', () => {
     
     chatPromptInput.addEventListener('input', autoResizeTextarea);
 
-    // --- START: Keyboard Hide on Tap Outside ---
+    // --- START: Keyboard Hide Logic ---
+    function hideKeyboardIfFocused() {
+        if (document.activeElement === chatPromptInput) {
+            chatPromptInput.blur();
+            logger.debug("Keyboard hidden by interaction (scroll/tap).");
+        }
+    }
+
     chatMessagesContainer.addEventListener('click', (event) => {
-        // Check if the click target is not the input field itself or the send button
-        if (document.activeElement === chatPromptInput && event.target !== chatPromptInput && event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target)) {
-            chatPromptInput.blur(); // Remove focus from input to hide keyboard
-            logger.debug("Keyboard hidden by tapping chat messages container.");
+        if (event.target !== chatPromptInput && event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target)) {
+            hideKeyboardIfFocused();
         }
     });
-    // --- END: Keyboard Hide on Tap Outside ---
+
+    let scrollTimeout;
+    chatMessagesContainer.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            // Only hide keyboard if scrolling is significant enough to assume user intent
+            // This is a simple check, can be made more sophisticated
+            if (chatMessagesContainer.scrollTop > 0) { // Check if not at the very top
+                 hideKeyboardIfFocused();
+            }
+        }, 150); // Debounce scroll event
+    });
+    // --- END: Keyboard Hide Logic ---
 
 
     async function fetchUpdates() {
