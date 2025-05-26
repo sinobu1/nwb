@@ -170,10 +170,9 @@
         /* Chat Screen Specific Styles */
         #chat-screen .chat-header { 
             flex-shrink: 0;
-            /* Ensure it's sticky if input area is part of normal flow below it */
              position: sticky; 
              top: 0;
-             background: rgba(18,18,18,0.95); /* More opaque for sticky header */
+             background: rgba(18,18,18,0.95); 
         }
         .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
@@ -184,12 +183,11 @@
             flex-shrink: 0;
             padding: 0.75rem 1rem; 
             border-bottom: 1px solid var(--border-color); 
-            background-color: var(--bg-main); /* Match screen bg */
+            background-color: var(--bg-main); 
             display: flex;
             flex-direction: column; 
             gap: 0.75rem; 
-            z-index: 15; /* Below header if header is sticky, above messages */
-            /* No longer sticky at the bottom */
+            z-index: 15; 
         }
         #chat-prompt-input { 
             width: 100%;
@@ -462,9 +460,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let agentsSwiper, modelsSwiper;
 
     const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
-    const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; // Your backend URL
+    const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; 
 
-    // Simple console logger for Mini App
     const logger = {
         info: (message, ...optionalParams) => console.log(`[INFO] ${new Date().toISOString()}: ${message}`, ...optionalParams),
         warn: (message, ...optionalParams) => console.warn(`[WARN] ${new Date().toISOString()}: ${message}`, ...optionalParams),
@@ -507,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentArea = document.getElementById('main-content-area');
 
     const imageGeneratorCard = document.getElementById('image-generator-card');
-    const imagePromptInputEl = document.getElementById('image-prompt-input'); // Renamed to avoid conflict
+    const imagePromptInputEl = document.getElementById('image-prompt-input'); 
     const generateImageBtn = document.getElementById('generate-image-btn');
     const imageLoadingIndicator = document.getElementById('image-loading-indicator');
     const generatedImageContainer = document.getElementById('generated-image-container');
@@ -566,17 +563,14 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentArea.scrollTop = 0;
     }
 
-    function saveChatToLocalStorage() { // Saves UI-displayable history
+    function saveChatToLocalStorage() { 
         try { 
             const displayHistory = Array.from(chatMessagesContainer.children)
                 .filter(el => el.classList.contains('chat-message') && !el.classList.contains('typing'))
                 .map(msgEl => {
                     const sender = msgEl.classList.contains('message-user') ? 'user' : 'bot';
                     const text = msgEl.querySelector('.message-content')?.textContent || '';
-                    const time = msgEl.querySelector('.message-meta span')?.textContent || formatTime(new Date());
-                    // Attempt to reconstruct a sortable timestamp if possible, or use current
-                    // This part is tricky without original timestamps on UI elements
-                    return { sender, text, timestamp: new Date().toISOString() }; // Placeholder timestamp logic
+                    return { sender, text, timestamp: new Date().toISOString() }; 
                 });
             setTimeout(() => {
                 localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
@@ -586,10 +580,9 @@ document.addEventListener('DOMContentLoaded', () => {
         catch (e) { console.error("Error saving UI chat history to localStorage:", e); }
     }
 
-    function loadChatFromLocalStorage() { // Loads UI-displayable history
+    function loadChatFromLocalStorage() { 
         chatMessagesContainer.innerHTML = '';
         lastMessageInfo = { sender: null, date: null };
-        // currentMiniAppChatHistory is for API context, not directly reloaded here for UI display logic
         try {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
@@ -597,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 parsedUiHistory.forEach(msg => {
                     addMessageToChat(msg.sender, msg.text, { 
                         isRestoredFromHistory: true, 
-                        timestamp: msg.timestamp // Use stored timestamp
+                        timestamp: msg.timestamp 
                     });
                 });
                 logger.info("UI Chat history loaded from localStorage.");
@@ -609,7 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function addMessageToChat(sender, text, options = {}) {
         const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestampStr } = options;
-        const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date(); // Use provided timestamp if available
+        const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date(); 
         const currentDate = now.toDateString();
 
         if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
@@ -648,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (sender === 'bot' && !isRestoredFromHistory && tg.sendData) {
                 const saveButton = document.createElement('button');
-                saveButton.innerHTML = '�';
+                saveButton.innerHTML = '💾';
                 saveButton.title = 'Сохранить в основной чат';
                 saveButton.className = 'save-to-bot-btn';
                 saveButton.onclick = () => {
@@ -668,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessagesContainer.appendChild(msgDiv);
 
         if (!isTyping && !isRestoredFromHistory) {
-            saveChatToLocalStorage(); // Save UI history after adding a new message
+            saveChatToLocalStorage(); 
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
@@ -676,14 +669,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function submitMessageToBackend(userText, agentKey, modelKey) {
-        const userId = tg.initDataUnsafe?.user?.id;
-        if (!userId) {
-            addMessageToChat('bot', "Ошибка: Не удалось определить ID пользователя Telegram для отправки на бэкенд.");
-            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-            if (typingIndicator) typingIndicator.remove();
-            return;
-        }
+        let userId = tg.initDataUnsafe?.user?.id;
 
+        if (!userId) { // Fallback for local testing or if ID is somehow missing
+            userId = "test_user_miniapp_fallback"; // Provide a default/test user ID
+            logger.warn(`Telegram User ID not found, using fallback: ${userId}`);
+             // Do not show error to user in this case, proceed with fallback for testing
+        }
+        
         const backendProcessUrl = `${APP_BACKEND_URL}/api/process_app_message/${userId}`;
         logger.info(`Sending message to backend: ${backendProcessUrl} with agent ${agentKey}, model ${modelKey}`);
 
@@ -712,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const result = await response.json();
             logger.info("Message submitted to backend successfully:", result);
-            // AI response handled by polling
         } catch (error) {
             logger.error("Network error submitting message to backend:", error);
             addMessageToChat('bot', "Сетевая ошибка при отправке сообщения на бэкенд.");
@@ -725,7 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = chatPromptInput.value.trim(); 
         if (!text) return;
 
-        addMessageToChat('user', text); // Adds to UI and triggers saveChatToLocalStorage
+        addMessageToChat('user', text); 
         chatPromptInput.value = ''; 
         chatSendMessageBtn.disabled = true; 
 
@@ -733,7 +725,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', 'Печатает...', { isTyping: true });
 
-        // Send to backend, backend handles AI call and saving for polling
         await submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
     }
 
@@ -742,8 +733,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     async function fetchUpdates() {
-        const userId = tg.initDataUnsafe?.user?.id;
-        if (!userId || !chatScreen.classList.contains('active')) { 
+        let userId = tg.initDataUnsafe?.user?.id;
+        if (!userId) {
+            // If testing locally without Telegram context, polling might not be meaningful
+            // or you might use a test_user_id if your backend supports it for polling.
+            // For now, if no real user ID, don't poll.
+            if (tg && Object.keys(tg).length > 0) { // Only log error if tg object exists but no ID
+                 logger.warn("fetchUpdates: Telegram User ID not found, polling skipped.");
+            }
+            return; 
+        }
+        if (!chatScreen.classList.contains('active')) { 
             return;
         }
 
@@ -825,7 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function handleGenerateImage() {
-        const prompt = imagePromptInputEl.value.trim(); // Use imagePromptInputEl
+        const prompt = imagePromptInputEl.value.trim(); 
         if (!prompt) {
             imageErrorMessage.textContent = "Пожалуйста, введите описание изображения.";
             imageErrorMessage.style.display = 'block';
@@ -837,8 +837,6 @@ document.addEventListener('DOMContentLoaded', () => {
         generateImageBtn.disabled = true;
         generatedImageContainer.innerHTML = ''; 
 
-        // IMPORTANT: This still calls Google API directly from client.
-        // For location/billing issues, this should ideally be proxied via your backend.
         const payload = { instances: [{ prompt: prompt }], parameters: { "sampleCount": 1} };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
         logger.info(`Image Generation: Calling API directly at ${apiUrl.split('?key=')[0]}...`);
@@ -929,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     generateImageBtn?.addEventListener('click', handleGenerateImage);
-    imagePromptInputEl?.addEventListener('keydown', (e) => { // Use imagePromptInputEl
+    imagePromptInputEl?.addEventListener('keydown', (e) => { 
         if (e.key === 'Enter') handleGenerateImage();
     });
 
@@ -947,7 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
         summarizeTextBtn.disabled = true;
         summarizerOutput.style.display = 'none';
 
-        // IMPORTANT: This still calls Google API directly from client.
         const prompt = `Сделай краткое содержание следующего текста:\n\n${textToSummarize}`;
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${models[0].key}:generateContent?key=${API_KEY}`;
