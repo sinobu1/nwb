@@ -118,8 +118,8 @@
             margin-bottom: 0.75rem; 
             padding: 0 0.25rem; 
         }
-        .swiper-header h2 { /* Increased font size for carousel titles */
-            font-size: 1.4rem; 
+        .swiper-header h2 {
+            font-size: 1.4rem; /* Increased font size */
             font-weight: 700;
         }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
@@ -135,8 +135,8 @@
             transition: opacity 0.2s, transform 0.1s; 
             color: var(--text-secondary); 
         }
-        .swiper-nav-arrow svg { /* Adjust SVG size if needed */
-            width: 18px;
+        .swiper-nav-arrow svg { 
+            width: 18px; /* Adjusted SVG size */
             height: 18px;
         }
         .swiper-nav-arrow:hover { color: var(--text-primary); }
@@ -159,7 +159,7 @@
         .palette-grad-6 { background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%); }
         .palette-grad-7 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
         .palette-grad-8 { background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%); }
-        .palette-grad-default { background-color: #2D2D2D; } /* Fallback */
+        .palette-grad-default { background-color: #2D2D2D; } 
 
 
         .full-screen-card-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
@@ -242,7 +242,7 @@
             justify-content: center; 
             text-align: center;
             padding: 0 0.5rem; 
-            overflow: hidden; /* Prevent long names from breaking layout */
+            overflow: hidden; 
         }
         #chat-agent-name {
             font-size: 1.0rem; 
@@ -250,10 +250,10 @@
             color: var(--text-primary);
             line-height: 1.2;
             display: block; 
-            white-space: nowrap; /* Prevent agent name from wrapping */
+            white-space: nowrap; 
             overflow: hidden;
-            text-overflow: ellipsis; /* Add ellipsis for long agent names */
-            max-width: 100%; /* Ensure it doesn't overflow its container */
+            text-overflow: ellipsis; 
+            max-width: 100%; 
         }
         #chat-model-name {
             font-size: 0.75rem; 
@@ -585,15 +585,17 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
         { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
-        { key: "gemini_pro_custom_mode", name: "Продвинутый (Gemini Pro)", icon: "💎", desc: "Мощный ИИ-ассистент", palette: "palette-grad-7", systemPrompt: "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент."}
+        // Removed "gemini_pro_custom_mode" as per request (it's hidden/managed by model choice)
+        // The "photo_dietitian_analyzer" is handled by a dedicated card, not usually in this generic agent list for chat.
+        // If it were, its name would be "🥑 Диетолог (анализ фото)"
     ];
 
     const models = [ 
         { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-grad-default" },
-        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-grad-1" },
-        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "🚀", desc: "Продвинутая модель", palette: "palette-grad-2" }, 
-        { key: "custom_api_grok_3", name: "Grok 3", icon: "🌀", desc: "Модель Grok", palette: "palette-grad-3" },
-        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-grad-4" }
+        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый и способный", palette: "palette-grad-1" }, // Removed "с Vision"
+        { key: "custom_api_gemini_2_5_pro", name: "Gemini 2.5 Pro", icon: "🚀", desc: "Продвинутая модель", palette: "palette-grad-2" }, // Removed "Custom"
+        { key: "custom_api_grok_3", name: "Grok 3", icon: "🌀", desc: "Модель Grok", palette: "palette-grad-3" }, // Removed "Custom"
+        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-grad-4" } // Removed "Custom"
     ];
     // --- END: Updated Agents and Models Definitions ---
 
@@ -611,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatScreen = document.getElementById('chat-screen');
     const imageGeneratorScreen = document.getElementById('image-generator-screen');
     const summarizerScreen = document.getElementById('summarizer-screen');
-    const dietitianAgentCard = document.getElementById('dietitian-agent-card'); // Dietitian card
+    const dietitianAgentCard = document.getElementById('dietitian-agent-card'); 
 
     const chatMessagesContainer = document.getElementById('chat-messages-container');
     const chatPromptInput = document.getElementById('chat-prompt-input'); 
@@ -985,30 +987,13 @@ document.addEventListener('DOMContentLoaded', () => {
         switchScreen(imageGeneratorScreen);
     });
 
-    // Click handler for Dietitian card
     dietitianAgentCard?.addEventListener('click', () => {
-        const dietitianAgent = agents.find(a => a.key === "photo_dietitian_analyzer"); // Assuming this key exists in your updated agents array
-        if (dietitianAgent) {
-            openChat(dietitianAgent);
+        const dietitianAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a => a.key === "photo_dietitian_analyzer");
+        if (dietitianAgentConfig) {
+            openChat(dietitianAgentConfig); // Pass the config object
         } else {
-            // Fallback or open a specific screen if it's not a generic chat agent
-            // For now, let's assume it should open a chat. If it has a dedicated screen:
-            // switchScreen(document.getElementById('dietitian-screen')); // if you create such a screen
-            logger.warn("Dietitian agent config not found for card click, or it's not meant for generic chat.");
-            // If photo_dietitian_analyzer is added to the main 'agents' array for the carousel, this specific card handler might be redundant
-            // unless you want a different behavior for this specific card.
-            // For now, we'll try to open it as a chat agent.
-            const agentToOpen = AI_MODES_FRONTEND_MIRROR.find(a => a.key === "photo_dietitian_analyzer");
-            if (agentToOpen) {
-                 const agentConfigForChat = { // Create a minimal config for openChat
-                    key: agentToOpen.key,
-                    name: agentToOpen.name,
-                    // icon and desc can be added if needed for chat title or other UI elements in chat
-                };
-                openChat(agentConfigForChat);
-            } else {
-                 if(tg.showAlert) tg.showAlert('Агент "Диетолог" не настроен для чата.');
-            }
+            logger.warn("Dietitian agent config not found for card click.");
+            if(tg.showAlert) tg.showAlert('Агент "Диетолог" не настроен.');
         }
     });
 
@@ -1237,7 +1222,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         loadChatFromLocalStorage(); 
         if (chatMessagesContainer.children.length === 0) { 
-            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь?`);
+            let welcomeMessage = `Привет! Я ${agent.name}. Чем могу помочь?`;
+            if (agent.key === "photo_dietitian_analyzer") {
+                welcomeMessage = `Привет! Я ${agent.name}. Для анализа КБЖУ, пожалуйста, отправьте фото блюда в основной чат с ботом, предварительно выбрав этого агента там. Здесь вы можете задавать текстовые вопросы по диетологии.`;
+            }
+            addMessageToChat('bot', welcomeMessage);
         }
         switchScreen(chatScreen); 
     }
@@ -1309,7 +1298,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         agentSelect.addEventListener('change', (e) => {
             selectedAgentKey = e.target.value;
-            const agent = agents.find(a=> a.key === selectedAgentKey);
+            const agent = agents.find(a=> a.key === selectedAgentKey) || AI_MODES_FRONTEND_MIRROR.find(a => a.key === selectedAgentKey); // Also check mirror for dietitian
             if(agent) {
                 if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name; 
                 const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a_cfg => a_cfg.key === agent.key);
@@ -1325,7 +1314,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agent) { 
-                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
+                 let welcomeMessage = `Агент изменен на ${agent.name}. Чем могу помочь?`;
+                 if (agent.key === "photo_dietitian_analyzer") {
+                    welcomeMessage = `Агент изменен на ${agent.name}. Для анализа КБЖУ, пожалуйста, отправьте фото блюда в основной чат с ботом. Здесь вы можете задавать текстовые вопросы по диетологии.`;
+                 }
+                 addMessageToChat('bot', welcomeMessage);
             }
         });
         modelSelect.addEventListener('change', (e) => { 
@@ -1334,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; 
             logger.info(`Model changed to ${selectedModelKey} via dropdown.`);
             
-            const currentAgent = agents.find(a => a.key === selectedAgentKey);
+            const currentAgent = agents.find(a => a.key === selectedAgentKey) || AI_MODES_FRONTEND_MIRROR.find(a => a.key === selectedAgentKey);
              if (chatScreen.classList.contains('active') && currentAgent) {
                 addMessageToChat('bot', `Модель изменена на ${modelNameToDisplay}.`);
              }
@@ -1349,14 +1342,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const AI_MODES_FRONTEND_MIRROR = [ 
-        { key: "universal_ai_basic", name: "Универсальный", forced_model_key: null }, // Matched name
+        { key: "universal_ai_basic", name: "Универсальный", forced_model_key: null }, 
         { key: "idea_generator", name: "Генератор идей", forced_model_key: null },
         { key: "career_coach", name: "Карьерный консультант", forced_model_key: null },
         { key: "programming_partner", name: "Партнер программиста", forced_model_key: null },
         { key: "tutor_assistant", name: "Внешкольный наставник", forced_model_key: null },
         { key: "literary_editor", name: "Литературный редактор", forced_model_key: null },
         { key: "photo_dietitian_analyzer", name: "🥑 Диетолог (анализ фото)", forced_model_key: "google_gemini_2_5_flash_preview" },
-        { key: "gemini_pro_custom_mode", name: "Продвинутый (Gemini Pro)", forced_model_key: "custom_api_gemini_2_5_pro" } // Added this agent
+        { key: "gemini_pro_custom_mode", name: "Продвинутый (Gemini Pro)", forced_model_key: "custom_api_gemini_2_5_pro" } 
     ];
 
     init();
