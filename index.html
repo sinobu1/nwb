@@ -19,8 +19,9 @@
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
             --border-color: #282828; 
+            --app-wrapper-border: #000000; 
             --font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', sans-serif;
-            --gold-highlight: #d8ab4e;
+            --gold-highlight: #d8ab4e; 
             --success-green: #4CAF50;
             --error-red: #F44336;
         }
@@ -45,14 +46,14 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            border-left: 1px solid var(--gold-highlight); 
-            border-right: 1px solid var(--gold-highlight); 
+            border-left: 1px solid var(--app-wrapper-border); 
+            border-right: 1px solid var(--app-wrapper-border); 
         }
         .screen {
             position: absolute;
             inset: 0;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Ensures flex context for children */
             transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
             background-color: var(--bg-main);
             z-index: 10;
@@ -81,16 +82,18 @@
             color: var(--text-primary);
             position: sticky; 
             top: 0;
+            flex-shrink: 0;
         }
         .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } 
         .fixed-header .back-btn {
-            color: var(--gold-highlight);
+            color: var(--gold-highlight); 
             cursor: pointer;
             padding: 0.25rem; 
         }
          .main-screen-header { 
             padding: 1rem 1rem 0.5rem 1rem;
             background-color: var(--bg-main);
+            flex-shrink: 0;
         }
         .main-screen-header h1 { font-size: 1.875rem; font-weight: 800; margin-bottom: 0.25rem; }
         .main-screen-header p.subtitle { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1rem; }
@@ -102,7 +105,7 @@
         h2 { font-size: 1.25rem; font-weight: 700; }
 
 
-        .swiper-container-wrapper { margin-top: 0.75rem; } 
+        .swiper-container-wrapper { margin-top: 0.75rem; flex-shrink: 0; } 
         .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.25rem; }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
         .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s, transform 0.1s; color: var(--text-secondary); }
@@ -134,16 +137,37 @@
             flex-shrink: 0;
             max-width: 400px;
             width: calc(100% - 2rem);
-            margin: 0 auto 1rem auto;
+            margin: 0 auto 1rem auto; 
             display: flex;
-            border-radius: 20px;
+            border-radius: 16px; /* Rounded like iOS tab bar */
             padding: 0.3rem; 
             border: 1px solid var(--border-color); 
+            background-color: transparent; /* Transparent background for the bar */
             z-index: 100;
+            position: relative; /* For potential pseudo-elements if needed for glassmorphism */
         }
-        .tab-item { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; padding: 0.25rem 0; }
-        .tab-item.active { color: var(--gold-highlight); }
-        .tab-item svg { width: 24px; height: 24px; margin-bottom: 2px; } 
+        .tab-item { 
+            flex-grow: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            color: var(--text-secondary); 
+            cursor: pointer; 
+            transition: color 0.2s, background-color 0.2s; 
+            padding: 0.35rem 0; /* Adjusted padding */
+            border-radius: 12px; /* Rounded corners for individual items */
+            background-color: transparent; /* Ensure individual items are transparent by default */
+            margin: 0.1rem; /* Small margin between items */
+        }
+        .tab-item.active { 
+            color: var(--gold-highlight); 
+            background-color: rgba(255, 255, 255, 0.1); /* Subtle background for active tab */
+        }
+        .tab-item:not(.active):hover {
+            background-color: rgba(255, 255, 255, 0.05); /* Subtle hover for non-active tabs */
+        }
+        .tab-item svg { width: 22px; height: 22px; margin-bottom: 2px; } 
         .tab-item span { font-size: 0.6rem; font-weight: 500; }
 
         .ios-card { background-color: var(--bg-card); border-radius: 1rem; padding: 1rem; margin-top: 1rem; }
@@ -168,6 +192,8 @@
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; font-size: 0.9rem;}
 
         /* Chat Screen Specific Styles */
+        #chat-screen { display: flex; flex-direction: column; }
+
         #chat-screen .chat-header { 
             flex-shrink: 0;
              position: sticky; 
@@ -179,50 +205,6 @@
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
         .chat-header-btn:hover { background-color: var(--bg-card); }
         
-        .chat-input-area { 
-            flex-shrink: 0;
-            padding: 0.75rem 1rem; 
-            border-bottom: 1px solid var(--border-color); 
-            background-color: var(--bg-main); 
-            display: flex;
-            flex-direction: column; 
-            gap: 0.75rem; 
-            z-index: 15; 
-        }
-        #chat-prompt-input { 
-            width: 100%;
-            background-color: var(--bg-card);
-            border-radius: 12px;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            min-height: 44px; 
-        }
-        #chat-prompt-input:focus {
-            outline: none;
-            border-color: var(--gold-highlight);
-            box-shadow: 0 0 0 1px var(--gold-highlight);
-        }
-        #chat-send-message-btn { 
-            display: block;
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--gold-highlight);
-            color: black;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            text-align: center;
-        }
-        #chat-send-message-btn:disabled {
-            background-color: var(--text-secondary);
-            cursor: not-allowed;
-        }
-
         .chat-messages { 
             flex-grow: 1; 
             overflow-y: auto; 
@@ -232,6 +214,63 @@
             gap: 0.25rem; 
             -webkit-overflow-scrolling: touch; 
         }
+        
+        .chat-input-area { 
+            flex-shrink: 0; /* Prevent shrinking */
+            padding: 0.5rem 0.75rem; 
+            border-top: 1px solid var(--border-color); 
+            background-color: var(--bg-main); 
+            display: flex;
+            align-items: flex-end; /* Align items to bottom for textarea expansion */
+            gap: 0.5rem; 
+            z-index: 15; 
+            /* This area is at the bottom of the chat-screen flex container */
+        }
+        #chat-prompt-input { 
+            flex-grow: 1; 
+            background-color: var(--bg-card);
+            border-radius: 18px; 
+            padding: 0.6rem 0.85rem; /* Adjusted padding */
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 0.9rem; /* Standard font size */
+            line-height: 1.3; /* For better readability in textarea */
+            min-height: 38px; /* Slightly taller base height */
+            max-height: 120px; 
+            resize: none; 
+            overflow-y: auto; 
+        }
+        #chat-prompt-input:focus {
+            outline: none;
+            border-color: var(--gold-highlight);
+            box-shadow: 0 0 0 1px var(--gold-highlight);
+        }
+        #chat-send-message-btn { 
+            flex-shrink: 0; 
+            background-color: var(--gold-highlight);
+            color: black;
+            border: none;
+            border-radius: 50%; /* Circular button */
+            width: 38px; /* Fixed width */
+            height: 38px; /* Fixed height */
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0; /* Remove padding if icon is centered */
+        }
+        #chat-send-message-btn svg {
+            width: 20px; /* Adjust icon size if needed */
+            height: 20px;
+        }
+        #chat-send-message-btn:disabled {
+            background-color: var(--text-secondary);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+
         .chat-message { padding: 0.5rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-wrap: break-word; line-height: 1.4; opacity: 0; transform: translateY(10px); animation: pop-in 0.3s ease forwards; margin-top: 0.65rem; will-change: transform, opacity; font-size: 0.9rem; }
         @keyframes pop-in { to { opacity: 1; transform: translateY(0); } }
         .message-bot { background-color: var(--bg-card); align-self: flex-start; color: var(--text-primary); }
@@ -246,14 +285,12 @@
         .message-meta { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: var(--text-secondary); float: right; margin-left: 0.5rem; margin-top: 0.2rem; line-height: 1; user-select: none; }
         .chat-date-divider { text-align: center; margin: 1rem auto; background-color: rgba(44, 44, 46, 0.8); color: var(--text-primary); font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.6rem; border-radius: 1rem; width: fit-content; }
 
+        /* Removed .chat-bottom-bar as input area is now the visual bottom of chat content */
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: none; align-items: center; justify-content: center; }
         .modal-content { background-color: var(--bg-card); padding: 1.5rem; border-radius: 1rem; width: calc(100% - 2rem); max-width: 400px; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
         .custom-select { width: 100%; background-color: var(--bg-select); color: var(--text-primary); padding: 0.75rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border-color); font-size: 1rem; margin-top: 0.5rem;}
-        .save-to-bot-btn { margin-left: 6px; padding: 1px 5px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-card); color: var(--text-secondary); cursor: pointer; font-size: 0.65rem; }
-        .save-to-bot-btn:hover { background-color: var(--bg-select); color: var(--text-primary); }
-        .save-to-bot-btn:disabled { cursor: default; opacity: 0.6; }
 
         .feature-input-area { margin-bottom: 1rem; }
         .feature-input-area textarea, .feature-input-area input[type="text"] {
@@ -268,7 +305,7 @@
             min-height: 44px;
         }
         .feature-input-area textarea { min-height: 100px; }
-        .feature-submit-btn {
+        .feature-submit-btn { /* General style, chat send button has specific overrides */
             display: block;
             width: 100%;
             padding: 0.75rem;
@@ -320,9 +357,7 @@
 </head>
 <body>
     <div class="app-wrapper">
-        <div id="main-screen" class="screen active">
-            <div id="main-content-area">
-                <div id="home-content" class="content-pane active">
+        <div id="main-screen" class="screen active"> <div id="main-content-area"> <div id="home-content" class="content-pane active">
                     <div class="main-screen-header">
                         <h1>Главная</h1>
                         <p class="subtitle">Панель управления ассистентом</p>
@@ -390,8 +425,8 @@
             </nav>
         </div>
 
-        <div id="chat-screen" class="screen">
-            <div class="chat-header fixed-header"> <div id="chat-back-btn" class="chat-header-btn">
+        <div id="chat-screen" class="screen"> <div class="chat-header fixed-header"> 
+                <div id="chat-back-btn" class="chat-header-btn">
                      <svg fill="currentColor" width="22" height="22" viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
                  </div>
                  <div id="chat-title" class="title">Чат</div>
@@ -399,12 +434,13 @@
                     <svg fill="currentColor" width="20" height="20" viewBox="0 0 24 24"> <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                  </div>
             </div>
-            <div class="chat-input-area"> <div class="feature-input-area" style="width: 100%; margin-bottom: 0;">
-                    <input type="text" id="chat-prompt-input" placeholder="Сообщение...">
-                </div>
-                <button id="chat-send-message-btn" class="feature-submit-btn" style="width: 100%;" disabled>Отправить</button>
+            <div class="chat-messages" id="chat-messages-container"></div>
+            <div class="chat-input-area"> 
+                <textarea id="chat-prompt-input" placeholder="Сообщение..." rows="1"></textarea>
+                <button id="chat-send-message-btn" disabled> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0" stroke-linecap="round" stroke-linejoin="round"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                </button>
             </div>
-            <div class="chat-messages" id="chat-messages-container"></div> </div>
+            </div>
 
         <div id="image-generator-screen" class="screen">
             <div class="fixed-header">
@@ -419,8 +455,7 @@
                 </div>
                 <button id="generate-image-btn" class="feature-submit-btn">Сгенерировать</button>
                 <div id="image-loading-indicator" class="loading-indicator" style="display: none;">Генерация изображения...</div>
-                <div id="generated-image-container" class="generated-image-container">
-                     </div>
+                <div id="generated-image-container" class="generated-image-container"></div>
                 <div id="image-error-message" class="error-message" style="display: none;"></div>
             </div>
         </div>
@@ -443,8 +478,8 @@
             </div>
         </div>
 
-
-        <div id="settings-modal"> <div class="modal-content">
+        <div id="settings-modal"> 
+            <div class="modal-content">
                 <div class="modal-header"><h3>Настройки чата</h3><div class="modal-close-btn" style="cursor: pointer;">✕</div></div>
                 <div><label for="agent-select">АГЕНТ</label><select id="agent-select" class="custom-select"></select></div>
                 <div style="margin-top: 1rem;"><label for="model-select">МОДЕЛЬ</label><select id="model-select" class="custom-select"></select></div>
@@ -469,7 +504,6 @@ document.addEventListener('DOMContentLoaded', () => {
         debug: (message, ...optionalParams) => console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...optionalParams),
     };
 
-    // --- START: Updated Agents and Models to match backend config ---
     const agents = [ 
         { key: "universal_ai_basic", name: "Универсал", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, 
         { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
@@ -477,18 +511,15 @@ document.addEventListener('DOMContentLoaded', () => {
         { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
         { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
         { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
-        // photo_dietitian_analyzer is primarily for photo analysis via main bot, might not be ideal for generic chat here.
-        // gemini_pro_custom_mode is an advanced agent, can be included if desired.
     ];
 
     const models = [ 
         { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
-        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-2" }, // Note: Vision capabilities are used by specific agents in the main bot.
-        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro (Custom)", icon: "🚀", desc: "Продвинутая модель", palette: "palette-4" }, // Changed icon
-        { key: "custom_api_grok_3", name: "Grok 3 (Custom)", icon: "🌀", desc: "Модель Grok", palette: "palette-5" },
+        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-2" },
+        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro (Custom)", icon: "🚀", desc: "Продвинутая модель", palette: "palette-4" },
+        { key: "custom_api_grok_3", name: "Grok 3 (Custom)", icon: "�", desc: "Модель Grok", palette: "palette-5" },
         { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini (Custom)", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-3" }
     ];
-    // --- END: Updated Agents and Models ---
 
     const tools = [
         { key: "summarizer", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
@@ -497,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let selectedAgentKey = agents[0].key;
-    let selectedModelKey = models[0].key; // Default model key now matches a valid backend key
+    let selectedModelKey = models[0].key; 
 
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
@@ -543,6 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (screenToShow === chatScreen) {
             startPolling();
+             chatPromptInput.focus(); // Focus input when chat screen is shown
         } else {
             stopPolling();
         }
@@ -655,25 +687,6 @@ document.addEventListener('DOMContentLoaded', () => {
             timeSpan.textContent = formatTime(now);
             metaDiv.appendChild(timeSpan);
             msgDiv.appendChild(metaDiv);
-
-            if (sender === 'bot' && !isRestoredFromHistory && tg.sendData) {
-                const saveButton = document.createElement('button');
-                saveButton.innerHTML = '💾';
-                saveButton.title = 'Сохранить в основной чат';
-                saveButton.className = 'save-to-bot-btn';
-                saveButton.onclick = () => {
-                    let userQueryText = "Запрос не найден";
-                     const userMessagesElements = Array.from(chatMessagesContainer.querySelectorAll('.message-user .message-content'));
-                    if (userMessagesElements.length > 0) {
-                         userQueryText = userMessagesElements[userMessagesElements.length -1].textContent;
-                    }
-                    tg.sendData(JSON.stringify({ action: 'save_chat_to_telegram', payload: { user_query: userQueryText, ai_response: text } }));
-                    saveButton.textContent = '✅';
-                    saveButton.disabled = true;
-                    if (tg.showAlert) tg.showAlert('Диалог сохранен в основной чат с ботом!');
-                };
-                metaDiv.appendChild(saveButton);
-            }
         }
         chatMessagesContainer.appendChild(msgDiv);
 
@@ -682,23 +695,17 @@ document.addEventListener('DOMContentLoaded', () => {
             saveChatToLocalStorage(); 
         }
         lastMessageInfo = { sender: sender, date: currentDate };
-        requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
+        // Scroll to bottom smoothly
+        chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
         return msgDiv;
     }
 
-    async function submitMessageToBackend(userText, agentKey, modelKeyToSubmit) { // Renamed modelKey to modelKeyToSubmit
+    async function submitMessageToBackend(userText, agentKey, modelKeyToSubmit) { 
         let userId = tg.initDataUnsafe?.user?.id;
 
         if (!userId) {
-            logger.error("submitMessageToBackend: Telegram User ID (tg.initDataUnsafe.user.id) is missing or undefined.");
-            if (tg && tg.initDataUnsafe) {
-                logger.error("submitMessageToBackend: tg.initDataUnsafe content:", JSON.stringify(tg.initDataUnsafe));
-            } else if (tg) {
-                logger.error("submitMessageToBackend: tg object exists, but initDataUnsafe is missing.");
-            } else {
-                logger.error("submitMessageToBackend: Telegram WebApp object (tg) is undefined.");
-            }
-            addMessageToChat('bot', "Ошибка: ID пользователя Telegram не найден. Убедитесь, что приложение запущено внутри Telegram.");
+            logger.error("submitMessageToBackend: Telegram User ID missing.");
+            addMessageToChat('bot', "Ошибка: ID пользователя Telegram не найден.");
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
             if (typingIndicator) typingIndicator.remove();
             return;
@@ -711,30 +718,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(backendProcessUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKeyToSubmit }) // Use modelKeyToSubmit
+                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKeyToSubmit }) 
             });
 
             if (!response.ok) {
                 let errorText = `Ошибка бэкенда: ${response.status} ${response.statusText}`;
                 try {
                     const errorResult = await response.json();
-                    if (errorResult && errorResult.message) {
-                        errorText = `Ошибка бэкенда: ${errorResult.message}`;
-                    } else if (errorResult && errorResult.detail) { 
-                        errorText = `Ошибка бэкенда (детали): ${JSON.stringify(errorResult.detail)}`;
-                    }
+                    errorText = errorResult.message || (errorResult.detail ? JSON.stringify(errorResult.detail) : errorText);
                 } catch (e) { logger.warn("Could not parse backend error response as JSON", e); }
                 logger.error("Error submitting message to backend:", errorText);
                 addMessageToChat('bot', errorText);
-                const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
-                if (typingIndicator) typingIndicator.remove();
-                return;
+            } else {
+                 const result = await response.json();
+                 logger.info("Message submitted to backend successfully:", result);
             }
-            const result = await response.json();
-            logger.info("Message submitted to backend successfully:", result);
         } catch (error) {
             logger.error("Network error submitting message to backend:", error);
             addMessageToChat('bot', "Сетевая ошибка при отправке сообщения на бэкенд.");
+        } finally {
             const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
             if (typingIndicator) typingIndicator.remove();
         }
@@ -746,32 +748,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         addMessageToChat('user', text); 
         chatPromptInput.value = ''; 
+        autoResizeTextarea.call(chatPromptInput); // Adjust textarea height after clearing
         chatSendMessageBtn.disabled = true; 
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', 'Печатает...', { isTyping: true });
-
-        // Ensure selectedModelKey is used here
         await submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
     }
 
-    function handleChatInput() {
+    function autoResizeTextarea() {
+        this.style.height = 'auto'; 
+        let newHeight = this.scrollHeight;
+        const maxHeight = parseInt(getComputedStyle(this).maxHeight);
+        if (newHeight > maxHeight) {
+            newHeight = maxHeight;
+            this.style.overflowY = 'auto'; // Show scrollbar if max height is reached
+        } else {
+            this.style.overflowY = 'hidden'; // Hide scrollbar if not needed
+        }
+        this.style.height = newHeight + 'px';
         chatSendMessageBtn.disabled = this.value.trim().length === 0;
     }
     
+    chatPromptInput.addEventListener('input', autoResizeTextarea);
+
+
     async function fetchUpdates() {
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
-            if (tg && Object.keys(tg).length > 0 && tg.initDataUnsafe === undefined) {
-                 logger.warn("fetchUpdates: tg.initDataUnsafe is undefined. Polling skipped.");
-            } else if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user === undefined) {
-                 logger.warn("fetchUpdates: tg.initDataUnsafe.user is undefined. Polling skipped.");
-            } else if (!tg || Object.keys(tg).length === 0) {
-                 logger.warn("fetchUpdates: Telegram WebApp object (tg) is undefined or empty. Polling skipped.");
-            } else {
-                 logger.warn("fetchUpdates: Telegram User ID not found for other reasons. Polling skipped.");
-            }
+             logger.warn("fetchUpdates: Telegram User ID not found. Polling skipped.");
             return; 
         }
         if (!chatScreen.classList.contains('active')) { 
@@ -826,15 +832,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (type === 'agent') {
                     selectedAgentKey = item.key;
                      const agentForChat = agents.find(a => a.key === item.key);
-                     openChat(agentForChat); // This will also handle model selection if agent forces one
+                     openChat(agentForChat); 
                 } else if (type === 'model') {
-                    selectedModelKey = item.key; // Update selectedModelKey
-                    // If an agent is already selected, open chat with this new model
+                    selectedModelKey = item.key; 
                     const currentAgent = agents.find(a => a.key === selectedAgentKey);
                     if (currentAgent) {
-                        openChat(currentAgent); // Re-open chat to reflect new model choice
+                        openChat(currentAgent); 
                     } else {
-                        // Or, if no agent is active, maybe just note the selection for next chat
                         logger.info("Model selected, but no active agent. Will be used for next chat.");
                         if(tg.showPopup) tg.showPopup({message: `Модель ${item.name} выбрана.`});
                     }
@@ -906,15 +910,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let userFriendlyDisplayError = `Ошибка API изображений: ${response.status} ${response.statusText}`;
                 if (response.status === 401) { 
-                    userFriendlyDisplayError = "Ошибка аутентификации (401) при доступе к API изображений. Возможно, проблема с ключом API или разрешениями.";
-                     if (errorDetailMessage && !errorDetailMessage.toLowerCase().includes("<html")) { 
-                        userFriendlyDisplayError += ` Детали: ${errorDetailMessage.substring(0,100)}`;
-                    }
+                    userFriendlyDisplayError = "Ошибка аутентификации (401) при доступе к API изображений.";
                 } else if (errorDetailMessage && !errorDetailMessage.toLowerCase().includes("<html")) { 
                      userFriendlyDisplayError = `Ошибка API изображений (${response.status}): ${errorDetailMessage.substring(0, 200)}${errorDetailMessage.length > 200 ? '...' : ''}`;
                 }
                 
-                console.error("Imagen API HTTP Error:", response.status, response.statusText, "Detail from response:", errorDetailMessage);
+                console.error("Imagen API HTTP Error:", response.status, response.statusText, "Detail:", errorDetailMessage);
                 imageErrorMessage.textContent = userFriendlyDisplayError;
                 imageErrorMessage.style.display = 'block';
                 return; 
@@ -953,16 +954,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 imageErrorMessage.style.display = 'block';
             } else { 
                 console.warn("Unexpected Imagen API success response structure:", result);
-                imageErrorMessage.textContent = "Не удалось сгенерировать изображение. Неожиданный ответ от сервера.";
+                imageErrorMessage.textContent = "Не удалось сгенерировать изображение.";
                 imageErrorMessage.style.display = 'block';
             }
         } catch (error) { 
             console.error("Error in handleGenerateImage (catch block):", error);
-            if (error instanceof SyntaxError) { 
-                imageErrorMessage.textContent = "Ошибка ответа от сервера изображений (неверный формат). Попробуйте позже.";
-            } else {
-                imageErrorMessage.textContent = "Ошибка сети при генерации изображения или обработке ответа.";
-            }
+            imageErrorMessage.textContent = "Ошибка сети при генерации изображения.";
             imageErrorMessage.style.display = 'block';
         } finally {
             imageLoadingIndicator.style.display = 'none';
@@ -990,10 +987,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prompt = `Сделай краткое содержание следующего текста:\n\n${textToSummarize}`;
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-        // Use the currently selected model for summarization, or a default one if needed
         const modelToUseForSummarizer = selectedModelKey || models[0].key;
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUseForSummarizer}:generateContent?key=${API_KEY}`;
-        logger.info(`Summarizer: Calling API directly at ${apiUrl.split('?key=')[0]} using model ${modelToUseForSummarizer}...`);
+        logger.info(`Summarizer: Calling API using model ${modelToUseForSummarizer}...`);
 
 
         try {
@@ -1007,14 +1003,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 let userFriendlyError = `Ошибка API суммаризации: ${response.status} ${response.statusText}`;
                 try {
                     const errorResult = await response.json();
-                    if (errorResult && errorResult.error && errorResult.error.message) {
-                        errorDetail = errorResult.error.message;
-                    }
-                } catch (e) {
-                    try { errorDetail = await response.text(); } catch (textErr) { /* ignore */ }
-                }
+                     errorDetail = errorResult?.error?.message || "";
+                } catch (e) { /* ignore */ }
+
                 if (response.status === 401) {
-                    userFriendlyError = "Ошибка аутентификации (401) при доступе к API суммаризации.";
+                    userFriendlyError = "Ошибка аутентификации (401) API суммаризации.";
                 } else if (errorDetail && !errorDetail.toLowerCase().includes("<html")) {
                     userFriendlyError = `Ошибка API суммаризации (${response.status}): ${errorDetail.substring(0,100)}`;
                 }
@@ -1024,9 +1017,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const result = await response.json();
-            if (result.candidates && result.candidates.length > 0 &&
-                result.candidates[0].content && result.candidates[0].content.parts &&
-                result.candidates[0].content.parts.length > 0) {
+            if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
                 summarizerOutput.textContent = result.candidates[0].content.parts[0].text;
                 summarizerOutput.style.display = 'block';
             } else if (result.error) {
@@ -1036,13 +1027,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             else {
                 console.warn("Unexpected Summarizer API response structure:", result);
-                summarizerErrorMessage.textContent = "Не удалось суммировать текст. Неожиданный ответ от сервера.";
+                summarizerErrorMessage.textContent = "Не удалось суммировать текст.";
                 summarizerErrorMessage.style.display = 'block';
             }
         } catch (error) {
             console.error("Error calling Summarizer API (catch):", error);
-             if (error instanceof SyntaxError) { summarizerErrorMessage.textContent = "Ошибка ответа от сервера суммаризации (неверный формат). Попробуйте позже.";}
-             else { summarizerErrorMessage.textContent = "Ошибка сети при суммировании текста.";}
+            summarizerErrorMessage.textContent = "Ошибка сети при суммировании текста.";
             summarizerErrorMessage.style.display = 'block';
         } finally {
             summarizerLoadingIndicator.style.display = 'none';
@@ -1090,19 +1080,19 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedAgentKey = agent.key;
         chatTitle.textContent = agent.name;
         
-        // Check if this agent forces a specific model
-        const backendAgentConfig = AI_MODES.find(a => a.key === agent.key); // Assuming AI_MODES is available or fetched
+        const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a => a.key === agent.key); 
         if (backendAgentConfig && backendAgentConfig.forced_model_key) {
             selectedModelKey = backendAgentConfig.forced_model_key;
             logger.info(`Agent ${agent.name} forces model to ${selectedModelKey}.`);
-        } // Else, the globally selectedModelKey (from carousel or default) will be used.
+        }
 
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
         
         loadChatFromLocalStorage(); 
         if (chatMessagesContainer.children.length === 0) { 
-            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь? (Модель: ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey})`);
+            const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
+            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь? (Модель: ${modelForDisplay})`);
         }
         switchScreen(chatScreen); 
     }
@@ -1132,18 +1122,17 @@ document.addEventListener('DOMContentLoaded', () => {
         displayProfileData();
 
         agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key))); // Use updated models list
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key))); 
 
         document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
         
         chatSendMessageBtn.addEventListener('click', handleSendMessage);
         chatPromptInput.addEventListener('keydown', (e) => { 
-            if (e.key === 'Enter' && !chatSendMessageBtn.disabled) { 
+            if (e.key === 'Enter' && !e.shiftKey && !chatSendMessageBtn.disabled) { 
                 e.preventDefault(); 
                 handleSendMessage(); 
             } 
         });
-        chatPromptInput.addEventListener('input', handleChatInput);
 
         chatBackButton?.addEventListener('click', closeChat);
         chatSettingsBtn?.addEventListener('click', openSettingsModal);
@@ -1155,47 +1144,41 @@ document.addEventListener('DOMContentLoaded', () => {
             const agent = agents.find(a=> a.key === selectedAgentKey);
             if(agent) {
                 chatTitle.textContent = agent.name;
-                 // Check if this newly selected agent forces a model
-                const backendAgentConfig = AI_MODES.find(a_cfg => a_cfg.key === agent.key); // Assuming AI_MODES is available
+                const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a_cfg => a_cfg.key === agent.key);
                 if (backendAgentConfig && backendAgentConfig.forced_model_key) {
                     selectedModelKey = backendAgentConfig.forced_model_key;
-                    modelSelect.value = selectedModelKey; // Update dropdown
+                    modelSelect.value = selectedModelKey; 
                     logger.info(`Agent ${agent.name} selected, forces model to ${selectedModelKey}.`);
                 }
             }
             loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agent) { 
-                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь? (Модель: ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey})`);
+                 const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
+                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь? (Модель: ${modelForDisplay})`);
             }
         });
         modelSelect.addEventListener('change', (e) => { 
             selectedModelKey = e.target.value; 
             logger.info(`Model changed to ${selectedModelKey} via dropdown.`);
-            // If a chat is active, reflect this change, perhaps by re-sending the welcome or just noting it.
             const currentAgent = agents.find(a => a.key === selectedAgentKey);
              if (chatScreen.classList.contains('active') && currentAgent) {
-                addMessageToChat('bot', `Модель изменена на ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey}.`);
+                 const modelForDisplay = models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey;
+                addMessageToChat('bot', `Модель изменена на ${modelForDisplay}.`);
              }
         });
 
-        handleChatInput.call(chatPromptInput); 
+        autoResizeTextarea.call(chatPromptInput); 
         showTab('home');
         if (tg.BackButton) tg.BackButton.hide();
 
-        // Log initial selected agent and model
         logger.info(`Initial selected agent: ${selectedAgentKey}`);
         logger.info(`Initial selected model: ${selectedModelKey}`);
-
     }
 
-    // Make AI_MODES from backend available to frontend logic if needed for forced_model_key checks
-    // This is a simplified approach. A better way would be to fetch this from backend or embed.
-    const AI_MODES = [ // This should ideally match your backend's AI_MODES structure for forced_model_key logic
+    const AI_MODES_FRONTEND_MIRROR = [ 
         { key: "universal_ai_basic", name: "Универсал", forced_model_key: null },
         { key: "photo_dietitian_analyzer", name: "🥑 Диетолог (анализ фото)", forced_model_key: "google_gemini_2_5_flash_preview" },
-        // Add other agents if they have forced_model_key
     ];
-
 
     init();
 });
