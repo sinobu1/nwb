@@ -1098,56 +1098,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleSendMessage() {
         const text = chatPromptInput.value.trim();
-        let imageToSendBase64 = selectedFileBase64; 
-        let mimeTypeToSend = selectedFileMimeType;
-        let imageDataUrlForUi = null;
+        let imageBase64ForBackend = null; 
+        let mimeTypeForBackend = null;   
+        let imageDataUrlForUi = null;    
 
-        if (imageToSendBase64 && mimeTypeToSend) {
-            imageDataUrlForUi = `data:${mimeTypeToSend};base64,${imageToSendBase64}`;
+        if (selectedFileBase64 && selectedFileMimeType) { 
+            imageBase64ForBackend = selectedFileBase64;
+            mimeTypeForBackend = selectedFileMimeType;
+            imageDataUrlForUi = `data:${mimeTypeForBackend};base64,${imageBase64ForBackend}`;
+            if (selectedAgentKey === "photo_dietitian_analyzer") {
+                pendingDietitianImage = { 
+                    base64: imageBase64ForBackend,
+                    mimeType: mimeTypeForBackend,
+                };
+            }
+        } else if (selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage) {
+            imageBase64ForBackend = pendingDietitianImage.base64;
+            mimeTypeForBackend = pendingDietitianImage.mimeType;
         }
 
-        if (!text && !imageToSendBase64 && selectedAgentKey !== "photo_dietitian_analyzer") {
-            return; 
-        }
-        if (!text && !imageToSendBase64 && selectedAgentKey === "photo_dietitian_analyzer" && !pendingDietitianImage) {
-             tg.showAlert("Пожалуйста, прикрепите фото или введите текстовый запрос для Диетолога.");
+        if (!text && !imageBase64ForBackend) {
+            if (selectedAgentKey === "photo_dietitian_analyzer") {
+                 tg.showAlert("Диетолог: Пожалуйста, прикрепите фото или введите текстовый запрос.");
+            }
             return;
         }
-
+        
+        let messageContentForChat = { text: text };
+        if (imageDataUrlForUi) { 
+             messageContentForChat.imageDataUrl = imageDataUrlForUi;
+        }
+        addMessageToChat('user', messageContentForChat);
+        
         let agentKeyForBackend = selectedAgentKey;
         let modelKeyForBackend = selectedModelKey; 
-
         if (selectedAgentKey === "photo_dietitian_analyzer") {
             const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
             if (dietitianConfig?.forced_model_key) {
                 modelKeyForBackend = dietitianConfig.forced_model_key;
             }
-
-            if (imageToSendBase64) { 
-                pendingDietitianImage = { 
-                    base64: imageToSendBase64, 
-                    mimeType: mimeTypeToSend,
-                    dataUrl: imageDataUrlForUi 
-                };
-            } else if (pendingDietitianImage) { 
-                imageToSendBase64 = pendingDietitianImage.base64; 
-                mimeTypeToSend = pendingDietitianImage.mimeType;
-                imageDataUrlForUi = null; // Don't re-show image in user's weight message bubble
-            } else if (!text) { 
-                 tg.showAlert("Диетолог: Пожалуйста, прикрепите фото или введите текстовый запрос.");
-                return;
-            }
         }
-        
-        let messageContentForChat = { text: text };
-        if (imageDataUrlForUi) { // Only add image to UI if it's a *new* image being sent with this action
-             messageContentForChat.imageDataUrl = imageDataUrlForUi;
-        }
-        
-        addMessageToChat('user', messageContentForChat);
-        
-        const finalImageBase64 = imageToSendBase64;
-        const finalMimeType = mimeTypeToSend;
 
         chatPromptInput.value = ''; 
         autoResizeTextarea.call(chatPromptInput); 
@@ -1157,19 +1147,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         chatSendMessageBtn.disabled = true; 
+        autoResizeTextarea.call(chatPromptInput); 
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true }); 
         
-        await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, finalImageBase64, finalMimeType);
+        await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, imageBase64ForBackend, mimeTypeForBackend);
 
-        if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && finalImageBase64 === pendingDietitianImage.base64 ) {
-            // If text (weight) was sent and it used the pending image, clear pending image.
-            // This check ensures we only clear it after the *second* step (weight submission).
-            // The `!imageToSendBase64` before was problematic because imageToSendBase64 was reassigned.
-            // The reliable check is if `text` is present (meaning this is likely the weight message) AND `pendingDietitianImage` was used.
-             logger.info("Dietitian: Weight/comment processed with pending image. Clearing pending image.");
+        // Clear pendingDietitianImage only if text was sent *after* an image was already pending (i.e., this was the weight/comment submission)
+        // And NOT if a new image was just sent (because that sets a new pending image)
+        if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && !selectedFileBase64 && imageBase64ForBackend === pendingDietitianImage.base64) {
+            logger.info("Dietitian: Text (weight/comment) processed with pending image. Clearing pending image.");
             pendingDietitianImage = null;
         }
     }
@@ -1216,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedFileMimeType = file.type;
                 displayImagePreview(e.target.result, file.name);
                 chatSendMessageBtn.disabled = false; 
-                autoResizeTextarea.call(chatPromptInput); // Re-evaluate send button state
+                autoResizeTextarea.call(chatPromptInput); 
             };
             reader.onerror = () => { tg.showAlert("Не удалось прочитать файл."); clearImagePreview(); };
             reader.readAsDataURL(file);
@@ -1238,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedFileBase64 = null; selectedFileMimeType = null;
         imagePreviewContainer.innerHTML = ''; imagePreviewContainer.style.display = 'none';
         chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage); 
-        autoResizeTextarea.call(chatPromptInput); // Re-evaluate send button state
+        autoResizeTextarea.call(chatPromptInput); 
     }
 
     async function fetchUpdates() {
@@ -1353,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedAgentKey = config.key; 
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
-        pendingDietitianImage = null; // Reset pending image when opening any chat
+        pendingDietitianImage = null; 
 
         if (config.key === "photo_dietitian_analyzer") { 
             chatScreen.classList.add('dietitian-chat-active'); 
@@ -1399,7 +1388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeChat() { 
         stopPolling();
         clearImagePreview();
-        pendingDietitianImage = null; // Clear pending dietitian image on chat close
+        pendingDietitianImage = null; 
         switchScreen(mainScreen); 
      }
     function openSettingsModal() { 
@@ -1469,7 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatModelNameEl.style.display = 'block';
                 chatSettingsBtn.style.display = 'flex';
                 chatAttachFileBtn.style.display = 'none';
-                pendingDietitianImage = null; // Clear dietitian pending image
+                pendingDietitianImage = null; 
 
                 clearImagePreview();
                 loadChatFromLocalStorage(); 
