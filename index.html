@@ -26,25 +26,27 @@
             --error-red: #F44336;
             --ios-tab-bar-bg: rgba(28, 28, 30, 0.85); /* Semi-transparent dark for tab bar */
         }
-        html, body {
-            position: fixed;
-            inset: 0;
-            overflow: hidden;
+        html {
+            height: 100%; /* Ensure html takes full viewport height */
+        }
+        body {
+            height: 100%; /* Ensure body takes full html height */
+            overflow: hidden; /* Prevent body scrollbars */
             font-family: var(--font-family);
             background-color: var(--bg-main);
             color: var(--text-primary);
             display: flex;
             justify-content: center;
-            overscroll-behavior-y: contain;
+            overscroll-behavior-y: contain; /* Keep this to prevent pull-to-refresh type behaviors */
             margin: 0;
             padding: 0;
         }
         .app-wrapper {
             width: 100%;
             max-width: 450px; 
-            height: 100%;
-            position: relative;
-            overflow: hidden;
+            height: 100%; /* Takes full height of the body */
+            position: relative; /* For absolute positioning of screens */
+            overflow: hidden; /* Clip content of screens */
             display: flex;
             flex-direction: column;
             border-left: 1px solid var(--app-wrapper-border); 
@@ -59,7 +61,7 @@
             background-color: var(--bg-main);
             z-index: 10;
             will-change: opacity, visibility;
-            padding-bottom: env(safe-area-inset-bottom); /* Add padding for iPhone X notch area */
+            padding-bottom: env(safe-area-inset-bottom); 
         }
         .screen.active { z-index: 20; opacity: 1; visibility: visible; }
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -143,7 +145,6 @@
             display: flex;
             border-radius: 16px; 
             padding: 0.3rem; 
-            /* border: 1px solid var(--border-color); Removed border for a more native iOS feel */
             background-color: var(--ios-tab-bar-bg); 
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -166,7 +167,7 @@
         }
         .tab-item.active { 
             color: var(--gold-highlight); 
-            background-color: rgba(80, 80, 80, 0.5); /* Darker, more distinct active background */
+            background-color: rgba(80, 80, 80, 0.5); 
         }
         .tab-item:not(.active):hover {
             background-color: rgba(255, 255, 255, 0.05); 
@@ -221,20 +222,20 @@
         
         .chat-input-area { 
             flex-shrink: 0; 
-            padding: 0.75rem; /* Increased padding for a bit more space */
-            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); /* Add safe area padding to bottom */
+            padding: 0.75rem; 
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom)); 
             border-top: 1px solid var(--border-color); 
             background-color: var(--bg-main); 
             display: flex;
             align-items: flex-end; 
-            gap: 0.75rem; /* Increased gap slightly */
+            gap: 0.75rem; 
             z-index: 15; 
         }
         #chat-prompt-input { 
             flex-grow: 1; 
             background-color: var(--bg-card);
-            border-radius: 20px; /* More rounded */
-            padding: 0.65rem 1rem; /* Adjusted padding */
+            border-radius: 20px; 
+            padding: 0.65rem 1rem; 
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             font-size: 0.95rem; 
@@ -251,18 +252,18 @@
         }
         #chat-send-message-btn { 
             flex-shrink: 0; 
-            padding: 0.65rem 1rem; /* Padding for text button */
+            padding: 0.65rem 1rem; 
             background-color: var(--gold-highlight);
             color: black;
             border: none;
-            border-radius: 20px; /* Rounded to match input */
+            border-radius: 20px; 
             font-size: 0.95rem; 
             font-weight: 500; 
             cursor: pointer;
             transition: background-color 0.2s;
             text-align: center;
-            height: 40px; /* Match input height */
-            line-height: 1; /* Ensure text is centered vertically */
+            height: 40px; 
+            line-height: 1; 
         }
         #chat-send-message-btn:disabled {
             background-color: var(--text-secondary);
@@ -1183,4 +1184,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </body>
-</html>
+</html>" in the Canv
