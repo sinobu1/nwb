@@ -87,7 +87,7 @@
             position: sticky; 
             top: 0;
             flex-shrink: 0;
-            min-height: 56px; /* Ensure header has a minimum height for two lines */
+            min-height: 56px; 
         }
         .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } 
         .fixed-header .back-btn {
@@ -111,12 +111,38 @@
 
 
         .swiper-container-wrapper { margin-top: 0.75rem; flex-shrink: 0; } 
-        .swiper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.25rem; }
+        .swiper-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 0.75rem; 
+            padding: 0 0.25rem; 
+        }
+        .swiper-header h2 { /* Increased font size for carousel titles */
+            font-size: 1.4rem; 
+            font-weight: 700;
+        }
         .swiper-nav-arrows { display: flex; gap: 0.5rem; }
-        .swiper-nav-arrow { width: 32px; height: 32px; background-color: var(--bg-card); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity 0.2s, transform 0.1s; color: var(--text-secondary); }
+        .swiper-nav-arrow { 
+            width: 36px; /* Increased size */
+            height: 36px; /* Increased size */
+            background-color: var(--bg-card); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            transition: opacity 0.2s, transform 0.1s; 
+            color: var(--text-secondary); 
+        }
+        .swiper-nav-arrow svg { /* Adjust SVG size if needed */
+            width: 18px;
+            height: 18px;
+        }
         .swiper-nav-arrow:hover { color: var(--text-primary); }
         .swiper-nav-arrow:active { transform: scale(0.9); }
         .swiper-nav-arrow.disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        
         .swiper-slide { width: 180px; height: 120px; cursor: pointer; }
         .tg-card { border-radius: 16px; overflow: hidden; height: 100%; }
         .carousel-card { height: 100%; display: flex; flex-direction: column; justify-content: space-between; padding: 0.75rem; text-align: left; }
@@ -124,12 +150,17 @@
         .card-title { font-size: 0.9rem; font-weight: 600; color: #FFFFFF; }
         .card-description { font-size: 0.75rem; color: #FFFFFF; opacity: 0.80; margin-top: 0.1rem; line-height: 1.2; }
 
-        .palette-1 { background: linear-gradient(45deg, #FF416C, #FF4B2B); }
-        .palette-2 { background: linear-gradient(45deg, #12C2E9, #C471ED, #F64F59); }
-        .palette-3 { background: linear-gradient(45deg, #00C9FF, #92FE9D); }
-        .palette-4 { background: linear-gradient(45deg, #FAD961, #F76B1C); }
-        .palette-5 { background: linear-gradient(45deg, #4A00E0, #8E2DE2); }
-        .palette-6 { background-color: #2D2D2D; }
+        /* New Gradient Palettes */
+        .palette-grad-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .palette-grad-2 { background: linear-gradient(135deg, #ff8c00 0%, #ff0080 100%); }
+        .palette-grad-3 { background: linear-gradient(135deg, #20bf55 0%, #01baef 100%); }
+        .palette-grad-4 { background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); }
+        .palette-grad-5 { background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); }
+        .palette-grad-6 { background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%); }
+        .palette-grad-7 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .palette-grad-8 { background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%); }
+        .palette-grad-default { background-color: #2D2D2D; } /* Fallback */
+
 
         .full-screen-card-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
         .full-screen-card { background-color: var(--bg-card); border-radius: 16px; padding: 1rem; display: flex; align-items: center; gap: 1rem; cursor: pointer; transition: transform 0.1s; }
@@ -201,32 +232,39 @@
         #chat-screen { display: flex; flex-direction: column; }
 
         #chat-screen .chat-header { 
-            /* Styles from .fixed-header are inherited */
-            /* Additional alignment for two-line title */
-            justify-content: space-between; /* Distribute space for back, title, settings */
+            justify-content: space-between; 
         }
         .chat-title-container {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Center title block horizontally */
-            justify-content: center; /* Center title block vertically */
+            align-items: center; 
+            justify-content: center; 
             text-align: center;
-            padding: 0 0.5rem; /* Add some padding if back/settings buttons are too close */
+            padding: 0 0.5rem; 
+            overflow: hidden; /* Prevent long names from breaking layout */
         }
         #chat-agent-name {
-            font-size: 1.0rem; /* Slightly smaller for agent name */
+            font-size: 1.0rem; 
             font-weight: 600;
             color: var(--text-primary);
             line-height: 1.2;
-            display: block; /* Ensure it takes its own line */
+            display: block; 
+            white-space: nowrap; /* Prevent agent name from wrapping */
+            overflow: hidden;
+            text-overflow: ellipsis; /* Add ellipsis for long agent names */
+            max-width: 100%; /* Ensure it doesn't overflow its container */
         }
         #chat-model-name {
-            font-size: 0.75rem; /* Smaller for model name */
+            font-size: 0.75rem; 
             font-weight: 400;
             color: var(--text-secondary);
             line-height: 1.1;
-            display: block; /* Ensure it takes its own line */
+            display: block; 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
 
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); flex-shrink: 0; }
@@ -392,11 +430,16 @@
                         <div class="icon" style="font-size: 2rem;">🎨</div>
                         <div class="info"><h3>Генератор изображений ✨</h3><p>Создание картинок по описанию.</p></div>
                     </div>
+                    <div class="full-screen-card" id="dietitian-agent-card">
+                        <div class="icon" style="font-size: 2rem;">🥑</div>
+                        <div class="info"><h3>Диетолог (анализ фото)</h3><p>Анализ КБЖУ по фото блюда.</p></div>
+                    </div>
+
                     <div class="swiper-container-wrapper">
-                        <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
+                        <div class="swiper-header"><h2>Агенты</h2><div class="swiper-nav-arrows"><div id="agents-nav-prev" class="swiper-nav-arrow"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="agents-nav-next" class="swiper-nav-arrow"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
                         <div class="swiper" id="agents-swiper"><div class="swiper-wrapper" id="agents-swiper-wrapper"></div></div>
                     </div>
-                    <div class="swiper-container-wrapper"> <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="16" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
+                    <div class="swiper-container-wrapper"> <div class="swiper-header"><h2>Модели</h2><div class="swiper-nav-arrows"><div id="models-nav-prev" class="swiper-nav-arrow"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M10 13L5 8L10 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div id="models-nav-next" class="swiper-nav-arrow"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M6 13L11 8L6 3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div>
                         <div class="swiper" id="models-swiper"><div class="swiper-wrapper" id="models-swiper-wrapper"></div></div>
                     </div>
                 </div>
@@ -534,22 +577,26 @@ document.addEventListener('DOMContentLoaded', () => {
         debug: (message, ...optionalParams) => console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...optionalParams),
     };
 
+    // --- START: Updated Agents and Models Definitions ---
     const agents = [ 
-        { key: "universal_ai_basic", name: "Универсал", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, 
-        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
-        { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
-        { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
-        { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
+        { key: "universal_ai_basic", name: "Универсальный", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-grad-1", systemPrompt: "Ты — полезный ИИ-ассистент." }, 
+        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-grad-2", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
+        { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", palette: "palette-grad-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
+        { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
+        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
+        { key: "gemini_pro_custom_mode", name: "Продвинутый (Gemini Pro)", icon: "💎", desc: "Мощный ИИ-ассистент", palette: "palette-grad-7", systemPrompt: "Ты — Gemini 2.5 Pro, мощный и продвинутый ИИ-ассистент."}
     ];
 
     const models = [ 
-        { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
-        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-2" },
-        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro (Custom)", icon: "🚀", desc: "Продвинутая модель", palette: "palette-4" },
-        { key: "custom_api_grok_3", name: "Grok 3 (Custom)", icon: "🌀", desc: "Модель Grok", palette: "palette-5" },
-        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini (Custom)", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-3" }
+        { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-grad-default" },
+        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-grad-1" },
+        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro", icon: "🚀", desc: "Продвинутая модель", palette: "palette-grad-2" }, 
+        { key: "custom_api_grok_3", name: "Grok 3", icon: "🌀", desc: "Модель Grok", palette: "palette-grad-3" },
+        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-grad-4" }
     ];
+    // --- END: Updated Agents and Models Definitions ---
+
 
     const tools = [
         { key: "summarizer", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
@@ -564,12 +611,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatScreen = document.getElementById('chat-screen');
     const imageGeneratorScreen = document.getElementById('image-generator-screen');
     const summarizerScreen = document.getElementById('summarizer-screen');
+    const dietitianAgentCard = document.getElementById('dietitian-agent-card'); // Dietitian card
 
     const chatMessagesContainer = document.getElementById('chat-messages-container');
     const chatPromptInput = document.getElementById('chat-prompt-input'); 
     const chatSendMessageBtn = document.getElementById('chat-send-message-btn'); 
 
-    // Updated chat title elements
     const chatAgentNameEl = document.getElementById('chat-agent-name');
     const chatModelNameEl = document.getElementById('chat-model-name');
 
@@ -894,7 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
         items.forEach(item => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
-            slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette || 'palette-6'}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
+            slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette || 'palette-grad-default'}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
             slide.addEventListener('click', () => {
                 if (type === 'agent') {
                     selectedAgentKey = item.key;
@@ -937,6 +984,34 @@ document.addEventListener('DOMContentLoaded', () => {
     imageGeneratorCard?.addEventListener('click', () => {
         switchScreen(imageGeneratorScreen);
     });
+
+    // Click handler for Dietitian card
+    dietitianAgentCard?.addEventListener('click', () => {
+        const dietitianAgent = agents.find(a => a.key === "photo_dietitian_analyzer"); // Assuming this key exists in your updated agents array
+        if (dietitianAgent) {
+            openChat(dietitianAgent);
+        } else {
+            // Fallback or open a specific screen if it's not a generic chat agent
+            // For now, let's assume it should open a chat. If it has a dedicated screen:
+            // switchScreen(document.getElementById('dietitian-screen')); // if you create such a screen
+            logger.warn("Dietitian agent config not found for card click, or it's not meant for generic chat.");
+            // If photo_dietitian_analyzer is added to the main 'agents' array for the carousel, this specific card handler might be redundant
+            // unless you want a different behavior for this specific card.
+            // For now, we'll try to open it as a chat agent.
+            const agentToOpen = AI_MODES_FRONTEND_MIRROR.find(a => a.key === "photo_dietitian_analyzer");
+            if (agentToOpen) {
+                 const agentConfigForChat = { // Create a minimal config for openChat
+                    key: agentToOpen.key,
+                    name: agentToOpen.name,
+                    // icon and desc can be added if needed for chat title or other UI elements in chat
+                };
+                openChat(agentConfigForChat);
+            } else {
+                 if(tg.showAlert) tg.showAlert('Агент "Диетолог" не настроен для чата.');
+            }
+        }
+    });
+
 
     async function handleGenerateImage() {
         const prompt = imagePromptInputEl.value.trim(); 
@@ -1145,7 +1220,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openChat(agent) {
         selectedAgentKey = agent.key;
-        // Update chat header with agent and model names
         if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name;
         
         const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a => a.key === agent.key); 
@@ -1153,11 +1227,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (backendAgentConfig && backendAgentConfig.forced_model_key) {
             selectedModelKey = backendAgentConfig.forced_model_key;
-            currentModelName = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Update model name if forced
+            currentModelName = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey;
             logger.info(`Agent ${agent.name} forces model to ${selectedModelKey}.`);
         }
         if (chatModelNameEl) chatModelNameEl.textContent = currentModelName;
-
 
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
@@ -1178,14 +1251,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function viewportChangedHandler() {
         logger.debug(`Viewport changed. Current: ${tg.WebApp.viewportHeight}px, Stable: ${tg.WebApp.viewportStableHeight}px, IsStable: ${tg.WebApp.isStateStable}`);
-        // No direct height manipulation of .app-wrapper, relying on CSS 100% height and viewport units.
-        // This handler now primarily ensures chat scrolls to bottom when viewport is stable.
         if (tg.WebApp.isStateStable && document.getElementById('chat-screen').classList.contains('active')) {
             const chatMessagesContainer = document.getElementById('chat-messages-container');
             setTimeout(() => {
                 chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
                  logger.debug("Chat scrolled to bottom after viewport stable.");
-            }, 50); // Short delay to ensure layout is final
+            }, 50); 
         }
     }
 
@@ -1200,12 +1271,10 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.info("Viewport changed event listener attached.");
         }
         
-        // Call viewportChangedHandler once initially after a short delay
-        // to allow Telegram WebApp to settle its viewport properties.
         setTimeout(() => {
             viewportChangedHandler();
             logger.info(`Initial call to viewportChangedHandler. Stable: ${tg.WebApp.viewportStableHeight}, Current: ${tg.WebApp.viewportHeight}`);
-        }, 200); // Increased delay slightly
+        }, 200); 
 
 
         populateCarousel('agents-swiper-wrapper', agents, 'agent');
@@ -1242,17 +1311,17 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedAgentKey = e.target.value;
             const agent = agents.find(a=> a.key === selectedAgentKey);
             if(agent) {
-                if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name; // Update agent name in header
+                if (chatAgentNameEl) chatAgentNameEl.textContent = agent.name; 
                 const backendAgentConfig = AI_MODES_FRONTEND_MIRROR.find(a_cfg => a_cfg.key === agent.key);
-                let modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Default to current model
+                let modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; 
 
                 if (backendAgentConfig && backendAgentConfig.forced_model_key) {
                     selectedModelKey = backendAgentConfig.forced_model_key;
                     modelSelect.value = selectedModelKey; 
-                    modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; // Update if forced
+                    modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey; 
                     logger.info(`Agent ${agent.name} selected, forces model to ${selectedModelKey}.`);
                 }
-                 if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; // Update model name in header
+                 if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; 
             }
             loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agent) { 
@@ -1262,7 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modelSelect.addEventListener('change', (e) => { 
             selectedModelKey = e.target.value; 
             const modelNameToDisplay = models.find(m => m.key === selectedModelKey)?.name || selectedModelKey;
-            if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; // Update model name in header
+            if (chatModelNameEl) chatModelNameEl.textContent = modelNameToDisplay; 
             logger.info(`Model changed to ${selectedModelKey} via dropdown.`);
             
             const currentAgent = agents.find(a => a.key === selectedAgentKey);
@@ -1280,8 +1349,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const AI_MODES_FRONTEND_MIRROR = [ 
-        { key: "universal_ai_basic", name: "Универсал", forced_model_key: null },
+        { key: "universal_ai_basic", name: "Универсальный", forced_model_key: null }, // Matched name
+        { key: "idea_generator", name: "Генератор идей", forced_model_key: null },
+        { key: "career_coach", name: "Карьерный консультант", forced_model_key: null },
+        { key: "programming_partner", name: "Партнер программиста", forced_model_key: null },
+        { key: "tutor_assistant", name: "Внешкольный наставник", forced_model_key: null },
+        { key: "literary_editor", name: "Литературный редактор", forced_model_key: null },
         { key: "photo_dietitian_analyzer", name: "🥑 Диетолог (анализ фото)", forced_model_key: "google_gemini_2_5_flash_preview" },
+        { key: "gemini_pro_custom_mode", name: "Продвинутый (Gemini Pro)", forced_model_key: "custom_api_gemini_2_5_pro" } // Added this agent
     ];
 
     init();
