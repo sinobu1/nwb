@@ -469,14 +469,27 @@ document.addEventListener('DOMContentLoaded', () => {
         debug: (message, ...optionalParams) => console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...optionalParams),
     };
 
-
-    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "�", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
-    const models = [ 
-        { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
-        { key: "gemini-pro-vision", name: "Gemini Pro Vision", icon: "👁️‍🗨️", desc: "Анализ изображений", palette: "palette-2" },
-        { key: "claude-3-opus", name: "Claude 3 Opus", icon: "📚", desc: "Мощный и вдумчивый", palette: "palette-4" },
-        { key: "llama-3-70b", name: "Llama 3 (70B)", icon: "🦙", desc: "Открытая модель", palette: "palette-3" }
+    // --- START: Updated Agents and Models to match backend config ---
+    const agents = [ 
+        { key: "universal_ai_basic", name: "Универсал", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, 
+        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
+        { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
+        { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
+        { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
+        { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." },
+        // photo_dietitian_analyzer is primarily for photo analysis via main bot, might not be ideal for generic chat here.
+        // gemini_pro_custom_mode is an advanced agent, can be included if desired.
     ];
+
+    const models = [ 
+        { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
+        { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый, с Vision", palette: "palette-2" }, // Note: Vision capabilities are used by specific agents in the main bot.
+        { key: "custom_api_gemini_2_5_pro", name: "Gemini Pro (Custom)", icon: "🚀", desc: "Продвинутая модель", palette: "palette-4" }, // Changed icon
+        { key: "custom_api_grok_3", name: "Grok 3 (Custom)", icon: "🌀", desc: "Модель Grok", palette: "palette-5" },
+        { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini (Custom)", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-3" }
+    ];
+    // --- END: Updated Agents and Models ---
+
     const tools = [
         { key: "summarizer", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео." },
         { key: "text_analyzer", name: "Анализатор текста", icon: "🔍", desc: "Анализ тональности и ключевых слов." },
@@ -484,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let selectedAgentKey = agents[0].key;
-    let selectedModelKey = models[0].key;
+    let selectedModelKey = models[0].key; // Default model key now matches a valid backend key
 
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
@@ -570,13 +583,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map(msgEl => {
                     const sender = msgEl.classList.contains('message-user') ? 'user' : 'bot';
                     const text = msgEl.querySelector('.message-content')?.textContent || '';
-                    // Attempt to find a timestamp if it was set as a data attribute, otherwise generate new
                     let timestamp = msgEl.dataset.timestamp || new Date().toISOString();
                     return { sender, text, timestamp }; 
                 });
             setTimeout(() => {
                 localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
-                 logger.info("UI Chat history saved to localStorage.");
+                 logger.info("UI Chat history saved to localStorage for agent:", selectedAgentKey);
             },0);
         }
         catch (e) { console.error("Error saving UI chat history to localStorage:", e); }
@@ -585,7 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadChatFromLocalStorage() { 
         chatMessagesContainer.innerHTML = '';
         lastMessageInfo = { sender: null, date: null };
-        currentMiniAppChatHistory = []; // Clear API history as well when loading from UI history
+        currentMiniAppChatHistory = []; 
         try {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
@@ -595,10 +607,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         isRestoredFromHistory: true, 
                         timestamp: msg.timestamp 
                     });
-                    // Rebuild API history from UI history for context
                     currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: [{text: msg.text}]});
                 });
-                logger.info("UI Chat history loaded from localStorage and API history rebuilt.");
+                logger.info("UI Chat history loaded from localStorage for agent:", selectedAgentKey);
             }
         } catch (e) {
             console.error("Error loading UI chat history from localStorage:", e);
@@ -629,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message message-${sender} tailed`;
-        msgDiv.dataset.timestamp = now.toISOString(); // Store timestamp for potential future use/sorting
+        msgDiv.dataset.timestamp = now.toISOString(); 
         const contentSpan = document.createElement('span');
         contentSpan.className = 'message-content';
         contentSpan.textContent = text;
@@ -667,16 +678,15 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessagesContainer.appendChild(msgDiv);
 
         if (!isTyping && !isRestoredFromHistory) {
-            // Add to API-formatted history (without timestamp for API call)
             currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: [{ text: text }] });
-            saveChatToLocalStorage(); // Save UI-displayable history (which now includes this new message implicitly)
+            saveChatToLocalStorage(); 
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
         return msgDiv;
     }
 
-    async function submitMessageToBackend(userText, agentKey, modelKey) {
+    async function submitMessageToBackend(userText, agentKey, modelKeyToSubmit) { // Renamed modelKey to modelKeyToSubmit
         let userId = tg.initDataUnsafe?.user?.id;
 
         if (!userId) {
@@ -695,13 +705,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const backendProcessUrl = `${APP_BACKEND_URL}/api/process_app_message/${userId}`;
-        logger.info(`Sending message to backend: ${backendProcessUrl} with agent ${agentKey}, model ${modelKey}`);
+        logger.info(`Sending message to backend: ${backendProcessUrl} with agent ${agentKey}, model ${modelKeyToSubmit}`);
 
         try {
             const response = await fetch(backendProcessUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKey })
+                body: JSON.stringify({ text: userText, agentKey: agentKey, modelKey: modelKeyToSubmit }) // Use modelKeyToSubmit
             });
 
             if (!response.ok) {
@@ -742,6 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', 'Печатает...', { isTyping: true });
 
+        // Ensure selectedModelKey is used here
         await submitMessageToBackend(text, selectedAgentKey, selectedModelKey);
     }
 
@@ -810,12 +821,24 @@ document.addEventListener('DOMContentLoaded', () => {
         items.forEach(item => {
             const slide = document.createElement('div');
             slide.className = 'swiper-slide';
-            slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
+            slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette || 'palette-6'}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
             slide.addEventListener('click', () => {
-                if (type === 'agent') selectedAgentKey = item.key;
-                else if (type === 'model') selectedModelKey = item.key;
-                const agentForChat = agents.find(a => a.key === (type === 'agent' ? item.key : selectedAgentKey));
-                openChat(agentForChat);
+                if (type === 'agent') {
+                    selectedAgentKey = item.key;
+                     const agentForChat = agents.find(a => a.key === item.key);
+                     openChat(agentForChat); // This will also handle model selection if agent forces one
+                } else if (type === 'model') {
+                    selectedModelKey = item.key; // Update selectedModelKey
+                    // If an agent is already selected, open chat with this new model
+                    const currentAgent = agents.find(a => a.key === selectedAgentKey);
+                    if (currentAgent) {
+                        openChat(currentAgent); // Re-open chat to reflect new model choice
+                    } else {
+                        // Or, if no agent is active, maybe just note the selection for next chat
+                        logger.info("Model selected, but no active agent. Will be used for next chat.");
+                        if(tg.showPopup) tg.showPopup({message: `Модель ${item.name} выбрана.`});
+                    }
+                }
             });
             wrapper.appendChild(slide);
         });
@@ -967,8 +990,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prompt = `Сделай краткое содержание следующего текста:\n\n${textToSummarize}`;
         const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${models[0].key}:generateContent?key=${API_KEY}`;
-        logger.info(`Summarizer: Calling API directly at ${apiUrl.split('?key=')[0]}...`);
+        // Use the currently selected model for summarization, or a default one if needed
+        const modelToUseForSummarizer = selectedModelKey || models[0].key;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUseForSummarizer}:generateContent?key=${API_KEY}`;
+        logger.info(`Summarizer: Calling API directly at ${apiUrl.split('?key=')[0]} using model ${modelToUseForSummarizer}...`);
 
 
         try {
@@ -1064,14 +1089,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function openChat(agent) {
         selectedAgentKey = agent.key;
         chatTitle.textContent = agent.name;
+        
+        // Check if this agent forces a specific model
+        const backendAgentConfig = AI_MODES.find(a => a.key === agent.key); // Assuming AI_MODES is available or fetched
+        if (backendAgentConfig && backendAgentConfig.forced_model_key) {
+            selectedModelKey = backendAgentConfig.forced_model_key;
+            logger.info(`Agent ${agent.name} forces model to ${selectedModelKey}.`);
+        } // Else, the globally selectedModelKey (from carousel or default) will be used.
+
         agentSelect.value = selectedAgentKey;
         modelSelect.value = selectedModelKey;
-        // currentMiniAppChatHistory is not used for API calls now when using backend
-        loadChatFromLocalStorage(); // Load UI history
+        
+        loadChatFromLocalStorage(); 
         if (chatMessagesContainer.children.length === 0) { 
-            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь?`);
+            addMessageToChat('bot', `Привет! Я ${agent.name}. Чем могу помочь? (Модель: ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey})`);
         }
-        switchScreen(chatScreen); // This will also call startPolling()
+        switchScreen(chatScreen); 
     }
 
     function closeChat() { 
@@ -1099,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         displayProfileData();
 
         agents.forEach(a => agentSelect.appendChild(new Option(`${a.icon} ${a.name}`, a.key)));
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key))); // Use updated models list
 
         document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
         
@@ -1120,18 +1153,49 @@ document.addEventListener('DOMContentLoaded', () => {
         agentSelect.addEventListener('change', (e) => {
             selectedAgentKey = e.target.value;
             const agent = agents.find(a=> a.key === selectedAgentKey);
-            if(agent) chatTitle.textContent = agent.name;
-            loadChatFromLocalStorage(); // Reload UI history for new agent
+            if(agent) {
+                chatTitle.textContent = agent.name;
+                 // Check if this newly selected agent forces a model
+                const backendAgentConfig = AI_MODES.find(a_cfg => a_cfg.key === agent.key); // Assuming AI_MODES is available
+                if (backendAgentConfig && backendAgentConfig.forced_model_key) {
+                    selectedModelKey = backendAgentConfig.forced_model_key;
+                    modelSelect.value = selectedModelKey; // Update dropdown
+                    logger.info(`Agent ${agent.name} selected, forces model to ${selectedModelKey}.`);
+                }
+            }
+            loadChatFromLocalStorage(); 
             if (chatMessagesContainer.children.length === 0 && agent) { 
-                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь?`);
+                 addMessageToChat('bot', `Агент изменен на ${agent.name}. Чем могу помочь? (Модель: ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey})`);
             }
         });
-        modelSelect.addEventListener('change', (e) => { selectedModelKey = e.target.value; });
+        modelSelect.addEventListener('change', (e) => { 
+            selectedModelKey = e.target.value; 
+            logger.info(`Model changed to ${selectedModelKey} via dropdown.`);
+            // If a chat is active, reflect this change, perhaps by re-sending the welcome or just noting it.
+            const currentAgent = agents.find(a => a.key === selectedAgentKey);
+             if (chatScreen.classList.contains('active') && currentAgent) {
+                addMessageToChat('bot', `Модель изменена на ${models.find(m=>m.key === selectedModelKey)?.name || selectedModelKey}.`);
+             }
+        });
 
         handleChatInput.call(chatPromptInput); 
         showTab('home');
         if (tg.BackButton) tg.BackButton.hide();
+
+        // Log initial selected agent and model
+        logger.info(`Initial selected agent: ${selectedAgentKey}`);
+        logger.info(`Initial selected model: ${selectedModelKey}`);
+
     }
+
+    // Make AI_MODES from backend available to frontend logic if needed for forced_model_key checks
+    // This is a simplified approach. A better way would be to fetch this from backend or embed.
+    const AI_MODES = [ // This should ideally match your backend's AI_MODES structure for forced_model_key logic
+        { key: "universal_ai_basic", name: "Универсал", forced_model_key: null },
+        { key: "photo_dietitian_analyzer", name: "🥑 Диетолог (анализ фото)", forced_model_key: "google_gemini_2_5_flash_preview" },
+        // Add other agents if they have forced_model_key
+    ];
+
 
     init();
 });
