@@ -61,14 +61,14 @@
         .screen.active { z-index: 20; opacity: 1; visibility: visible; }
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
-        #main-screen, #image-generator-screen, #summarizer-screen, #chat-screen { flex-grow: 1; } /* Ensure chat-screen also grows */
+        #main-screen, #image-generator-screen, #summarizer-screen, #chat-screen { flex-grow: 1; } 
         #main-content-area, .feature-content-area { 
             flex-grow: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             padding: 1rem;
         }
-         .fixed-header { /* Used for feature screens and now potentially chat header if it were sticky */
+         .fixed-header { 
             padding: 0.75rem 1rem;
             background: rgba(18,18,18,0.85); 
             backdrop-filter: blur(15px);
@@ -79,8 +79,8 @@
             border-bottom: 1px solid var(--border-color);
             z-index: 25; 
             color: var(--text-primary);
-            /* position: sticky; /* Removed for general fixed-header, apply specifically if needed */
-            /* top: 0; */
+            position: sticky; 
+            top: 0;
         }
         .fixed-header h1 { font-size: 1.125rem; font-weight: 600; margin: 0; flex-grow: 1; text-align: center; } 
         .fixed-header .back-btn {
@@ -168,24 +168,23 @@
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; font-size: 0.9rem;}
 
         /* Chat Screen Specific Styles */
-        #chat-screen .chat-header { /* Chat header is not sticky by default, part of screen flow */
+        #chat-screen .chat-header { 
             flex-shrink: 0;
-            /* position: sticky; top: 0; /* If chat header needs to be sticky */
         }
         .chat-header .title { font-weight: 600; font-size: 1.125rem; text-align: center; flex-grow: 1; color: var(--text-primary); margin-left: 38px; }
         .chat-header-btn { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; color: var(--text-secondary); }
         .chat-header-btn#chat-back-btn { color: var(--gold-highlight); }
         .chat-header-btn:hover { background-color: var(--bg-card); }
         
-        .chat-input-area { /* Now at the top, after header */
+        .chat-input-area { 
             flex-shrink: 0;
-            padding: 0.75rem 1rem; /* Consistent padding */
-            border-bottom: 1px solid var(--border-color); /* Separator from messages */
+            padding: 0.75rem 1rem; 
+            border-bottom: 1px solid var(--border-color); 
             background-color: var(--bg-main);
             display: flex;
             flex-direction: column; 
             gap: 0.75rem; 
-            z-index: 15; /* Above messages, below header if header is sticky */
+            z-index: 15; 
         }
         #chat-prompt-input { 
             width: 100%;
@@ -221,7 +220,7 @@
             cursor: not-allowed;
         }
 
-        .chat-messages { /* Takes remaining space and scrolls */
+        .chat-messages { 
             flex-grow: 1; 
             overflow-y: auto; 
             padding: 1rem; 
@@ -457,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastMessageInfo = { sender: null, date: null }; 
     let agentsSwiper, modelsSwiper;
 
-    const API_KEY = ""; 
+    const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
 
     const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
     const models = [ 
@@ -646,8 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const agentConfig = agents.find(a=>a.key === selectedAgentKey);
             const systemPromptText = agentConfig ? agentConfig.systemPrompt : null;
 
+            // Only add to API history if it's not a system message being restored
             if (!(role === 'user' && text === systemPromptText) && !(role === 'model' && text === "Понял. Я готов помочь.")) {
-                 currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }], timestamp: now.toISOString() });
+                 // Create a clean object for API history, excluding timestamp
+                 currentMiniAppChatHistory.push({ role: role, parts: [{ text: text }] }); 
                  saveChatToLocalStorage(); 
             }
         }
@@ -660,21 +661,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const agentConfig = agents.find(a => a.key === agentKey) || agents[0];
         let historyForAPIRequest = [];
 
-        const systemPromptAlreadyInCurrentHistory = currentMiniAppChatHistory.length > 0 &&
-                                           currentMiniAppChatHistory[0].role === 'user' &&
-                                           currentMiniAppChatHistory[0].parts[0].text === agentConfig.systemPrompt;
+        // Prepare history for API: map currentMiniAppChatHistory to exclude timestamp
+        const preparedHistory = currentMiniAppChatHistory.map(msg => ({
+            role: msg.role,
+            parts: msg.parts
+        }));
+
+        const systemPromptAlreadyInCurrentHistory = preparedHistory.length > 0 &&
+                                           preparedHistory[0].role === 'user' &&
+                                           preparedHistory[0].parts[0].text === agentConfig.systemPrompt;
 
         if (agentConfig.systemPrompt && !systemPromptAlreadyInCurrentHistory) {
             historyForAPIRequest.push({ role: "user", parts: [{ text: agentConfig.systemPrompt }] });
             historyForAPIRequest.push({ role: "model", parts: [{ text: "Понял. Я готов помочь." }] });
         }
         
-        historyForAPIRequest = historyForAPIRequest.concat(currentMiniAppChatHistory.slice(systemPromptAlreadyInCurrentHistory ? 2 : 0));
+        historyForAPIRequest = historyForAPIRequest.concat(preparedHistory.slice(systemPromptAlreadyInCurrentHistory ? 2 : 0));
         
-        if (historyForAPIRequest.length === 0 || historyForAPIRequest[historyForAPIRequest.length -1].parts[0].text !== promptText || historyForAPIRequest[historyForAPIRequest.length -1].role !== 'user' ) {
-             historyForAPIRequest.push({ role: "user", parts: [{ text: promptText }] });
-        }
-
+        // The current user prompt (promptText) is added to currentMiniAppChatHistory by addMessageToChat,
+        // so it will be included in historyForAPIRequest via preparedHistory.
+        // No need to add it separately here unless it's missing from currentMiniAppChatHistory,
+        // which shouldn't happen with the current flow.
 
         const payload = { contents: historyForAPIRequest };
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelKey}:generateContent?key=${API_KEY}`;
