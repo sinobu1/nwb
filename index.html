@@ -67,7 +67,7 @@
         .screen:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; }
 
         #main-screen, #image-generator-screen, #summarizer-screen, #chat-screen { flex-grow: 1; } 
-        #main-content-area, .feature-content-area { 
+        #main-content-area, .feature-content-area, #profile-content-area { /* Added profile-content-area */
             flex-grow: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
@@ -238,6 +238,13 @@
         .profile-info h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.2rem 0;}
         .profile-info p { font-size: 0.85rem; color: var(--text-secondary); margin:0;}
         .profile-gems { display: flex; justify-content: space-between; align-items: center; padding-top: 1rem; font-size: 0.9rem;}
+        .profile-limits-section { margin-top: 1.5rem; }
+        .profile-limits-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .limit-item { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border-color); }
+        .limit-item:last-child { border-bottom: none; }
+        .limit-item .name { color: var(--text-primary); }
+        .limit-item .value { color: var(--text-secondary); font-weight: 500; }
+
 
         /* Chat Screen Specific Styles */
         #chat-screen { display: flex; flex-direction: column; }
@@ -264,24 +271,22 @@
         }
 
         #chat-agent-name {
-            font-size: 0.75rem; /* Same as model name */
-            font-weight: 400;   /* Same as model name */
-            color: var(--text-secondary); /* Same as model name for consistency when both shown */
+            font-size: 0.75rem; 
+            font-weight: 400;   
+            color: var(--text-secondary); 
             line-height: 1.2;
             display: block; 
             white-space: nowrap; 
             overflow: hidden;
             text-overflow: ellipsis; 
             max-width: 100%; 
-            /* margin-bottom: 0.1rem; Removed, let parent flexbox handle spacing */
         }
-        /* When agent name is primary title (e.g. dietitian or if model name is hidden) */
         #chat-screen.dietitian-chat-active #chat-agent-name,
-        #chat-screen:not(.dietitian-chat-active) #chat-model-name:empty + #chat-agent-name, /* If model name is hidden/empty */
-        #chat-screen:not(.dietitian-chat-active) #chat-model-name[style*="display: none"] + #chat-agent-name { /* If model name is explicitly hidden */
+        #chat-screen:not(.dietitian-chat-active) #chat-model-name:empty + #chat-agent-name, 
+        #chat-screen:not(.dietitian-chat-active) #chat-model-name[style*="display: none"] + #chat-agent-name { 
             font-size: 1.0rem; 
             font-weight: 600;
-            color: var(--text-primary); /* Primary color when it's the main title */
+            color: var(--text-primary); 
             margin-bottom: 0; 
         }
 
@@ -643,19 +648,32 @@
                         </div>
                 </div>
                 <div id="profile-content" class="content-pane">
-                     <div class="main-screen-header">
-                        <h1>Профиль</h1>
-                        <p class="subtitle">Информация о вашем аккаунте</p>
-                    </div>
-                    <div class="ios-card">
-                       <div class="profile-header">
-                           <div id="profile-avatar-img" class="profile-avatar"></div>
-                           <div class="profile-info">
-                               <h2 id="profile-name">Пользователь</h2>
-                               <p id="profile-id">ID: Неизвестно</p>
+                    <div id="profile-content-area"> <div class="main-screen-header">
+                            <h1>Профиль</h1>
+                            <p class="subtitle">Информация о вашем аккаунте</p>
+                        </div>
+                        <div class="ios-card">
+                           <div class="profile-header">
+                               <div id="profile-avatar-img" class="profile-avatar"></div>
+                               <div class="profile-info">
+                                   <h2 id="profile-name">Пользователь</h2>
+                                   <p id="profile-id">ID: Неизвестно</p>
+                               </div>
                            </div>
-                       </div>
-                       <div class="profile-gems"><span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Загрузка...</span></div>
+                           <div class="profile-gems"><span>💎 Баланс гемов</span><span id="gem-balance" style="font-weight:700;">Загрузка...</span></div>
+                        </div>
+                        <div class="ios-card profile-limits-section">
+                            <h3>📊 Лимиты использования</h3>
+                            <div id="profile-daily-limits-container">
+                                <div class="limit-item"><span class="name">Загрузка лимитов...</span><span class="value"></span></div>
+                            </div>
+                        </div>
+                         <div class="ios-card profile-limits-section">
+                            <h3>🎁 Бонусы и спец. агенты</h3>
+                            <div id="profile-agent-bonus-container">
+                                <div class="limit-item"><span class="name">Загрузка бонусов...</span><span class="value"></span></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -922,6 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mainContentArea.scrollTop = 0;
         if (tabId === 'profile') { 
             displayProfileData(); 
+            fetchUserProfileData(); // Fetch data when profile tab is shown
         }
     }
 
@@ -1345,13 +1364,84 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleSummarizeText() { /* ... same as before ... */ }
     summarizeTextBtn?.addEventListener('click', handleSummarizeText);
 
+    async function fetchUserProfileData() {
+        const userId = tg.initDataUnsafe?.user?.id;
+        if (!userId) {
+            logger.warn("User ID not available for fetching profile data.");
+            document.getElementById('gem-balance').textContent = 'Н/Д';
+            document.getElementById('profile-daily-limits-container').innerHTML = '<div class="limit-item"><span class="name">Не удалось загрузить лимиты</span><span class="value"></span></div>';
+            document.getElementById('profile-agent-bonus-container').innerHTML = '<div class="limit-item"><span class="name">Не удалось загрузить бонусы</span><span class="value"></span></div>';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${APP_BACKEND_URL}/api/get_user_profile_data/${userId}`);
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.status === 'ok') {
+                document.getElementById('gem-balance').textContent = data.gem_balance?.toFixed(1) || '0.0';
+                
+                const dailyLimitsContainer = document.getElementById('profile-daily-limits-container');
+                dailyLimitsContainer.innerHTML = ''; // Clear previous
+                if (data.daily_limits && Object.keys(data.daily_limits).length > 0) {
+                    for (const modelKey in data.daily_limits) {
+                        const limitInfo = data.daily_limits[modelKey];
+                        const modelConfig = models.find(m => m.key === modelKey) || {name: modelKey}; // Fallback name
+                        const item = document.createElement('div');
+                        item.className = 'limit-item';
+                        item.innerHTML = `<span class="name">${modelConfig.name}</span><span class="value">${limitInfo.used}/${limitInfo.limit} (гем: ${limitInfo.gem_cost.toFixed(1)})</span>`;
+                        dailyLimitsContainer.appendChild(item);
+                    }
+                } else {
+                     dailyLimitsContainer.innerHTML = '<div class="limit-item"><span class="name">Дневные лимиты не найдены</span><span class="value"></span></div>';
+                }
+
+                const agentBonusContainer = document.getElementById('profile-agent-bonus-container');
+                agentBonusContainer.innerHTML = ''; // Clear previous
+                let hasBonuses = false;
+                if (data.agent_lifetime_uses && Object.keys(data.agent_lifetime_uses).length > 0) {
+                     for (const agentKey in data.agent_lifetime_uses) {
+                        const bonusInfo = data.agent_lifetime_uses[agentKey];
+                        const agentConfig = generalAgents.find(a => a.key === agentKey) || toolConfigs[agentKey] || {name: agentKey};
+                        const item = document.createElement('div');
+                        item.className = 'limit-item';
+                        item.innerHTML = `<span class="name">${agentConfig.name}</span><span class="value">${bonusInfo.left}/${bonusInfo.initial}</span>`;
+                        agentBonusContainer.appendChild(item);
+                        hasBonuses = true;
+                    }
+                }
+                 if (data.news_bonus && data.news_bonus.claimed) {
+                    const item = document.createElement('div');
+                    item.className = 'limit-item';
+                    item.innerHTML = `<span class="name">Бонус (${data.news_bonus.model_name})</span><span class="value">${data.news_bonus.uses_left}</span>`;
+                    agentBonusContainer.appendChild(item);
+                    hasBonuses = true;
+                }
+                if (!hasBonuses) {
+                    agentBonusContainer.innerHTML = '<div class="limit-item"><span class="name">Специальные бонусы не найдены</span><span class="value"></span></div>';
+                }
+
+
+            } else {
+                throw new Error(data.message || 'Failed to parse profile data');
+            }
+        } catch (error) {
+            logger.error("Error fetching user profile data:", error);
+            document.getElementById('gem-balance').textContent = 'Ошибка';
+            document.getElementById('profile-daily-limits-container').innerHTML = '<div class="limit-item"><span class="name">Ошибка загрузки лимитов</span><span class="value"></span></div>';
+            document.getElementById('profile-agent-bonus-container').innerHTML = '<div class="limit-item"><span class="name">Ошибка загрузки бонусов</span><span class="value"></span></div>';
+        }
+    }
+
+
     function displayProfileData() {
         const user = tg.initDataUnsafe?.user;
         const avatarImg = document.getElementById('profile-avatar-img');
         const profileNameEl = document.getElementById('profile-name');
         const profileIdEl = document.getElementById('profile-id');
-        const gemBalanceEl = document.getElementById('gem-balance');
-
+        
         if (user && user.id) {
             if (user.photo_url) {
                 avatarImg.style.backgroundImage = `url(${user.photo_url})`;
@@ -1370,7 +1460,10 @@ document.addEventListener('DOMContentLoaded', () => {
             profileNameEl.textContent = 'Нет данных';
             profileIdEl.textContent = 'ID: Н/Д';
         }
-        gemBalanceEl.textContent = "0.0"; // Placeholder
+        // Gem balance and limits will be updated by fetchUserProfileData
+        document.getElementById('gem-balance').textContent = 'Загрузка...';
+        document.getElementById('profile-daily-limits-container').innerHTML = '<div class="limit-item"><span class="name">Загрузка лимитов...</span><span class="value"></span></div>';
+        document.getElementById('profile-agent-bonus-container').innerHTML = '<div class="limit-item"><span class="name">Загрузка бонусов...</span><span class="value"></span></div>';
     }
 
     function updateNavArrows(swiperInstance, prefix) { /* ... same as before ... */ }
