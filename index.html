@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
 
-    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "🌍", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
+    const agents = [ { key: "universal_ai_basic", name: "Универсал", icon: "�", desc: "Ответы на любые темы", palette: "palette-5", systemPrompt: "Ты — полезный ИИ-ассистент." }, { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-4", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, { key: "career_coach", name: "Карьерный коуч", icon: "📈", desc: "Советы по карьере", palette: "palette-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, { key: "programming_partner", name: "Партнер-прогер", icon: "💻", desc: "Помощь в коде", palette: "palette-2", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, { key: "tutor_assistant", name: "Репетитор", icon: "📚", desc: "Помощь с учебой", palette: "palette-1", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, { key: "literary_editor", name: "Редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." } ];
     const models = [ 
         { key: "gemini-2.0-flash", name: "Gemini Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-6" },
         { key: "gemini-pro-vision", name: "Gemini Pro Vision", icon: "👁️‍🗨️", desc: "Анализ изображений", palette: "palette-2" },
@@ -570,7 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 .map(msgEl => {
                     const sender = msgEl.classList.contains('message-user') ? 'user' : 'bot';
                     const text = msgEl.querySelector('.message-content')?.textContent || '';
-                    return { sender, text, timestamp: new Date().toISOString() }; 
+                    // Attempt to find a timestamp if it was set as a data attribute, otherwise generate new
+                    let timestamp = msgEl.dataset.timestamp || new Date().toISOString();
+                    return { sender, text, timestamp }; 
                 });
             setTimeout(() => {
                 localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
@@ -583,6 +585,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadChatFromLocalStorage() { 
         chatMessagesContainer.innerHTML = '';
         lastMessageInfo = { sender: null, date: null };
+        currentMiniAppChatHistory = []; // Clear API history as well when loading from UI history
         try {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
@@ -592,8 +595,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         isRestoredFromHistory: true, 
                         timestamp: msg.timestamp 
                     });
+                    // Rebuild API history from UI history for context
+                    currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: [{text: msg.text}]});
                 });
-                logger.info("UI Chat history loaded from localStorage.");
+                logger.info("UI Chat history loaded from localStorage and API history rebuilt.");
             }
         } catch (e) {
             console.error("Error loading UI chat history from localStorage:", e);
@@ -624,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message message-${sender} tailed`;
+        msgDiv.dataset.timestamp = now.toISOString(); // Store timestamp for potential future use/sorting
         const contentSpan = document.createElement('span');
         contentSpan.className = 'message-content';
         contentSpan.textContent = text;
@@ -661,7 +667,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessagesContainer.appendChild(msgDiv);
 
         if (!isTyping && !isRestoredFromHistory) {
-            saveChatToLocalStorage(); 
+            // Add to API-formatted history (without timestamp for API call)
+            currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: [{ text: text }] });
+            saveChatToLocalStorage(); // Save UI-displayable history (which now includes this new message implicitly)
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         requestAnimationFrame(() => chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' }));
@@ -671,10 +679,19 @@ document.addEventListener('DOMContentLoaded', () => {
     async function submitMessageToBackend(userText, agentKey, modelKey) {
         let userId = tg.initDataUnsafe?.user?.id;
 
-        if (!userId) { // Fallback for local testing or if ID is somehow missing
-            userId = "test_user_miniapp_fallback"; // Provide a default/test user ID
-            logger.warn(`Telegram User ID not found, using fallback: ${userId}`);
-             // Do not show error to user in this case, proceed with fallback for testing
+        if (!userId) {
+            logger.error("submitMessageToBackend: Telegram User ID (tg.initDataUnsafe.user.id) is missing or undefined.");
+            if (tg && tg.initDataUnsafe) {
+                logger.error("submitMessageToBackend: tg.initDataUnsafe content:", JSON.stringify(tg.initDataUnsafe));
+            } else if (tg) {
+                logger.error("submitMessageToBackend: tg object exists, but initDataUnsafe is missing.");
+            } else {
+                logger.error("submitMessageToBackend: Telegram WebApp object (tg) is undefined.");
+            }
+            addMessageToChat('bot', "Ошибка: ID пользователя Telegram не найден. Убедитесь, что приложение запущено внутри Telegram.");
+            const typingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
+            if (typingIndicator) typingIndicator.remove();
+            return;
         }
         
         const backendProcessUrl = `${APP_BACKEND_URL}/api/process_app_message/${userId}`;
@@ -735,11 +752,14 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchUpdates() {
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
-            // If testing locally without Telegram context, polling might not be meaningful
-            // or you might use a test_user_id if your backend supports it for polling.
-            // For now, if no real user ID, don't poll.
-            if (tg && Object.keys(tg).length > 0) { // Only log error if tg object exists but no ID
-                 logger.warn("fetchUpdates: Telegram User ID not found, polling skipped.");
+            if (tg && Object.keys(tg).length > 0 && tg.initDataUnsafe === undefined) {
+                 logger.warn("fetchUpdates: tg.initDataUnsafe is undefined. Polling skipped.");
+            } else if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user === undefined) {
+                 logger.warn("fetchUpdates: tg.initDataUnsafe.user is undefined. Polling skipped.");
+            } else if (!tg || Object.keys(tg).length === 0) {
+                 logger.warn("fetchUpdates: Telegram WebApp object (tg) is undefined or empty. Polling skipped.");
+            } else {
+                 logger.warn("fetchUpdates: Telegram User ID not found for other reasons. Polling skipped.");
             }
             return; 
         }
