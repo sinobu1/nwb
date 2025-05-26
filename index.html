@@ -264,23 +264,27 @@
         }
 
         #chat-agent-name {
-            /* font-size: 1.0rem;  Original size */
-            font-size: 0.875rem; /* Slightly smaller like model name */
-            font-weight: 500; /* Adjusted to be less prominent or match model name */
-            color: var(--text-primary);
+            font-size: 0.75rem; /* Same as model name */
+            font-weight: 400;   /* Same as model name */
+            color: var(--text-secondary); /* Same as model name for consistency when both shown */
             line-height: 1.2;
             display: block; 
             white-space: nowrap; 
             overflow: hidden;
             text-overflow: ellipsis; 
             max-width: 100%; 
-            margin-bottom: 0.1rem; /* Add a small margin if both agent and model are shown */
+            /* margin-bottom: 0.1rem; Removed, let parent flexbox handle spacing */
         }
-        #chat-screen.dietitian-chat-active #chat-agent-name {
-            font-size: 1.0rem; /* Keep original size for dietitian if it's the only title */
+        /* When agent name is primary title (e.g. dietitian or if model name is hidden) */
+        #chat-screen.dietitian-chat-active #chat-agent-name,
+        #chat-screen:not(.dietitian-chat-active) #chat-model-name:empty + #chat-agent-name, /* If model name is hidden/empty */
+        #chat-screen:not(.dietitian-chat-active) #chat-model-name[style*="display: none"] + #chat-agent-name { /* If model name is explicitly hidden */
+            font-size: 1.0rem; 
             font-weight: 600;
-            margin-bottom: 0; /* No margin if it's the only title element */
+            color: var(--text-primary); /* Primary color when it's the main title */
+            margin-bottom: 0; 
         }
+
 
         #chat-model-name {
             font-size: 0.75rem; 
@@ -948,7 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
                 const parsedUiHistory = JSON.parse(savedUiHistory);
-                if (parsedUiHistory.length === 0) return false; // Indicate history was empty
+                if (parsedUiHistory.length === 0) return false; 
 
                 parsedUiHistory.forEach(msg => {
                     if (msg.content && (msg.content.text || msg.content.imageDataUrl)) {
@@ -961,12 +965,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: historyEntryParts});
                     }
                 });
-                return true; // Indicate history was loaded
+                return true; 
             }
-            return false; // Indicate no history found
+            return false; 
         } catch (e) {
             console.error("Error loading UI chat history:", e);
-            return false; // Indicate error during load
+            return false; 
         }
     }
     
