@@ -5,3 +5,4 @@ nest_asyncio
 firebase-admin
 fastapi 
 uvicorn
+pytz
