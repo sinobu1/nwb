@@ -761,5 +761,3 @@ async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param
         await bot.send_message(chat_id=user_id, text=menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
 
     logger.info(f"User {user_id} was shown menu '{menu_key}'.")
-
-}
