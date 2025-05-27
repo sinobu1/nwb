@@ -395,7 +395,7 @@ class GoogleGenAIService(BaseAIService):
 
 class CustomHttpAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str, history: List[Dict], image_data: Optional[Dict[str, Any]] = None) -> str:
-        if image_data: # Custom HTTP API пока не поддерживает изображения в этом примере
+        if image_data:
             logger.warning(f"CustomHttpAIService for model {self.model_id} received image_data, but current implementation ignores it.")
 
         api_key_name = self.model_config.get("api_key_var_name")
@@ -412,12 +412,14 @@ class CustomHttpAIService(BaseAIService):
         }
         
         endpoint_url = self.model_config.get("endpoint", "")
-        
         # --- НАЧАЛО ИЗМЕНЕНИЙ ---
 
+        # Определяем переменную здесь, чтобы она была доступна во всей функции
+        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
+        
         messages_payload = []
 
-        # 1. Преобразуем историю, исправляя роль 'model' на 'assistant'
+        # Преобразуем историю, исправляя роль 'model' на 'assistant'
         if history:
             for msg in history:
                 role = msg.get("role")
@@ -430,13 +432,12 @@ class CustomHttpAIService(BaseAIService):
                 elif role and msg.get("content"):
                      messages_payload.append({"role": role, "content": msg["content"]})
 
-        # 2. Обрабатываем системный промпт: добавляем его к первому сообщению пользователя,
-        # а не отдельной ролью 'system', для лучшей совместимости.
+        # Обрабатываем системный промпт, добавляя его к первому сообщению пользователя
         current_user_content = user_prompt
-        if system_prompt and not history: # Добавляем системный промпт только в начале диалога
+        if system_prompt and not history:
             current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
-        # 3. Добавляем текущее сообщение пользователя в историю
+        # Добавляем текущее сообщение пользователя в историю
         if user_prompt:
             messages_payload.append({"role": "user", "content": current_user_content})
         
@@ -446,13 +447,7 @@ class CustomHttpAIService(BaseAIService):
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
         
-        # 4. Не добавляем 'model' в payload, т.к. это может конфликтовать с URL
-        # if is_gen_api_endpoint and self.model_id:
-        #      payload['model'] = self.model_id 
-
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-        
-        endpoint = endpoint_url 
+        endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
         try:
@@ -466,6 +461,7 @@ class CustomHttpAIService(BaseAIService):
             
             extracted_text = None
 
+            # Здесь мы снова используем is_gen_api_endpoint для выбора логики
             if is_gen_api_endpoint:
                 if json_resp.get("status") == "success" and "output" in json_resp:
                     extracted_text = json_resp["output"]
@@ -479,31 +475,43 @@ class CustomHttpAIService(BaseAIService):
                 if not extracted_text and json_resp.get("status") not in ["success", "starting", "processing"]:
                     status_from_api = json_resp.get('status','N/A')
                     error_msg_from_api = json_resp.get('error_message', json_resp.get('result'))
-                    if isinstance(error_msg_from_api, list): error_msg_from_api = " ".join(error_msg_from_api)
+                    if isinstance(error_msg_from_api, list): error_msg_from_api = " ".join(map(str, error_msg_from_api))
+                    elif isinstance(error_msg_from_api, dict): error_msg_from_api = str(error_msg_from_api)
+
+                    # Извлекаем ошибку из 'response' если она там
+                    if not error_msg_from_api and "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
+                        if isinstance(json_resp["response"][0], str):
+                            error_msg_from_api = json_resp["response"][0]
+
                     input_details_on_error = json_resp.get('input', {})
                     if not error_msg_from_api and isinstance(input_details_on_error, dict): error_msg_from_api = input_details_on_error.get('error', '')
+                    
                     logger.error(f"Ошибка API для {self.model_config['name']}. Статус: {status_from_api}. Полный ответ: {json_resp}")
-                    final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». {error_msg_from_api}"
-                    if not str(error_msg_from_api).strip() and str(error_msg_from_api) != '0':
-                        final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
+                    final_error_message = f"Ошибка API «{self.model_config['name']}»: {error_msg_from_api or 'Неизвестная ошибка'}"
                     return final_error_message
-            else: # Предполагаем стандартный OpenAI-совместимый формат
+            else: # Стандартный OpenAI-совместимый формат
                 if isinstance(json_resp.get("choices"), list) and json_resp["choices"]:
                     choice = json_resp["choices"][0]
                     if isinstance(choice.get("message"), dict) and choice["message"].get("content"):
                         extracted_text = choice["message"]["content"]
-                    elif isinstance(choice.get("text"), str): # Для более старых API
+                    elif isinstance(choice.get("text"), str):
                          extracted_text = choice.get("text")
-                elif isinstance(json_resp.get("text"), str): # Некоторые API могут возвращать текст напрямую
+                elif isinstance(json_resp.get("text"), str):
                     extracted_text = json_resp.get("text")
-                elif isinstance(json_resp.get("content"), str): # Еще один возможный вариант
+                elif isinstance(json_resp.get("content"), str):
                      extracted_text = json_resp.get("content")
             
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
         except requests.exceptions.HTTPError as e:
             error_body = e.response.text if e.response else "No response body"; status_code = e.response.status_code if e.response else "N/A"
             logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {status_code} - {error_body}", exc_info=True)
-            return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
+            try:
+                error_json = e.response.json()
+                detail = error_json.get("detail", error_body)
+                if isinstance(detail, list) and detail: detail = detail[0].get("msg", str(detail))
+                return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Детали: {detail}"
+            except:
+                 return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
         except requests.exceptions.RequestException as e:
             logger.error(f"Custom API RequestException for {self.model_id} ({endpoint}): {e}", exc_info=True)
             return f"Сетевая ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
