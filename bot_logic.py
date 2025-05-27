@@ -21,7 +21,7 @@ from config import (
     increment_request_count, logger, show_menu,
     get_user_gem_balance, update_user_gem_balance, get_daily_usage_for_model,
     get_agent_lifetime_uses_left, decrement_agent_lifetime_uses,
-    genai # Ensure genai is imported if used directly here, though it's usually in config/AIService
+    genai 
 )
 
 # --- ОБРАБОТЧИКИ КОМАНД TELEGRAM ---
@@ -53,10 +53,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             uses_firestore_key = f"lifetime_uses_{agent_key}"
             if uses_firestore_key not in user_data_loc:
                 updates_to_user_data[uses_firestore_key] = initial_uses
+    
+    # Инициализация бонусных использований, если еще не было
+    if 'claimed_news_bonus' not in user_data_loc:
+        updates_to_user_data['claimed_news_bonus'] = False
+        for bonus_model_key in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.keys():
+            bonus_uses_left_firestore_key = f"news_bonus_uses_left_{bonus_model_key}"
+            if bonus_uses_left_firestore_key not in user_data_loc:
+                 updates_to_user_data[bonus_uses_left_firestore_key] = 0
+
 
     if updates_to_user_data:
         await firestore_service.set_user_data(user_id, updates_to_user_data)
-        user_data_loc.update(updates_to_user_data)
+        user_data_loc.update(updates_to_user_data) # Обновляем локальную копию
 
     current_model_key_val = await get_current_model_key(user_id, user_data_loc)
     mode_details_res = await get_current_mode_details(user_id, user_data_loc)
@@ -118,7 +127,10 @@ async def show_limits(update: Update, user_id: int):
     user_data_loc = await firestore_service.get_user_data(user_id)
     bot_data_loc = await firestore_service.get_bot_data()
     user_gem_balance = await get_user_gem_balance(user_id, user_data_loc)
-    parts = [f"<b>💎 Ваш баланс: {user_gem_balance:.1f} гемов</b>\n"]
+    
+    parts = [f"<b>💎 Ваш баланс: {user_gem_balance:.1f} гемов</b>"]
+    parts.append("") # Отступ
+
     parts.append("<b>🎁 Общие бесплатные попытки для спец. агентов:</b>")
     has_lifetime_agent_limits = False
     for agent_k, agent_c in AI_MODES.items():
@@ -126,29 +138,83 @@ async def show_limits(update: Update, user_id: int):
             lt_uses_left = await get_agent_lifetime_uses_left(user_id, agent_k, user_data_loc)
             parts.append(f"▫️ {agent_c['name']}: {lt_uses_left}/{initial_lt_uses} попыток")
             has_lifetime_agent_limits = True
-    if not has_lifetime_agent_limits: parts.append("▫️ Нет агентов с общим лимитом бесплатных попыток.")
-    parts.append("\n<b>📊 Ваши дневные бесплатные лимиты и стоимость моделей:</b>")
+    if not has_lifetime_agent_limits: 
+        parts.append("▫️ Нет агентов с общим лимитом бесплатных попыток.")
+    parts.append("") # Отступ
+
+    parts.append("<b>📊 Ваши дневные бесплатные лимиты и стоимость моделей:</b>")
     for model_key, model_config in AVAILABLE_TEXT_MODELS.items():
         current_free_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_loc)
         free_daily_limit = model_config.get('free_daily_limit', 0)
         gem_cost = model_config.get('gem_cost', 0.0)
+        
         usage_display = f"Бесплатно сегодня: {current_free_usage}/{free_daily_limit}"
-        cost_display = f"Стоимость: {gem_cost:.1f} гемов" if gem_cost > 0 else "Только бесплатно"
+        
+        cost_display_parts = []
+        if gem_cost > 0:
+            cost_display_parts.append(f"Стоимость: {gem_cost:.1f} гемов за 1 генерацию")
+        elif free_daily_limit > 0 : # Если модель бесплатная, но лимитированная
+             cost_display_parts.append("Бесплатно в рамках дневного лимита")
+
+
+        # Проверка бонуса за подписку для данной модели
         bonus_notification = ""
-        if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and \
+        news_bonus_uses_left_key = f"news_bonus_uses_left_{model_key}"
+        if model_key in CONFIG.NEWS_CHANNEL_BONUS_CONFIG and \
            user_data_loc.get('claimed_news_bonus', False) and \
-           (bonus_left := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
+           (bonus_left := user_data_loc.get(news_bonus_uses_left_key, 0)) > 0:
             bonus_notification = f" (еще <b>{bonus_left}</b> бонусных)"
-        parts.append(f"▫️ {model_config['name']}: {usage_display}{bonus_notification}. {cost_display}")
-    parts.append("")
-    bonus_model_cfg = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
-    if bonus_model_cfg:
-        bonus_model_name_display = bonus_model_cfg['name']
-        if not user_data_loc.get('claimed_news_bonus', False):
-            parts.append(f'🎁 Подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">канал новостей</a> (+{CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS} для {bonus_model_name_display})! «🎁 Бонус» в меню.')
-        elif (bonus_left_val := user_data_loc.get('news_bonus_uses_left', 0)) > 0:
-            parts.append(f"✅ У вас <b>{bonus_left_val}</b> бонусных генераций для {bonus_model_name_display}.")
-        else: parts.append(f"ℹ️ Бонус с канала новостей для {bonus_model_name_display} был использован.")
+            if not cost_display_parts: # Если модель полностью бесплатна (gem_cost=0, free_daily_limit=0), но есть бонус
+                cost_display_parts.append("Доступно по бонусу")
+
+
+        cost_display_str = ". ".join(filter(None, cost_display_parts))
+        if not cost_display_str and free_daily_limit == 0 and gem_cost == 0 and not bonus_notification:
+             cost_display_str = "Модель не настроена для использования."
+
+
+        parts.append(f"▫️ {model_config['name']}: {usage_display}{bonus_notification}. {cost_display_str}")
+        parts.append("") # Отступ между моделями
+        
+    # Удаляем последний лишний отступ, если он есть
+    if parts[-1] == "":
+        parts.pop()
+    parts.append("") # Гарантированный отступ перед секцией бонусов
+
+    # Информация о бонусе за подписку (общая)
+    bonus_models_names = []
+    any_bonus_available_to_claim = False
+    claimed_bonus = user_data_loc.get('claimed_news_bonus', False)
+
+    for bk, b_uses in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.items():
+        if bk_cfg := AVAILABLE_TEXT_MODELS.get(bk):
+            bonus_models_names.append(f"{bk_cfg['name']} ({b_uses} шт.)")
+            if claimed_bonus:
+                bonus_uses_left_for_model_key = f"news_bonus_uses_left_{bk}"
+                if user_data_loc.get(bonus_uses_left_for_model_key, 0) > 0:
+                    any_bonus_available_to_claim = True # Технически, уже используется, не "to claim"
+            elif not claimed_bonus: # Если еще не затребован, то он доступен к получению
+                 any_bonus_available_to_claim = True
+
+
+    if bonus_models_names:
+        bonus_models_str = ", ".join(bonus_models_names)
+        if not claimed_bonus:
+            parts.append(f'🎁 Подпишитесь на <a href="{CONFIG.NEWS_CHANNEL_LINK}">канал новостей</a> (+{bonus_models_str})! «🎁 Бонус» в меню.')
+        else:
+            active_bonuses_texts = []
+            for bk_check, b_uses_check in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.items():
+                bonus_uses_left_for_model_key_check = f"news_bonus_uses_left_{bk_check}"
+                bonus_left_val_check = user_data_loc.get(bonus_uses_left_for_model_key_check, 0)
+                if bonus_left_val_check > 0:
+                    model_name_display_check = AVAILABLE_TEXT_MODELS.get(bk_check, {}).get('name', bk_check)
+                    active_bonuses_texts.append(f"<b>{bonus_left_val_check}</b> для {model_name_display_check}")
+            
+            if active_bonuses_texts:
+                parts.append(f"✅ У вас бонусных генераций: {'; '.join(active_bonuses_texts)}.")
+            else:
+                parts.append(f"ℹ️ Бонус с канала новостей ({bonus_models_str}) был использован или не активирован для этих моделей.")
+    
     parts.append("\n💎 Пополнить баланс: /gems или через меню «💎 Гемы».")
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_LIMITS_SUBMENU)
     await update.message.reply_text("\n".join(parts), parse_mode=ParseMode.HTML,
@@ -160,22 +226,46 @@ async def claim_news_bonus_logic(update: Update, user_id: int):
     parent_menu_key = user_data_loc.get('current_menu', BotConstants.MENU_BONUS_SUBMENU)
     current_menu_config = MENU_STRUCTURE.get(parent_menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     reply_menu_key = current_menu_config.get("parent", BotConstants.MENU_MAIN) if current_menu_config.get("is_submenu") else parent_menu_key
-    bonus_model_config = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
-    if not bonus_model_config:
-        await update.message.reply_text("Ошибка: Бонусная модель не настроена.", reply_markup=generate_menu_keyboard(reply_menu_key))
+
+    if not CONFIG.NEWS_CHANNEL_BONUS_CONFIG:
+        await update.message.reply_text("Ошибка: Бонусные модели не настроены.", reply_markup=generate_menu_keyboard(reply_menu_key))
         return
-    bonus_model_name = bonus_model_config['name']
+
     if user_data_loc.get('claimed_news_bonus', False):
-        uses_left = user_data_loc.get('news_bonus_uses_left', 0)
-        reply_text = f"Вы уже активировали бонус. " + (f"У вас осталось: <b>{uses_left}</b> бонусных генераций для {bonus_model_name}." if uses_left > 0 else f"Бонусные генерации для {bonus_model_name} использованы.")
+        active_bonuses_texts = []
+        all_bonuses_used = True
+        for bonus_model_key, bonus_amount in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.items():
+            bonus_uses_left_firestore_key = f"news_bonus_uses_left_{bonus_model_key}"
+            uses_left = user_data_loc.get(bonus_uses_left_firestore_key, 0)
+            model_name = AVAILABLE_TEXT_MODELS.get(bonus_model_key, {}).get('name', bonus_model_key)
+            if uses_left > 0:
+                active_bonuses_texts.append(f"<b>{uses_left}</b> для {model_name}")
+                all_bonuses_used = False
+        
+        reply_text = "Вы уже активировали бонус. "
+        if not all_bonuses_used and active_bonuses_texts:
+            reply_text += f"У вас осталось: {'; '.join(active_bonuses_texts)}."
+        else:
+            reply_text += "Все бонусные генерации использованы."
+            
         await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_key))
         return
+
     try:
         member_status = await update.get_bot().get_chat_member(chat_id=CONFIG.NEWS_CHANNEL_USERNAME, user_id=user_id)
         if member_status.status in ['member', 'administrator', 'creator']:
-            await firestore_service.set_user_data(user_id, {'claimed_news_bonus': True, 'news_bonus_uses_left': CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS})
+            updates_for_firestore = {'claimed_news_bonus': True}
+            awarded_bonuses_texts = []
+            for bonus_model_key, bonus_amount in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.items():
+                bonus_uses_left_firestore_key = f"news_bonus_uses_left_{bonus_model_key}"
+                updates_for_firestore[bonus_uses_left_firestore_key] = bonus_amount
+                model_name = AVAILABLE_TEXT_MODELS.get(bonus_model_key, {}).get('name', bonus_model_key)
+                awarded_bonuses_texts.append(f"<b>{bonus_amount}</b> для {model_name}")
+
+            await firestore_service.set_user_data(user_id, updates_for_firestore)
+            
             success_text = (f'🎉 Спасибо за подписку на <a href="{CONFIG.NEWS_CHANNEL_LINK}">{CONFIG.NEWS_CHANNEL_USERNAME}</a>! '
-                            f"Вам начислен бонус: <b>{CONFIG.NEWS_CHANNEL_BONUS_GENERATIONS}</b> генераций для модели {bonus_model_name}.")
+                            f"Вам начислены бонусы: {'; '.join(awarded_bonuses_texts)}.")
             await update.message.reply_text(success_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_key), disable_web_page_preview=True)
             await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_key})
         else:
@@ -229,7 +319,8 @@ async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAUL
         return
     try:
         current_menu = (await firestore_service.get_user_data(user_id)).get('current_menu', BotConstants.MENU_GEMS_SUBMENU)
-        await update.message.reply_text(f"Пакет «{title}». Отправляю счет...", reply_markup=generate_menu_keyboard(current_menu))
+        # Отправляем сообщение перед инвойсом, чтобы пользователь видел, что что-то происходит
+        await update.message.reply_text(f"Готовлю счет для пакета «{title}»...", reply_markup=generate_menu_keyboard(current_menu))
         await context.bot.send_invoice(chat_id=user_id, title=title, description=description, payload=payload, provider_token=CONFIG.PAYMENT_PROVIDER_TOKEN, currency=currency, prices=prices)
         logger.info(f"Invoice for '{package_key}' sent to user {user_id}.")
     except Exception as e:
@@ -239,57 +330,111 @@ async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAUL
 async def menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE): 
     if not update.message or not update.message.text: return
     button_text = update.message.text.strip()
-    if not is_menu_button_text(button_text): return
+    if not is_menu_button_text(button_text): return # Если это не текст кнопки меню, выходим
+    
     user_id = update.effective_user.id
     logger.info(f"User {user_id} pressed menu button: '{button_text}'")
-    try: await update.message.delete()
-    except telegram.error.TelegramError as e: logger.warning(f"Failed to delete menu button message '{button_text}': {e}")
+    
+    # Удаляем сообщение с кнопкой, если это не команда /start или другая, которую нужно сохранить
+    try: 
+        await update.message.delete()
+    except telegram.error.TelegramError as e: 
+        logger.warning(f"Failed to delete menu button message '{button_text}': {e}")
+
     user_data_loc = await firestore_service.get_user_data(user_id)
     current_menu_key_from_db = user_data_loc.get('current_menu', BotConstants.MENU_MAIN)
+
     if button_text == "⬅️ Назад":
         parent_key = MENU_STRUCTURE.get(current_menu_key_from_db, {}).get("parent", BotConstants.MENU_MAIN)
-        await show_menu(update, user_id, parent_key); return
+        await show_menu(update, user_id, parent_key)
+        return
     elif button_text == "🏠 Главное меню":
-        await show_menu(update, user_id, BotConstants.MENU_MAIN); return
+        await show_menu(update, user_id, BotConstants.MENU_MAIN)
+        return
+
     action_item_found, effective_menu_key_of_action = None, current_menu_key_from_db
+    # Ищем действие сначала в текущем меню, потом в остальных (на случай рассинхрона)
     search_order = [current_menu_key_from_db] + [k for k in MENU_STRUCTURE if k != current_menu_key_from_db]
+
     for menu_key_search in search_order:
         for item in MENU_STRUCTURE.get(menu_key_search, {}).get("items", []):
             if item["text"] == button_text:
-                action_item_found, effective_menu_key_of_action = item, menu_key_search; break
-        if action_item_found: break
+                action_item_found = item
+                effective_menu_key_of_action = menu_key_search # Запоминаем, в каком меню нашли кнопку
+                break
+        if action_item_found:
+            break
+            
     if not action_item_found:
-        logger.error(f"Button '{button_text}' no action found. DB current_menu: '{current_menu_key_from_db}'")
-        await show_menu(update, user_id, BotConstants.MENU_MAIN); return
-    action_type, action_target = action_item_found["action"], action_item_found["target"]
-    reply_menu_after_action = effective_menu_key_of_action
+        logger.error(f"Button '{button_text}' no action found. DB current_menu: '{current_menu_key_from_db}'. Showing main menu.")
+        await show_menu(update, user_id, BotConstants.MENU_MAIN)
+        return
+
+    action_type = action_item_found["action"]
+    action_target = action_item_found["target"]
+    
+    # Меню, которое будет показано ПОСЛЕ выполнения действия (обычно то же, где была кнопка)
+    reply_menu_after_action = effective_menu_key_of_action 
+
     if action_type == BotConstants.CALLBACK_ACTION_SUBMENU:
         await show_menu(update, user_id, action_target)
     elif action_type == BotConstants.CALLBACK_ACTION_SET_AGENT:
         await firestore_service.set_user_data(user_id, {'current_ai_mode': action_target})
         agent_name = AI_MODES.get(action_target, {}).get('name', 'N/A')
-        await update.message.reply_text(f"🤖 Агент ИИ: <b>{agent_name}</b>.", parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_action))
-        await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_action})
+        await update.message.reply_text(f"🤖 Агент ИИ изменен на: <b>{agent_name}</b>.", parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_action))
+        await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_action}) # Сохраняем текущее меню
     elif action_type == BotConstants.CALLBACK_ACTION_SET_MODEL:
         model_info = AVAILABLE_TEXT_MODELS.get(action_target, {})
         update_payload = {'selected_model_id': model_info.get("id"), 'selected_api_type': model_info.get("api_type")}
-        if action_target in ["custom_api_grok_3", "custom_api_gpt_4o_mini"] and user_data_loc.get('current_ai_mode') == "gemini_pro_custom_mode":
-            update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY
+        
+        # Сброс агента, если выбранная модель несовместима с текущим агентом, который форсирует другую модель
+        # (например, если был выбран "Диетолог", а потом пользователь меняет модель на не-vision)
+        current_agent_key_local = user_data_loc.get('current_ai_mode')
+        current_agent_config_local = AI_MODES.get(current_agent_key_local)
+        if current_agent_config_local and current_agent_config_local.get("forced_model_key") and \
+           current_agent_config_local.get("forced_model_key") != action_target :
+            update_payload['current_ai_mode'] = CONFIG.DEFAULT_AI_MODE_KEY # Сброс на универсального агента
+            logger.info(f"Agent '{current_agent_key_local}' was reset to default due to model change to '{action_target}'.")
+            await update.message.reply_text(f"Агент сброшен на '{AI_MODES[CONFIG.DEFAULT_AI_MODE_KEY]['name']}', т.к. он несовместим с новой моделью.", parse_mode=ParseMode.HTML)
+
+
         await firestore_service.set_user_data(user_id, update_payload)
-        user_data_loc.update(update_payload)
-        bot_data = await firestore_service.get_bot_data()
+        user_data_loc.update(update_payload) # Обновляем локальный кеш user_data
+        
+        bot_data = await firestore_service.get_bot_data() # Получаем свежие данные по лимитам
         free_uses = await get_daily_usage_for_model(user_id, action_target, bot_data)
-        free_limit = model_info.get('free_daily_limit',0); gem_cost = model_info.get('gem_cost',0.0)
-        response_text = (f"⚙️ Модель: <b>{model_info.get('name', 'N/A')}</b>.\n"
-                         f"Бесплатно: {free_uses}/{free_limit}. Стоимость: {gem_cost:.1f} гемов.")
-        await update.message.reply_text(response_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_action))
-        await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_action})
-    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_LIMITS: await show_limits(update, user_id)
-    elif action_type == BotConstants.CALLBACK_ACTION_CHECK_BONUS: await claim_news_bonus_logic(update, user_id)
-    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_GEMS_STORE: await show_menu(update, user_id, BotConstants.MENU_GEMS_SUBMENU)
-    elif action_type == BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE: await send_gem_purchase_invoice(update, context, action_target)
-    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_HELP: await show_help(update, user_id)
-    else: logger.warning(f"Unknown action_type '{action_type}' for button '{button_text}'"); await show_menu(update, user_id, BotConstants.MENU_MAIN)
+        free_limit = model_info.get('free_daily_limit',0)
+        gem_cost = model_info.get('gem_cost',0.0)
+        
+        response_text_parts = [f"⚙️ Модель изменена на: <b>{model_info.get('name', 'N/A')}</b>."]
+        response_text_parts.append(f"Бесплатно сегодня: {free_uses}/{free_limit}.")
+        if gem_cost > 0:
+            response_text_parts.append(f"Стоимость: {gem_cost:.1f} гемов за 1 генерацию.")
+        elif free_limit > 0: # Если модель бесплатная, но лимитированная
+             response_text_parts.append("Бесплатно в рамках дневного лимита.")
+        
+        # Проверка бонуса
+        news_bonus_uses_left_key = f"news_bonus_uses_left_{action_target}"
+        if action_target in CONFIG.NEWS_CHANNEL_BONUS_CONFIG and \
+           user_data_loc.get('claimed_news_bonus', False) and \
+           (bonus_left := user_data_loc.get(news_bonus_uses_left_key, 0)) > 0:
+            response_text_parts.append(f"(Еще <b>{bonus_left}</b> бонусных генераций для этой модели!)")
+            
+        await update.message.reply_text("\n".join(response_text_parts), parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(reply_menu_after_action))
+        await firestore_service.set_user_data(user_id, {'current_menu': reply_menu_after_action}) # Сохраняем текущее меню
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_LIMITS:
+        await show_limits(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_CHECK_BONUS:
+        await claim_news_bonus_logic(update, user_id)
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_GEMS_STORE:
+        await show_menu(update, user_id, BotConstants.MENU_GEMS_SUBMENU) # Переход в подменю гемов
+    elif action_type == BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE:
+        await send_gem_purchase_invoice(update, context, action_target)
+    elif action_type == BotConstants.CALLBACK_ACTION_SHOW_HELP:
+        await show_help(update, user_id)
+    else:
+        logger.warning(f"Unknown action_type '{action_type}' for button '{button_text}'. Showing main menu.")
+        await show_menu(update, user_id, BotConstants.MENU_MAIN)
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE): 
     user_id = update.effective_user.id
@@ -297,8 +442,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_ai_mode_key = user_data.get('current_ai_mode')
     active_agent_config = AI_MODES.get(current_ai_mode_key)
 
-    # This handler is for photos sent directly to the bot, not via Mini App.
-    # The Mini App photo upload will be handled by the /api/process_app_message endpoint.
     if active_agent_config and current_ai_mode_key == "photo_dietitian_analyzer":
         billing_model_key = active_agent_config.get("forced_model_key")
         if not billing_model_key or billing_model_key not in AVAILABLE_TEXT_MODELS:
@@ -313,8 +456,8 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(check_message, parse_mode=ParseMode.HTML); return
         
         photo_file = update.message.photo[-1]
-        context.user_data['dietitian_pending_photo_id'] = photo_file.file_id # Store for when user sends weight
-        context.user_data['dietitian_state'] = 'awaiting_weight' # Set state
+        context.user_data['dietitian_pending_photo_id'] = photo_file.file_id 
+        context.user_data['dietitian_state'] = 'awaiting_weight' 
         logger.info(f"User {user_id} (agent {current_ai_mode_key}) sent photo {photo_file.file_id} directly to bot. Awaiting weight.")
         await update.message.reply_text("Отличное фото! Теперь, пожалуйста, укажите примерный вес этой порции в граммах для расчета КБЖУ.")
     else:
@@ -332,17 +475,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_ai_mode_key = user_data_cache.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     active_agent_config = AI_MODES.get(current_ai_mode_key)
 
-    # Handle dietitian state if photo was sent directly to bot
     if current_ai_mode_key == "photo_dietitian_analyzer" and context.user_data.get('dietitian_state') == 'awaiting_weight':
         photo_file_id = context.user_data.get('dietitian_pending_photo_id')
         if not photo_file_id:
             logger.warning(f"Dietitian awaiting weight for user {user_id}, but no pending photo ID found.")
-            context.user_data.pop('dietitian_state', None) # Reset state
-            # Fall through to normal text processing for this agent
+            context.user_data.pop('dietitian_state', None) 
         else:
-            # This is the weight/comment for a photo previously sent to the main bot
             billing_model_key = active_agent_config.get("forced_model_key")
-            native_vision_model_id = active_agent_config.get("native_vision_model_id") # Ensure this is correct in config
+            native_vision_model_id = active_agent_config.get("native_vision_model_id") 
             
             if not (billing_model_key and billing_model_key in AVAILABLE_TEXT_MODELS and native_vision_model_id):
                 logger.error(f"Photo Dietitian (direct bot) config error for agent '{current_ai_mode_key}'. Billing: {billing_model_key}, Vision: {native_vision_model_id}")
@@ -369,7 +509,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 actual_photo_file = await context.bot.get_file(photo_file_id)
                 file_bytes = await actual_photo_file.download_as_bytearray()
                 
-                # Try to guess MIME type, default to jpeg if unknown
                 mime_type, _ = mimetypes.guess_type(actual_photo_file.file_path or "image.jpg")
                 if not mime_type or not mime_type.startswith("image/"):
                     mime_type = "image/jpeg" 
@@ -379,7 +518,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 vision_system_instruction = active_agent_config["prompt"]
                 text_prompt_with_weight = f"Проанализируй предоставленное ФОТО. Пользователь указал вес порции или комментарий: {user_message_text}."
                 
-                model_vision = genai.GenerativeModel(native_vision_model_id)
+                model_vision = genai.GenerativeModel(native_vision_model_id) # Используем ID нативной vision модели
                 response_vision = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: model_vision.generate_content([vision_system_instruction, image_part_direct, text_prompt_with_weight])
@@ -395,14 +534,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await increment_request_count(user_id, billing_model_key, usage_type, current_ai_mode_key, gem_cost_for_request)
             final_reply_text, _ = smart_truncate(ai_response_text, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-            current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU)
+            current_menu_reply = user_data_cache.get('current_menu', BotConstants.MENU_AI_MODES_SUBMENU) # Возврат в меню агентов
             await update.message.reply_text(final_reply_text, reply_markup=generate_menu_keyboard(current_menu_reply))
             
             context.user_data.pop('dietitian_state', None)
             context.user_data.pop('dietitian_pending_photo_id', None)
-            return # End processing for dietitian state
+            return 
 
-    # Standard text processing for other agents or dietitian without pending photo
     final_model_key_for_request = ""
     if active_agent_config and active_agent_config.get("forced_model_key"):
         final_model_key_for_request = active_agent_config.get("forced_model_key")
@@ -440,9 +578,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     ai_response_text = "К сожалению, не удалось получить ответ от ИИ."
     try:
-        # Standard text request, no image data from direct bot text message
         ai_response_text = await ai_service.generate_response(system_prompt_to_use, user_message_text, image_data=None)
-        logger.info(f"Raw AI response (from direct chat): '{ai_response_text}'")
+        # logger.info(f"Raw AI response (from direct chat): '{ai_response_text}'") # Можно раскомментировать для детального логгирования
     except Exception as e:
         model_name_for_error = AVAILABLE_TEXT_MODELS.get(final_model_key_for_request, {}).get('name', final_model_key_for_request)
         logger.error(f"Unhandled exception in AI service for model {model_name_for_error}: {e}", exc_info=True)
@@ -560,11 +697,11 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     action = data.get("action")
     logger.info(f"WebApp action '{action}' for user {user_id}")
 
-    if update.message.web_app_data:
+    if update.message.web_app_data: # Удаляем сообщение от WebApp, чтобы не засорять чат
         try:
             await context.bot.delete_message(chat_id=user_id, message_id=update.message.message_id)
-        except Exception:
-            pass 
+        except Exception as e:
+            logger.warning(f"Could not delete web_app_data message: {e}")
 
     if action == "set_agent" or action == "set_model":
         target = data.get("target")
@@ -589,11 +726,14 @@ async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             f"💡 **Ответ ИИ:**\n`{ai_response}`"
         )
         try:
-            await context.bot.send_message(chat_id=user_id, text=saved_message_text, parse_mode=ParseMode.MARKDOWN_V2)
+            # Отправляем сохраненный диалог с ReplyKeyboard текущего меню пользователя
+            user_data = await firestore_service.get_user_data(user_id)
+            current_menu = user_data.get('current_menu', BotConstants.MENU_MAIN)
+            await context.bot.send_message(chat_id=user_id, text=saved_message_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=generate_menu_keyboard(current_menu))
         except Exception as e:
             logger.error(f"Failed to send saved chat to user {user_id}: {e}")
+            # Fallback без Markdown и без клавиатуры, если что-то пошло не так
             await context.bot.send_message(chat_id=user_id, text=f"Диалог из Mini App:\nЗапрос: {user_query}\nОтвет: {ai_response}")
             
     else:
         logger.warning(f"Unknown WebApp action '{action}' for user {user_id}")
-        # This part for 'app_chat_message' was removed as it's now handled by the API endpoint
