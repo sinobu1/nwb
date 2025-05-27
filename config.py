@@ -18,9 +18,9 @@ import os
 import asyncio
 import nest_asyncio
 import json
-import base64 # Added for image processing
+import base64 
 from datetime import datetime, timedelta, timezone
-import pytz # Добавлено для работы с часовыми поясами
+import pytz 
 from typing import Optional, Dict, Any, Tuple, Union, List
 import uuid
 import firebase_admin
@@ -46,16 +46,16 @@ class AppConfig:
     ADMIN_ID = int(os.getenv("ADMIN_ID", "489230152"))
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
     FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
-
     WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://nwb-production.up.railway.app/") 
     
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
+    MAX_CONVERSATION_HISTORY = 6 # Хранить последние 3 пары (вопрос-ответ)
 
     DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY = 65
     DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50 
-    DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 0 # Изменено: убран бесплатный дневной лимит для Grok
+    DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 0 
     DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1 
     DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY = 10
     
@@ -63,33 +63,26 @@ class AppConfig:
     
     GEM_PACKAGES = {
         "pack_25_gems_trial": { 
-            "gems": 25, 
-            "price_units": 5900, 
-            "currency": "RUB", 
-            "title": "💎 25 Гемов (Пробный)", 
-            "description": "Специальный пробный пакет" 
+            "gems": 25, "price_units": 5900, "currency": "RUB", 
+            "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет. Только один раз!",
+            "is_one_time": True # Добавлен флаг для одноразовой покупки
         },
         "pack_50_gems": {
-            "gems": 50, 
-            "price_units": 12500, 
-            "currency": "RUB", 
-            "title": "🌟 50 Гемов", 
-            "description": "Выгодный пакет для частого использования"
+            "gems": 50, "price_units": 12500, "currency": "RUB", 
+            "title": "🌟 50 Гемов", "description": "Выгодный пакет для частого использования"
         }
     }
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
-    # Новая конфигурация для бонусов за подписку (модель: количество попыток)
     NEWS_CHANNEL_BONUS_CONFIG = {
-        "custom_api_gemini_2_5_pro": 1,
-        "custom_api_grok_3": 1
+        "custom_api_gemini_2_5_pro": 1, "custom_api_grok_3": 1
     }
 
     DEFAULT_AI_MODE_KEY = "universal_ai_basic"
     DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
     
-    MOSCOW_TZ = pytz.timezone('Europe/Moscow') # Добавлено для часового пояса Москвы
+    MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
 CONFIG = AppConfig()
 
@@ -326,17 +319,19 @@ firestore_service = FirestoreService(
     creds_json_str=CONFIG.FIREBASE_CREDENTIALS_JSON_STR
 )
 
-class BaseAIService(ABC):
+
+
+            class BaseAIService(ABC):
     def __init__(self, model_config: Dict[str, Any]):
         self.model_config = model_config
         self.model_id = model_config["id"]
 
     @abstractmethod
-    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, system_prompt: str, user_prompt: str, history: List[Dict], image_data: Optional[Dict[str, Any]] = None) -> str:
         pass
 
 class GoogleGenAIService(BaseAIService):
-    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, system_prompt: str, user_prompt: str, history: List[Dict], image_data: Optional[Dict[str, Any]] = None) -> str:
         try:
             if not CONFIG.GOOGLE_GEMINI_API_KEY or "YOUR_" in CONFIG.GOOGLE_GEMINI_API_KEY:
                  return "API ключ для Google Gemini не настроен."
@@ -354,34 +349,25 @@ class GoogleGenAIService(BaseAIService):
                         image_bytes = base64.b64decode(image_data["base64"])
                         image_part = {"mime_type": image_data["mime_type"], "data": image_bytes}
                         content_parts.append(image_part) 
-                        logger.info(f"Image data prepared for vision model {self.model_id}")
                     except Exception as e:
                         logger.error(f"Error decoding base64 image for model {self.model_id}: {e}")
                         return "Ошибка обработки изображения." 
-                else:
-                    logger.warning(f"Vision model {self.model_id} called but image_data is incomplete.")
-            elif image_data:
-                 logger.warning(f"Text model {self.model_id} received image_data but will ignore it.")
-
+            
             if user_prompt: 
                 content_parts.append(user_prompt)
 
-
             if not content_parts: 
-                logger.warning(f"No content parts to send for model {self.model_id}.")
                 return "Нет данных для отправки в ИИ."
 
-            response = await asyncio.get_event_loop().run_in_executor(None, lambda: model_genai.generate_content(content_parts))
+            chat_session = model_genai.start_chat(history=history)
+            response = await asyncio.get_event_loop().run_in_executor(None, lambda: chat_session.send_message(content_parts))
             return response.text.strip() if response.text else "Ответ Google GenAI пуст."
-        except google.api_core.exceptions.ResourceExhausted as e:
-            logger.error(f"Google GenAI API limit exhausted for model {self.model_id}: {e}")
-            return f"Лимит Google API исчерпан: {e}"
         except Exception as e:
             logger.error(f"Google GenAI API error for model {self.model_id}: {e}", exc_info=True)
             return f"Ошибка Google API ({type(e).__name__}) при обращении к {self.model_id}."
 
 class CustomHttpAIService(BaseAIService):
-    async def generate_response(self, system_prompt: str, user_prompt: str, image_data: Optional[Dict[str, Any]] = None) -> str:
+    async def generate_response(self, system_prompt: str, user_prompt: str, history: List[Dict], image_data: Optional[Dict[str, Any]] = None) -> str:
         if image_data:
             logger.warning(f"CustomHttpAIService for model {self.model_id} received image_data, but current implementation ignores it.")
 
@@ -405,14 +391,14 @@ class CustomHttpAIService(BaseAIService):
         if system_prompt:
             messages_payload.append({"role": "system", "content": system_prompt})
         
+        # Добавляем историю диалога
+        if history:
+            messages_payload.extend(history)
+            
         if user_prompt: 
             messages_payload.append({"role": "user", "content": user_prompt})
         
-        payload = {
-            "messages": messages_payload,
-            "is_sync": True, 
-            "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
-        }
+        payload = { "messages": messages_payload, "is_sync": True }
         
         if is_gen_api_endpoint and self.model_id:
              payload['model'] = self.model_id 
@@ -525,53 +511,51 @@ async def check_and_log_request_attempt(
     if bot_data_cache is None: bot_data_cache = await firestore_service.get_bot_data()
     active_agent_config = AI_MODES.get(current_agent_key) if current_agent_key else None
 
-    # Проверка бонуса за подписку
+    # 1. Проверка бонуса за подписку
     news_bonus_uses_left_key = f"news_bonus_uses_left_{model_key}"
     if user_data.get('claimed_news_bonus', False) and user_data.get(news_bonus_uses_left_key, 0) > 0:
         logger.info(f"User {user_id} can use model {model_key} via news channel bonus.")
         return True, f"Используется бонусная генерация для «{model_cfg['name']}».", "bonus", 0.0
 
+    # 2. Проверка пожизненного лимита агента
+    agent_lifetime_uses_exhausted = False
     if active_agent_config and current_agent_key:
         initial_lifetime_uses = active_agent_config.get('initial_lifetime_free_uses')
         if initial_lifetime_uses is not None and model_key == active_agent_config.get("forced_model_key"):
             agent_uses_left = await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data)
             if agent_uses_left > 0:
-                logger.info(f"User {user_id} can use agent {current_agent_key} (model {model_key}) via agent lifetime free use. Left: {agent_uses_left}")
                 return True, f"Используется бесплатная попытка для агента «{active_agent_config.get('name')}» ({agent_uses_left}/{initial_lifetime_uses}).", "agent_lifetime_free", 0.0
+            else:
+                agent_lifetime_uses_exhausted = True
 
-    free_daily_limit = model_cfg.get('free_daily_limit', 0)
-    current_daily_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
-    if current_daily_usage < free_daily_limit:
-        logger.info(f"User {user_id} can use model {model_key} via free daily limit ({current_daily_usage}/{free_daily_limit}).")
-        return True, f"Используется бесплатная дневная попытка для модели «{model_cfg['name']}» ({current_daily_usage + 1}/{free_daily_limit}).", "daily_free", 0.0
+    # 3. Проверка дневного бесплатного лимита (ПРОПУСКАЕТСЯ, если лимит агента исчерпан)
+    if not agent_lifetime_uses_exhausted:
+        free_daily_limit = model_cfg.get('free_daily_limit', 0)
+        current_daily_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
+        if current_daily_usage < free_daily_limit:
+            return True, f"Используется бесплатная дневная попытка для модели «{model_cfg['name']}» ({current_daily_usage + 1}/{free_daily_limit}).", "daily_free", 0.0
 
+    # 4. Проверка платного использования за гемы
     gem_cost = model_cfg.get('gem_cost', 0.0)
     if gem_cost > 0:
         user_gem_balance = await get_user_gem_balance(user_id, user_data)
         if user_gem_balance >= gem_cost:
-            logger.info(f"User {user_id} can use model {model_key} for {gem_cost} gems (balance: {user_gem_balance}).")
             return True, f"Будет списано {gem_cost:.1f} гемов.", "gem", gem_cost
         else:
-            msg = (f"Недостаточно гемов для модели «{model_cfg['name']}».\n"
-                   f"Нужно: {gem_cost:.1f} гемов, у вас: {user_gem_balance:.1f} гемов.\n"
-                   f"Пополните баланс: /gems или через меню.")
-            logger.warning(f"User {user_id} insufficient gems for {model_key}. Needed: {gem_cost}, Has: {user_gem_balance}")
+            msg = (f"Недостаточно гемов для «{model_cfg['name']}».\n"
+                   f"Нужно: {gem_cost:.1f}, у вас: {user_gem_balance:.1f}\n"
+                   f"Пополните баланс через меню «💎 Гемы».")
             return False, msg, "no_gems", gem_cost
     
-    # Если gem_cost == 0 и дневной лимит исчерпан
-    if gem_cost == 0 and current_daily_usage >= free_daily_limit:
-        # Проверяем, не исчерпан ли также и агентский лимит, если он был
-        agent_had_lifetime_option = active_agent_config and active_agent_config.get('initial_lifetime_free_uses') is not None
-        agent_lifetime_uses_exhausted_or_not_applicable = True
-        if agent_had_lifetime_option and model_key == active_agent_config.get("forced_model_key"):
-            if await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data) > 0:
-                agent_lifetime_uses_exhausted_or_not_applicable = False
+    # 5. Если дошли сюда, значит все лимиты исчерпаны и модель не платная
+    msg = (f"Все бесплатные лимиты для «{model_cfg['name']}» на сегодня исчерпаны. "
+           f"Эта модель недоступна за гемы.")
+    if agent_lifetime_uses_exhausted:
+        msg = (f"Все бесплатные попытки для агента «{active_agent_config.get('name')}» исчерпаны. "
+               f"Для дальнейшего использования требуются гемы, но для этой модели они не настроены.")
         
-        if agent_lifetime_uses_exhausted_or_not_applicable:
-            msg = (f"Дневной бесплатный лимит для «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. "
-                   f"Эта модель не доступна за гемы после исчерпания бесплатных попыток.")
-            logger.warning(f"User {user_id} free daily limit exhausted for {model_key} (no gem cost).")
-            return False, msg, "limit_exhausted_no_gems", None
+    logger.warning(f"User {user_id} all limits exhausted for {model_key} (no gem cost).")
+    return False, msg, "limit_exhausted_no_gems", None
 
     logger.error(f"User {user_id} check_and_log_request_attempt unexpected state for {model_key} with agent {current_agent_key}.")
     return False, "Не удалось определить возможность использования модели. Обратитесь в поддержку.", "error", None
