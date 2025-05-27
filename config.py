@@ -436,7 +436,33 @@ class CustomHttpAIService(BaseAIService):
             messages_payload.append({"role": "user", "content": current_user_content})
         
         # Payload для создания задачи, как в документации
-        task_payload = { "messages": messages_payload }
+        # --- НАЧАЛО ИЗМЕНЕНИЙ PAYLOAD ---
+        if is_gen_api_endpoint: # Если это endpoint api.gen-api.ru
+            # Формируем payload согласно второму, более полному примеру из документации Grok
+            task_payload = {
+                "messages": messages_payload,
+                "model": self.model_id,  # Явно указываем модель, даже если есть default
+                "is_sync": False,        # Явно указываем асинхронный режим
+                "stream": False,         # Явно указываем, что не используем стриминг
+                "n": 1,
+                "temperature": 1.0,      # Используем float для температуры
+                "top_p": 1.0,            # Используем float для top_p
+                "response_format": "{\"type\":\"text\"}", # Передаем как JSON-строку
+                "frequency_penalty": 0,
+                "presence_penalty": 0
+            }
+            # callback_url здесь не указываем, так как его нет во втором примере
+            # и мы используем is_sync: false для асинхронного опроса.
+        else:
+            # Для других Custom HTTP API оставляем более простой payload,
+            # который, возможно, работал для них ранее.
+            # Либо можно будет унифицировать, если этот новый payload подойдет всем.
+            task_payload = {
+                "messages": messages_payload,
+                "model": self.model_id,
+                # Можно добавить другие параметры, если они общие для других API
+            }
+        # --- КОНЕЦ ИЗМЕНЕНИЙ PAYLOAD ---
 
         try:
             # Отправляем запрос на создание задачи
