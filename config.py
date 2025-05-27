@@ -62,9 +62,9 @@ class AppConfig:
     GEMS_FOR_NEW_USER = 0
     
     GEM_PACKAGES = {
-        "pack_25_gems_trial": { 
-            "gems": 25, "price_units": 5900, "currency": "RUB", 
-            "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет. Только один раз!",
+        "pack_24_gems_trial": { 
+            "gems": 24, "price_units": 6000, "currency": "RUB", 
+            "title": "💎 24 Гемов (Пробный)", "description": "Специальный пробный пакет.",
             "is_one_time": True 
         },
         "pack_50_gems": {
