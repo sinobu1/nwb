@@ -1108,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return msgDiv;
     }
 
-    async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType) { 
+     async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType, history) { 
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
             addMessageToChat('bot', { text: "Ошибка: ID пользователя Telegram не найден." });
@@ -1121,7 +1121,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = { 
             text: userText, 
             agentKey: agentKeyForBackend, 
-            modelKey: modelKeyToSubmit 
+            modelKey: modelKeyToSubmit,
+            history: history || [] // <<< ДОБАВЬТЕ ИСТОРИЮ В PAYLOAD
         };
 
         if (imageBase64 && imageMimeType) {
@@ -1158,7 +1159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = chatPromptInput.value.trim();
         let imageBase64ForBackend = null; 
         let mimeTypeForBackend = null;   
-        let imageDataUrlForUi = null;    
+        let imageDataUrlForUi = null;  
+        
+        const historyToSend = [...currentMiniAppChatHistory];
 
         if (selectedFileBase64 && selectedFileMimeType) { 
             imageBase64ForBackend = selectedFileBase64;
@@ -1211,7 +1214,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(oldTypingIndicator) oldTypingIndicator.remove();
         addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true }); 
         
-        await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, imageBase64ForBackend, mimeTypeForBackend);
+        await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, imageBase64ForBackend, mimeTypeForBackend, historyToSend);
 
         if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && !selectedFileBase64 && imageBase64ForBackend === pendingDietitianImage.base64) {
             logger.info("Dietitian: Text (weight/comment) processed with pending image. Clearing pending image.");
