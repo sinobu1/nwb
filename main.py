@@ -103,6 +103,7 @@ ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 # --- Регистрация обработчиков из bot_logic ---
 # (Предполагается, что все CommandHandler, MessageHandler и т.д. определены в bot_logic)
 if hasattr(bot_logic, 'start'): ptb_app.add_handler(bot_logic.CommandHandler("start", bot_logic.start), group=0)
+if hasattr(bot_logic, 'new_topic_command'): ptb_app.add_handler(bot_logic.CommandHandler("new", bot_logic.new_topic_command), group=0)
 if hasattr(bot_logic, 'open_menu_command'): ptb_app.add_handler(bot_logic.CommandHandler("menu", bot_logic.open_menu_command), group=0)
 if hasattr(bot_logic, 'usage_command'): ptb_app.add_handler(bot_logic.CommandHandler("usage", bot_logic.usage_command), group=0)
 if hasattr(bot_logic, 'gems_info_command'): ptb_app.add_handler(bot_logic.CommandHandler("gems", bot_logic.gems_info_command), group=0)
