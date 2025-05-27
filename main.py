@@ -2,7 +2,7 @@
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, status, Form, File, UploadFile
-from typing import Optional, Dict, List # Added Dict, List
+from typing import Optional, Dict, List, Any # Added Dict, List
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -57,6 +57,7 @@ class AppChatMessageRequest(BaseModel):
     modelKey: str
     image_base64: Optional[str] = None
     image_mime_type: Optional[str] = None
+    history: Optional[List[Dict[str, Any]]] = None
 
 # Pydantic Models for Profile Data API
 class DailyLimitInfo(BaseModel):
@@ -156,6 +157,19 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
                 "base64": request_data.image_base64,
                 "mime_type": request_data.image_mime_type
             }
+                 history_from_app = request_data.history or []
+            if len(history_from_app) > CONFIG.MAX_CONVERSATION_HISTORY * 2:
+                history_from_app = history_from_app[-(CONFIG.MAX_CONVERSATION_HISTORY * 2):]
+                logger.info(f"History from Mini App for user {user_id} was truncated to {len(history_from_app)} messages.")
+
+
+            raw_ai_response = await ai_service.generate_response(
+                system_prompt,
+                request_data.text or ("Анализ изображения" if image_data_for_logic else "Пустой запрос"),
+                history=history_from_app, # <<< ЗАМЕНИТЕ [] на history_from_app
+                image_data=image_data_for_logic
+            )
+        
         except Exception as e:
             logger.error(f"Error processing base64 image for user {user_id}: {e}")
             image_data_for_logic = None
