@@ -417,9 +417,15 @@ class CustomHttpAIService(BaseAIService):
         # Определяем переменную здесь, чтобы она была доступна во всей функции
         is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
         
+        # --- НАЧАЛО ИЗМЕНЕНИЙ (ФИНАЛЬНАЯ ВЕРСИЯ) ---
+
         messages_payload = []
 
-        # Преобразуем историю, исправляя роль 'model' на 'assistant'
+        # 1. Сначала добавляем системный промпт, если он есть, в чистом виде.
+        if system_prompt:
+            messages_payload.append({"role": "system", "content": system_prompt})
+
+        # 2. Затем добавляем историю, исправляя роль 'model' на 'assistant'.
         if history:
             for msg in history:
                 role = msg.get("role")
@@ -432,22 +438,21 @@ class CustomHttpAIService(BaseAIService):
                 elif role and msg.get("content"):
                      messages_payload.append({"role": role, "content": msg["content"]})
 
-        # Обрабатываем системный промпт, добавляя его к первому сообщению пользователя
-        current_user_content = user_prompt
-        if system_prompt and not history:
-            current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
-
-        # Добавляем текущее сообщение пользователя в историю
+        # 3. В конце добавляем сообщение пользователя.
         if user_prompt:
-            messages_payload.append({"role": "user", "content": current_user_content})
+            messages_payload.append({"role": "user", "content": user_prompt})
         
         payload = {
             "messages": messages_payload,
             "is_sync": True, 
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
+        
+        # 4. Оставляем параметр 'model', так как он может быть необходим для валидации.
         if is_gen_api_endpoint and self.model_id:
              payload['model'] = self.model_id
+        
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
             
         endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
