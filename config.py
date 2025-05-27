@@ -412,16 +412,17 @@ class CustomHttpAIService(BaseAIService):
         }
         
         endpoint_url = self.model_config.get("endpoint", "")
-       # --- НАЧАЛО ФИНАЛЬНЫХ ИЗМЕНЕНИЙ ---
+      # --- НАЧАЛО ИЗМЕНЕНИЙ (ВЕРСИЯ С ИСПРАВЛЕННЫМ NameError) ---
+
+        # ЭТА СТРОКА БЫЛА ПРОПУЩЕНА В ПРОШЛЫЙ РАЗ. ТЕПЕРЬ ОНА НА МЕСТЕ.
+        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
 
         messages_payload = []
 
-        # 1. Поскольку в примере нет роли 'system', объединяем системный промпт с первым сообщением пользователя.
         current_user_content = user_prompt
         if system_prompt and not history:
             current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
-        # 2. Добавляем историю, все еще исправляя роль 'model' на 'assistant' для совместимости.
         if history:
             for msg in history:
                 role = msg.get("role")
@@ -434,19 +435,12 @@ class CustomHttpAIService(BaseAIService):
                 elif role and msg.get("content"):
                      messages_payload.append({"role": role, "content": msg["content"]})
 
-        # 3. Добавляем текущее сообщение пользователя.
         if user_prompt:
             messages_payload.append({"role": "user", "content": current_user_content})
         
-        # 4. СОЗДАЕМ PAYLOAD СТРОГО ПО ДОКУМЕНТАЦИИ: только ключ 'messages'.
-        payload = {
-            "messages": messages_payload
-        }
+        payload = { "messages": messages_payload }
         
-        # Примечание: документация также перечисляет другие необязательные параметры, такие как 'temperature', 'top_p' и т.д.
-        # Их можно добавить в этот payload при необходимости, но 'is_sync' и 'max_tokens', видимо, не поддерживаются.
-        
-        # --- КОНЕЦ ФИНАЛЬНЫХ ИЗМЕНЕНИЙ ---
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
             
         endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
