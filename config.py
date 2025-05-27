@@ -16,7 +16,7 @@ import logging
 import traceback
 import os
 import asyncio
-import nest_asyncio
+# import nest_asyncio  # <--- ЗАКОММЕНТИРОВАЛИ
 import json
 import base64 
 from datetime import datetime, timedelta, timezone
@@ -30,7 +30,7 @@ from google.cloud.firestore_v1.client import Client as FirestoreClient
 from abc import ABC, abstractmethod
 
 # --- ГЛОБАЛЬНАЯ НАСТРОЙКА ---
-nest_asyncio.apply()
+# nest_asyncio.apply() # <--- ЗАКОММЕНТИРОВАЛИ
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
