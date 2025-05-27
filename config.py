@@ -63,7 +63,7 @@ class AppConfig:
     
     GEM_PACKAGES = {
     "pack_25_gems": {  # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
-        "gems": 25, "price_units": 5900, "currency": "RUB",
+        "gems": 24, "price_units": 6000, "currency": "RUB",
         "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет!",
         
     },
