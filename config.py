@@ -480,36 +480,22 @@ class CustomHttpAIService(BaseAIService):
                 logger.debug(f"Polling request_id {request_id}. Status: {status}")
 
                 if status == "success":
-                    # --- НАЧАЛО ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
-                    output = result_json.get("output") 
-
-                    if not output:
-                        logger.error(f"Task {request_id} succeeded but the 'output' field is missing or empty. Full response: {result_json}")
-                        return f"API-задача для модели «{self.model_config.get('name')}» выполнена, но вернула пустой результат."
-
-                    # Проверяем, является ли output строкой, содержащей JSON
-                    if isinstance(output, str) and output.startswith('{'):
-                         try:
-                             output_json = json.loads(output)
-                             # Пытаемся извлечь вложенный ответ
-                             nested_response = output_json.get("response")
-                             if isinstance(nested_response, list) and len(nested_response) > 0:
-                                 if isinstance(nested_response[0], dict):
-                                     content = nested_response[0].get("message", {}).get("content")
-                                     if content:
-                                         return content
-                         except json.JSONDecodeError:
-                              # Если это невалидный JSON, просто возвращаем строку как есть
-                              return output
-
-                    # Если output - это обычная строка (или не удалось распарсить JSON), возвращаем ее
-                    if isinstance(output, str):
-                        return output
+                    # --- НАЧАЛО ПОБЕДНОГО ИСПРАВЛЕНИЯ ---
+                    # Лог показал, что текст ответа находится в ключе 'result',
+                    # который является списком (массивом).
                     
-                    # Если дошли сюда, значит структура ответа неизвестна
-                    logger.error(f"Task {request_id} succeeded but has an unknown output format. Full response: {result_json}")
-                    return f"API-задача для «{self.model_config.get('name')}» выполнена, но имеет неизвестный формат ответа."
-                    # --- КОНЕЦ ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
+                    result_list = result_json.get("result")
+
+                    # Проверяем, что 'result' существует, это список, и он не пустой
+                    if result_list and isinstance(result_list, list) and len(result_list) > 0:
+                        # Извлекаем первый элемент из списка — это и есть наш текст.
+                        ai_text = result_list[0]
+                        return ai_text
+                    else:
+                        # Если 'result' пустой или имеет неверный формат
+                        logger.error(f"Task {request_id} succeeded but the 'result' field has an unexpected format. Full response: {result_json}")
+                        return f"API-задача для «{self.model_config.get('name')}» выполнена, но вернула неожиданный формат ответа."
+                    # --- КОНЕЦ ПОБЕДНОГО ИСПРАВЛЕНИЯ ---
 
                 elif status in ["error", "failed"]:
                     logger.error(f"Task failed for request_id {request_id}. Response: {result_json}")
