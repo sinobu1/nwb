@@ -593,8 +593,27 @@ async def get_daily_usage_for_model(user_id: int, model_key: str, bot_data_cache
     return model_usage_info['count']
 
 async def get_agent_lifetime_uses_left(user_id: int, agent_config_key: str, user_data: Optional[Dict[str, Any]] = None) -> int:
-    if user_data is None: user_data = await firestore_service.get_user_data(user_id)
+    if user_data is None:
+        user_data = await firestore_service.get_user_data(user_id)
+
     firestore_key = f"lifetime_uses_{agent_config_key}"
+    
+    # Если ключ для подсчета попыток отсутствует в данных пользователя
+    if firestore_key not in user_data:
+        # Проверяем конфигурацию агента на наличие начального значения
+        agent_config = AI_MODES.get(agent_config_key)
+        if agent_config and (initial_uses := agent_config.get('initial_lifetime_free_uses')):
+            # Ключ отсутствует, значит это первая встреча пользователя с этим агентом.
+            # Устанавливаем начальное значение в Firestore, чтобы исправить это на будущее.
+            await firestore_service.set_user_data(user_id, {firestore_key: initial_uses})
+            logger.info(f"Initialized lifetime uses for user {user_id}, agent {agent_config_key} to {initial_uses}.")
+            # Возвращаем начальное значение
+            return initial_uses
+        else:
+            # У агента не настроены пожизненные попытки, значит их 0.
+            return 0
+    
+    # Если ключ существует, возвращаем его значение
     return int(user_data.get(firestore_key, 0))
 
 async def decrement_agent_lifetime_uses(user_id: int, agent_config_key: str, user_data: Optional[Dict[str, Any]] = None) -> None:
