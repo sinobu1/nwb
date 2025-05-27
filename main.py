@@ -2,7 +2,7 @@
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, status, Form, File, UploadFile
-from typing import Optional, Dict, List, Any # Added Dict, List
+from typing import Optional, Dict, List, Any # 'Any' добавлено для гибкости
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -57,7 +57,7 @@ class AppChatMessageRequest(BaseModel):
     modelKey: str
     image_base64: Optional[str] = None
     image_mime_type: Optional[str] = None
-    history: Optional[List[Dict[str, Any]]] = None
+    history: Optional[List[Dict[str, Any]]] = None # Поле для приема истории чата
 
 # Pydantic Models for Profile Data API
 class DailyLimitInfo(BaseModel):
@@ -148,7 +148,7 @@ async def get_app_updates(user_id: int):
 @app.post("/api/process_app_message/{user_id_unsafe}")
 async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageRequest):
     user_id = user_id_unsafe
-    logger.info(f"Received message from MiniApp for user {user_id}. Agent: {request_data.agentKey}, Model: {request_data.modelKey}, Text: '{request_data.text}', HasImage: {bool(request_data.image_base64)}")
+    logger.info(f"Received message from MiniApp for user {user_id}. Agent: {request_data.agentKey}, Model: {request_data.modelKey}, Text: '{request_data.text}', HasImage: {bool(request_data.image_base64)}, History: {len(request_data.history or [])} items")
 
     image_data_for_logic = None
     if request_data.image_base64 and request_data.image_mime_type:
@@ -157,19 +157,6 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
                 "base64": request_data.image_base64,
                 "mime_type": request_data.image_mime_type
             }
-                 history_from_app = request_data.history or []
-            if len(history_from_app) > CONFIG.MAX_CONVERSATION_HISTORY * 2:
-                history_from_app = history_from_app[-(CONFIG.MAX_CONVERSATION_HISTORY * 2):]
-                logger.info(f"History from Mini App for user {user_id} was truncated to {len(history_from_app)} messages.")
-
-
-            raw_ai_response = await ai_service.generate_response(
-                system_prompt,
-                request_data.text or ("Анализ изображения" if image_data_for_logic else "Пустой запрос"),
-                history=history_from_app, # <<< ЗАМЕНИТЕ [] на history_from_app
-                image_data=image_data_for_logic
-            )
-        
         except Exception as e:
             logger.error(f"Error processing base64 image for user {user_id}: {e}")
             image_data_for_logic = None
@@ -193,7 +180,6 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
     else:
         try:
             ai_service = bot_logic.get_ai_service(request_data.modelKey)
-            # system_prompt_key = request_data.agentKey # Используется для получения промпта
             active_agent_config = AI_MODES.get(request_data.agentKey)
 
             if not active_agent_config:
@@ -202,10 +188,18 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
             
             system_prompt = active_agent_config["prompt"]
 
+            # Получаем историю из запроса или создаем пустой список
+            history_from_app = request_data.history or []
+            
+            # Обрезаем историю, если она слишком длинная, чтобы избежать ошибок с контекстным окном
+            if len(history_from_app) > CONFIG.MAX_CONVERSATION_HISTORY * 2:
+                history_from_app = history_from_app[-(CONFIG.MAX_CONVERSATION_HISTORY * 2):]
+                logger.info(f"History from Mini App for user {user_id} was truncated to {len(history_from_app)} messages.")
 
             raw_ai_response = await ai_service.generate_response(
                 system_prompt,
                 request_data.text or ("Анализ изображения" if image_data_for_logic else "Пустой запрос"),
+                history=history_from_app, # Передаем полученную и обрезанную историю
                 image_data=image_data_for_logic
             )
             ai_response_text, _ = bot_logic.smart_truncate(raw_ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
