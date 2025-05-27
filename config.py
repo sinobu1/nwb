@@ -461,7 +461,7 @@ class CustomHttpAIService(BaseAIService):
         # ЭТАП 2: Получение результата по request_id (Long-Pooling)
         
         # Формируем URL для получения результата. Обычно он выглядит так:
-        result_url = f"https://api.gen-api.ru/api/v1/requests/{request_id}"
+        result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}"
         
         start_time = time.time()
         timeout_seconds = 120 # Ждем результат не дольше 2 минут
