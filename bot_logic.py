@@ -309,7 +309,7 @@ async def show_help(update: Update, user_id: int):
     current_menu_for_reply = user_data_loc.get('current_menu', BotConstants.MENU_HELP_SUBMENU)
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML, reply_markup=generate_menu_keyboard(current_menu_for_reply), disable_web_page_preview=True)
 
-async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, package_key: str): 
+async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAULT_TYPE, package_key: str):
     user_id = update.effective_user.id
     package_info = CONFIG.GEM_PACKAGES.get(package_key)
     if not package_info:
@@ -324,7 +324,9 @@ async def send_gem_purchase_invoice(update: Update, context: ContextTypes.DEFAUL
             await update.message.reply_text(f"Вы уже приобретали пакет «{package_info['title']}». Эта покупка доступна только один раз.", reply_markup=generate_menu_keyboard(BotConstants.MENU_GEMS_SUBMENU))
             return
 
-    title, description, payload = package_info["title"], package_info["description"], f"gems_{package_key}_user_{user_id}_{int(datetime.now().timestamp())}"
+    title, description = package_info["title"], package_info["description"]
+    # ИСПРАВЛЕНИЕ: Используем ':' как основной разделитель, чтобы избежать конфликта с '_' в названии пакета.
+    payload = f"gems:{package_key}:user:{user_id}_{int(datetime.now().timestamp())}"
     currency, price_units = package_info["currency"], package_info["price_units"]
     prices = [LabeledPrice(label=f"{package_info['gems']} Гемов", amount=price_units)]
     if not CONFIG.PAYMENT_PROVIDER_TOKEN or "YOUR_" in CONFIG.PAYMENT_PROVIDER_TOKEN:
@@ -622,21 +624,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Successfully sent AI response (model: {final_model_key_for_request}, usage: {usage_type}) to user {user_id}.")
 
 # --- ОБРАБОТЧИКИ ПЛАТЕЖЕЙ ---
-async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): 
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.pre_checkout_query
-    if query.invoice_payload and query.invoice_payload.startswith("gems_"):
-        payload_parts = query.invoice_payload.split('_')
-        user_part_index = -1
-        for i, part in enumerate(payload_parts):
-            if part == "user": user_part_index = i; break
-        if user_part_index > 1 and len(payload_parts) > user_part_index + 1 :
-            package_key_from_payload = "_".join(payload_parts[1:user_part_index])
+    # ИСПРАВЛЕНИЕ: Логика разбора payload изменена для поддержки нового формата с ':'
+    if query.invoice_payload and query.invoice_payload.startswith("gems:"):
+        payload_parts = query.invoice_payload.split(':')
+        # Ожидаемый формат: ['gems', package_key, 'user', 'user_id_timestamp'] -> 4 части
+        if len(payload_parts) == 4 and payload_parts[2] == "user":
+            package_key_from_payload = payload_parts[1]
+            user_info_part = payload_parts[3]
             package_info_check = CONFIG.GEM_PACKAGES.get(package_key_from_payload)
+
             if package_info_check:
                 try:
-                    user_id_in_payload = int(payload_parts[user_part_index + 1])
+                    user_id_in_payload = int(user_info_part.split('_')[0])
                     if query.from_user.id == user_id_in_payload:
-                        # Дополнительная проверка для одноразовых пакетов
                         if package_info_check.get("is_one_time"):
                             user_data_check = await firestore_service.get_user_data(query.from_user.id)
                             purchased_one_time_packs_check = user_data_check.get('purchased_one_time_packs', [])
@@ -647,52 +649,61 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                         await query.answer(ok=True)
                         logger.info(f"PreCheckout OK: {query.invoice_payload}")
                         return
-                    else: logger.error(f"PreCheckout User ID mismatch: Payload {user_id_in_payload}, Query {query.from_user.id}")
-                except (ValueError, IndexError): logger.error(f"PreCheckout Error parsing payload: {query.invoice_payload}")
-            else: logger.warning(f"PreCheckout Unknown gem package: {query.invoice_payload}")
-        else: logger.warning(f"PreCheckout Invalid payload structure: {query.invoice_payload}")
-    else: logger.warning(f"PreCheckout Invalid payload type: {query.invoice_payload}")
+                    else:
+                        logger.error(f"PreCheckout User ID mismatch: Payload {user_id_in_payload}, Query {query.from_user.id}")
+                except (ValueError, IndexError):
+                    logger.error(f"PreCheckout Error parsing user_id from payload: {query.invoice_payload}")
+            else:
+                logger.warning(f"PreCheckout Unknown gem package in payload: {query.invoice_payload}")
+        else:
+            logger.warning(f"PreCheckout Invalid payload structure: {query.invoice_payload}")
+    else:
+        logger.warning(f"PreCheckout Invalid payload type or prefix: {query.invoice_payload}")
+
     await query.answer(ok=False, error_message="Ошибка проверки платежа. Попробуйте еще раз или выберите другой пакет.")
 
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE): 
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     payment_info = update.message.successful_payment
     invoice_payload = payment_info.invoice_payload
     logger.info(f"Successful payment from {user_id}. Amount: {payment_info.total_amount} {payment_info.currency}. Payload: {invoice_payload}")
-    if invoice_payload and invoice_payload.startswith("gems_"):
+
+    # ИСПРАВЛЕНИЕ: Логика разбора payload изменена для поддержки нового формата с ':'
+    if invoice_payload and invoice_payload.startswith("gems:"):
         try:
-            payload_parts = invoice_payload.split('_')
-            user_part_index = -1;
-            for i, part in enumerate(payload_parts):
-                if part == "user": user_part_index = i; break
-            if user_part_index == -1 or user_part_index <= 1 or len(payload_parts) <= user_part_index + 1:
+            payload_parts = invoice_payload.split(':')
+            # Ожидаемый формат: ['gems', package_key, 'user', 'user_id_timestamp']
+            if len(payload_parts) != 4 or payload_parts[0] != 'gems' or payload_parts[2] != 'user':
                 raise ValueError("Invalid payload structure")
-            package_key = "_".join(payload_parts[1:user_part_index])
-            user_id_from_payload = int(payload_parts[user_part_index + 1])
+
+            package_key = payload_parts[1]
+            user_id_from_payload = int(payload_parts[3].split('_')[0])
+
             if user_id != user_id_from_payload:
-                logger.error(f"Security: Payload UID {user_id_from_payload} != message UID {user_id}"); raise ValueError("User ID mismatch")
-            
+                logger.error(f"Security: Payload UID {user_id_from_payload} != message UID {user_id}")
+                raise ValueError("User ID mismatch")
+
             package_info = CONFIG.GEM_PACKAGES.get(package_key)
-            if not package_info: 
-                logger.error(f"Payment for UNKNOWN package '{package_key}' by {user_id}"); 
+            if not package_info:
+                logger.error(f"Payment for UNKNOWN package '{package_key}' by {user_id}")
                 raise ValueError("Unknown package")
-            
+
             if package_info.get("is_one_time"):
                 user_data_for_pack = await firestore_service.get_user_data(user_id)
                 purchased_packs = user_data_for_pack.get('purchased_one_time_packs', [])
                 if package_key not in purchased_packs:
                     purchased_packs.append(package_key)
                     await firestore_service.set_user_data(user_id, {'purchased_one_time_packs': purchased_packs})
-                else: # Эта проверка должна была быть в precheckout, но на всякий случай
+                else:
                     logger.warning(f"User {user_id} somehow managed to pay for one-time package '{package_key}' again. Gems not added.")
                     await update.message.reply_text(f"Похоже, вы уже приобретали пакет «{package_info['title']}». Гемы не были начислены повторно.")
                     return
 
-
             gems_to_add = float(package_info["gems"])
             current_balance = await get_user_gem_balance(user_id)
-            new_gem_balance = current_balance + gems_to_add 
+            new_gem_balance = current_balance + gems_to_add
             await update_user_gem_balance(user_id, new_gem_balance)
+
             confirmation_msg = (f"🎉 Оплата успешна! Начислено <b>{gems_to_add:.1f} гемов</b>.\n"
                                f"Новый баланс: <b>{new_gem_balance:.1f} гемов</b>.")
             user_data = await firestore_service.get_user_data(user_id)
@@ -706,7 +717,8 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         except Exception as e:
             logger.error(f"Error processing gem payment for user {user_id}, payload {invoice_payload}: {e}", exc_info=True)
             await update.message.reply_text("Ошибка начисления гемов. Свяжитесь с поддержкой.")
-    else: logger.warning(f"Successful payment with unknown payload from {user_id}: {invoice_payload}")
+    else:
+        logger.warning(f"Successful payment with unknown payload from {user_id}: {invoice_payload}")
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None: 
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
