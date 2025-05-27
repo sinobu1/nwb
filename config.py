@@ -412,31 +412,33 @@ class CustomHttpAIService(BaseAIService):
         }
         
         endpoint_url = self.model_config.get("endpoint", "")
-        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
         
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+
         messages_payload = []
-        if system_prompt:
-            messages_payload.append({"role": "system", "content": system_prompt})
-        
-        # Добавляем историю диалога, преобразуя формат Gemini (parts: [{'text': ...}]) в стандартный (content: ...)
+
+        # 1. Преобразуем историю, исправляя роль 'model' на 'assistant'
         if history:
             for msg in history:
                 role = msg.get("role")
-                parts = msg.get("parts")
-                # --- НАЧАЛО ИЗМЕНЕНИЯ ---
-                # API, совместимые с OpenAI, ожидают роль 'assistant', а не 'model'.
                 if role == "model":
                     role = "assistant"
-                # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+                
+                parts = msg.get("parts")
                 if role and parts and isinstance(parts, list) and parts[0].get("text"):
                     messages_payload.append({"role": role, "content": parts[0]["text"]})
-                # Если история уже в нужном формате (например, от другого Custom API), можно добавить проверку
                 elif role and msg.get("content"):
                      messages_payload.append({"role": role, "content": msg["content"]})
 
+        # 2. Обрабатываем системный промпт: добавляем его к первому сообщению пользователя,
+        # а не отдельной ролью 'system', для лучшей совместимости.
+        current_user_content = user_prompt
+        if system_prompt and not history: # Добавляем системный промпт только в начале диалога
+            current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
-        if user_prompt: 
-            messages_payload.append({"role": "user", "content": user_prompt})
+        # 3. Добавляем текущее сообщение пользователя в историю
+        if user_prompt:
+            messages_payload.append({"role": "user", "content": current_user_content})
         
         payload = {
             "messages": messages_payload,
@@ -444,11 +446,11 @@ class CustomHttpAIService(BaseAIService):
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
         
-        if is_gen_api_endpoint and self.model_id:
-             payload['model'] = self.model_id 
+        # 4. Не добавляем 'model' в payload, т.к. это может конфликтовать с URL
+        # if is_gen_api_endpoint and self.model_id:
+        #      payload['model'] = self.model_id 
 
-        if self.model_config.get("parameters"):
-            payload.update(self.model_config["parameters"])
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
         
         endpoint = endpoint_url 
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
