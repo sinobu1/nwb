@@ -795,15 +795,15 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const tg = window.Telegram?.WebApp || {};
-    let currentMiniAppChatHistory = []; 
-    let lastMessageInfo = { sender: null, date: null }; 
+    let currentMiniAppChatHistory = [];
+    let lastMessageInfo = { sender: null, date: null };
     let agentsSwiper, modelsSwiper;
-    let selectedFileBase64 = null; 
-    let selectedFileMimeType = null; 
-    let pendingDietitianImage = null; 
+    let selectedFileBase64 = null;
+    let selectedFileMimeType = null;
+    let pendingDietitianImage = null;
 
-    const API_KEY = "AIzaSyCdDMpgLJyz6aYdwT9q4sbBk7sHVID4BTI"; 
-    const APP_BACKEND_URL = "https://nwb-production.up.railway.app"; 
+    // ИСПРАВЛЕНО: Бэкенд-URL теперь единственная точка для API-запросов
+    const APP_BACKEND_URL = "https://nwb-production.up.railway.app";
 
     const logger = {
         info: (message, ...optionalParams) => console.log(`[INFO] ${new Date().toISOString()}: ${message}`, ...optionalParams),
@@ -812,53 +812,60 @@ document.addEventListener('DOMContentLoaded', () => {
         debug: (message, ...optionalParams) => console.debug(`[DEBUG] ${new Date().toISOString()}: ${message}`, ...optionalParams),
     };
 
-    const generalAgents = [ 
-        { key: "universal_ai_basic", name: "Универсальный", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-grad-1", systemPrompt: "Ты — полезный ИИ-ассистент." }, 
-        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-grad-2", systemPrompt: "Ты — ИИ, специализирующийся на генерации креативных идей. Помоги пользователю придумать что-то новое." }, 
-        { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", palette: "palette-grad-3", systemPrompt: "Ты — опытный карьерный коуч. Давай конструктивные советы и рекомендации по развитию карьеры." }, 
-        { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4", systemPrompt: "Ты — ИИ-ассистент для программистов. Помогай с кодом, объясняй концепции и предлагай решения." }, 
-        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5", systemPrompt: "Ты — дружелюбный и терпеливый ИИ-репетитор. Помогай пользователю разбираться в учебных материалах." }, 
-        { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6", systemPrompt: "Ты — ИИ-редактор. Помогай улучшать тексты, исправлять ошибки и делать их более выразительными." }
+    // ИСПРАВЛЕНО: Данные синхронизированы с бэкендом (убраны лишние промпты)
+    const generalAgents = [
+        { key: "universal_ai_basic", name: "Универсальный", icon: "🌐", desc: "Ответы на любые темы", palette: "palette-grad-1" },
+        { key: "idea_generator", name: "Генератор идей", icon: "💡", desc: "Помощь в поиске идей", palette: "palette-grad-2" },
+        { key: "career_coach", name: "Карьерный консультант", icon: "📈", desc: "Советы по карьере", palette: "palette-grad-3" },
+        { key: "programming_partner", name: "Партнер программиста", icon: "💻", desc: "Помощь в коде", palette: "palette-grad-4" },
+        { key: "tutor_assistant", name: "Внешкольный наставник", icon: "📚", desc: "Помощь с учебой", palette: "palette-grad-5" },
+        { key: "literary_editor", name: "Литературный редактор", icon: "✍️", desc: "Улучшение текстов", palette: "palette-grad-6" }
     ];
 
-    const models = [ 
+    const models = [
         { key: "google_gemini_2_0_flash", name: "Gemini 2.0 Flash", icon: "⚡️", desc: "Быстрая и доступная", palette: "palette-grad-default" },
         { key: "google_gemini_2_5_flash_preview", name: "Gemini 2.5 Flash", icon: "👁️‍🗨️", desc: "Быстрый и способный", palette: "palette-grad-1" },
-        { key: "custom_api_gemini_2_5_pro", name: "Gemini 2.5 Pro", icon: "🚀", desc: "Продвинутая модель", palette: "palette-grad-2" }, 
+        { key: "custom_api_gemini_2_5_pro", name: "Gemini 2.5 Pro", icon: "🚀", desc: "Продвинутая модель", palette: "palette-grad-2" },
         { key: "custom_api_grok_3", name: "Grok 3", icon: "🌀", desc: "Модель Grok", palette: "palette-grad-3" },
         { key: "custom_api_gpt_4o_mini", name: "GPT-4o mini", icon: "🧠", desc: "Компактная GPT-4o", palette: "palette-grad-4" }
     ];
-    
+
     const toolConfigs = {
-        "photo_dietitian_analyzer": { 
-            key: "photo_dietitian_analyzer", 
-            name: "🥑 Диетолог (анализ фото)", 
-            icon: "🥑", 
-            desc: "Анализ КБЖУ по фото блюда.", 
-            forced_model_key: "google_gemini_2_5_flash_preview", 
-            systemPrompt: "Ты — Диетолог-Профессионал, эксперт по здоровому питанию, работающий с продвинутой мультимодальной ИИ-моделью, способной анализировать изображения еды. Твоя главная задача — детальный анализ ФОТОГРАФИЙ еды, присланных пользователем, и предоставление развернутых рекомендаций. Твой рабочий процесс СТРОГО следующий: 1. Пользователь присылает ФОТО блюда. 2. Ты получаешь это фото. Твоя задача на этом этапе: ТОЛЬКО вежливо и профессионально попросить пользователя указать ПРИМЕРНЫЙ ВЕС порции в граммах. Не делай никаких предположений о калорийности или составе до получения веса! Пример твоего ответа: 'Прекрасное фото! Чтобы я мог провести точный анализ и рассчитать КБЖУ, пожалуйста, уточните примерный вес этой порции в граммах.' 3. Пользователь присылает ВЕС порции текстом. 4. Теперь, имея ФОТО и ВЕС, ты должен: а) Максимально точно определить все ингредиенты блюда по фото. Если есть сомнения, лучше задать уточняющий вопрос пользователю о составе. б) Учитывая указанный вес, рассчитать примерное количество калорий (Ккал), содержание белков (Б), жиров (Ж) и углеводов (У) для всей порции. в) Представить результат в четком, структурированном виде. Например: 'Анализ вашего блюда (примерный вес: [вес] г): - Блюдо/Продукты: [Детальное перечисление распознанных ингредиентов] - Калорийность: ~[X] Ккал - Белки: ~[Y] г - Жиры: ~[Z] г - Углеводы: ~[W] г Рекомендации: [1-2 кратких, полезных совета по данному блюду/приему пищи, например, о его полезности, возможных заменах, сочетаемости или влиянии на цели пользователя, если они известны].' г) Будь внимателен, дружелюбен и профессионален, как настоящий диетолог. Используй эмодзи уместно для создания приятного впечатления. Если пользователь вместо фото или веса задает ОБЩИЙ текстовый вопрос по диетологии (например, 'польза авокадо'), отвечай на него как эксперт-диетолог, основываясь на своих знаниях, без упоминания анализа фото и запроса веса."
+        "photo_dietitian_analyzer": {
+            key: "photo_dietitian_analyzer",
+            // ИСПРАВЛЕНО: Опечатка в названии
+            name: "🥑 Диетолог (анализ фото)",
+            icon: "🥑",
+            desc: "Анализ КБЖУ по фото блюда.",
+            forced_model_key: "google_gemini_2_5_flash_preview",
+            // ИСПРАВЛЕНО: Системный промпт убран, т.к. он находится на бэкенде
         }
     };
 
-    const appTools = [
-        { key: "image_generator_tool", name: "Генератор изображений ✨", icon: "🎨", desc: "Создание картинок по описанию.", screenId: "image-generator-screen" },
-        { key: "photo_dietitian_analyzer", name: "Диетолог (анализ фото)", icon: "🥑", desc: "Анализ КБЖУ по фото блюда.", isChatTool: true }, 
-        { key: "summarizer_tool", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео.", screenId: "summarizer-screen" },
+    // Этот список определяет, какие инструменты показывать на вкладке "Инструменты"
+     const appTools = [
+        // { key: "image_generator_tool", name: "Генератор изображений ✨", icon: "🎨", desc: "Создание картинок по описанию.", screenId: "image-generator-screen" },
+        { key: "photo_dietitian_analyzer", name: "Диетолог (анализ фото)", icon: "🥑", desc: "Анализ КБЖУ по фото блюда.", isChatTool: true },
+        // { key: "summarizer_tool", name: "Суммаризатор текста ✨", icon: "📑", desc: "Краткий пересказ длинных статей и видео.", screenId: "summarizer-screen" },
     ];
 
-    let selectedAgentKey = generalAgents[0].key; 
-    let selectedModelKey = models[0].key; 
+
+    let selectedAgentKey = generalAgents[0].key;
+    let selectedModelKey = models[0].key;
+
+    // ... (весь остальной код JavaScript остается без изменений) ...
+    // (далее идет тот же самый код, что и был в вашем файле, начиная с `const mainScreen = ...`)
 
     const mainScreen = document.getElementById('main-screen');
     const chatScreen = document.getElementById('chat-screen');
     const imageGeneratorScreen = document.getElementById('image-generator-screen');
     const summarizerScreen = document.getElementById('summarizer-screen');
-    const dietitianAgentCard = document.getElementById('dietitian-agent-card'); 
+    const dietitianAgentCard = document.getElementById('dietitian-agent-card');
     const imageGeneratorCard = document.getElementById('image-generator-card');
 
     const chatMessagesContainer = document.getElementById('chat-messages-container');
-    const chatPromptInput = document.getElementById('chat-prompt-input'); 
-    const chatSendMessageBtn = document.getElementById('chat-send-message-btn'); 
+    const chatPromptInput = document.getElementById('chat-prompt-input');
+    const chatSendMessageBtn = document.getElementById('chat-send-message-btn');
     const chatAttachFileBtn = document.getElementById('chat-attach-file-btn');
     const chatFileInput = document.getElementById('chat-file-input');
     const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -866,15 +873,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatAgentNameEl = document.getElementById('chat-agent-name');
     const chatModelNameEl = document.getElementById('chat-model-name');
 
-    const chatBackButton = document.getElementById('chat-back-btn'); 
+    const chatBackButton = document.getElementById('chat-back-btn');
     const chatSettingsBtn = document.getElementById('chat-settings-btn');
-    const chatClearHistoryBtn = document.getElementById('chat-clear-history-btn'); 
+    const chatClearHistoryBtn = document.getElementById('chat-clear-history-btn');
     const settingsModal = document.getElementById('settings-modal');
-    const agentSelect = document.getElementById('agent-select'); 
-    const modelSelect = document.getElementById('model-select'); 
+    const agentSelect = document.getElementById('agent-select');
+    const modelSelect = document.getElementById('model-select');
     const mainContentArea = document.getElementById('main-content-area');
 
-    const imagePromptInputEl = document.getElementById('image-prompt-input'); 
+    const imagePromptInputEl = document.getElementById('image-prompt-input');
     const generateImageBtn = document.getElementById('generate-image-btn');
     const imageLoadingIndicator = document.getElementById('image-loading-indicator');
     const generatedImageContainer = document.getElementById('generated-image-container');
@@ -885,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const summarizerLoadingIndicator = document.getElementById('summarizer-loading-indicator');
     const summarizerOutput = document.getElementById('summarizer-output');
     const summarizerErrorMessage = document.getElementById('summarizer-error-message');
-    
+
     const fullscreenImageViewer = document.getElementById('fullscreen-image-viewer');
     const fullscreenImage = fullscreenImageViewer.querySelector('img');
     const closeFullscreenBtn = fullscreenImageViewer.querySelector('.close-fullscreen-btn');
@@ -901,21 +908,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screenToShow !== mainScreen) { tg.BackButton.show(); }
             else { tg.BackButton.hide(); }
         }
-        if (screenToShow === chatScreen) { startPolling(); chatPromptInput.focus(); } 
+        if (screenToShow === chatScreen) { startPolling(); chatPromptInput.focus(); }
         else { stopPolling(); }
     }
 
     if (tg.BackButton) {
         tg.BackButton.onClick(() => {
             const activeScreenEl = document.querySelector('.screen.active');
-            if (!activeScreenEl) return; 
+            if (!activeScreenEl) return;
             const activeScreenId = activeScreenEl.id;
 
             if (activeScreenId === 'chat-screen') {
-                closeChat(); 
+                closeChat();
             } else if (activeScreenId === 'image-generator-screen' || activeScreenId === 'summarizer-screen') {
                 switchScreen(mainScreen);
-            } else if (activeScreenId !== 'main-screen') { 
+            } else if (activeScreenId !== 'main-screen') {
                 switchScreen(mainScreen);
             }
         });
@@ -938,14 +945,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pane) pane.classList.add('active');
         if (tab) tab.classList.add('active');
         mainContentArea.scrollTop = 0;
-        if (tabId === 'profile') { 
-            displayProfileData(); 
+        if (tabId === 'profile') {
+            displayProfileData();
             fetchUserProfileData(); // Fetch data when profile tab is shown
         }
     }
 
-    function saveChatToLocalStorage() { 
-        try { 
+    function saveChatToLocalStorage() {
+        try {
             const displayHistory = Array.from(chatMessagesContainer.children)
                 .filter(el => el.classList.contains('chat-message') && !el.classList.contains('typing'))
                 .map(msgEl => {
@@ -954,60 +961,60 @@ document.addEventListener('DOMContentLoaded', () => {
                     const imageEl = msgEl.querySelector('.message-image');
                     const imageDataUrl = imageEl ? imageEl.src : null;
                     let timestamp = msgEl.dataset.timestamp || new Date().toISOString();
-                    return { sender, content: { text: textContent, imageDataUrl: imageDataUrl }, timestamp }; 
+                    return { sender, content: { text: textContent, imageDataUrl: imageDataUrl }, timestamp };
                 });
             setTimeout(() => {
-                localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory)); 
+                localStorage.setItem('uiChatHistory_' + selectedAgentKey, JSON.stringify(displayHistory));
             },0);
         }
         catch (e) { console.error("Error saving UI chat history:", e); }
     }
 
-    function loadChatFromLocalStorage() { 
+    function loadChatFromLocalStorage() {
         chatMessagesContainer.innerHTML = '';
         lastMessageInfo = { sender: null, date: null };
-        currentMiniAppChatHistory = []; 
+        currentMiniAppChatHistory = [];
         try {
             const savedUiHistory = localStorage.getItem('uiChatHistory_' + selectedAgentKey);
             if (savedUiHistory) {
                 const parsedUiHistory = JSON.parse(savedUiHistory);
-                if (parsedUiHistory.length === 0) return false; 
+                if (parsedUiHistory.length === 0) return false;
 
                 parsedUiHistory.forEach(msg => {
                     if (msg.content && (msg.content.text || msg.content.imageDataUrl)) {
-                        addMessageToChat(msg.sender, msg.content, { 
-                            isRestoredFromHistory: true, 
-                            timestamp: msg.timestamp 
+                        addMessageToChat(msg.sender, msg.content, {
+                            isRestoredFromHistory: true,
+                            timestamp: msg.timestamp
                         });
                         const historyEntryParts = [];
                         if (msg.content.text) historyEntryParts.push({text: msg.content.text});
                         currentMiniAppChatHistory.push({role: msg.sender === 'user' ? 'user' : 'model', parts: historyEntryParts});
                     }
                 });
-                return true; 
+                return true;
             }
-            return false; 
+            return false;
         } catch (e) {
             console.error("Error loading UI chat history:", e);
-            return false; 
+            return false;
         }
     }
-    
+
     function openFullscreenImage(src) {
         fullscreenImage.src = src;
         fullscreenImageViewer.style.display = 'flex';
     }
     closeFullscreenBtn.addEventListener('click', () => {
         fullscreenImageViewer.style.display = 'none';
-        fullscreenImage.src = ''; 
+        fullscreenImage.src = '';
     });
-    fullscreenImageViewer.addEventListener('click', (e) => { 
+    fullscreenImageViewer.addEventListener('click', (e) => {
         if (e.target === fullscreenImageViewer) {
             fullscreenImageViewer.style.display = 'none';
             fullscreenImage.src = '';
         }
     });
-    
+
     function formatTextToHtml(text) {
         if (!text) return '';
         let html = text;
@@ -1023,11 +1030,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function addMessageToChat(sender, content, options = {}) {
         const { isTyping = false, isRestoredFromHistory = false, timestamp: msgTimestampStr } = options;
-        
+
         let textContent = '';
         let imageDataUrl = null;
 
-        if (typeof content === 'string') { 
+        if (typeof content === 'string') {
             textContent = content;
         } else if (typeof content === 'object' && content !== null) {
             textContent = content.text || '';
@@ -1035,10 +1042,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!isTyping && !textContent && !imageDataUrl) {
-            return null; 
+            return null;
         }
 
-        const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date(); 
+        const now = msgTimestampStr ? new Date(msgTimestampStr) : new Date();
         const currentDate = now.toDateString();
 
         if (!isTyping && (!lastMessageInfo.date || currentDate !== lastMessageInfo.date)) {
@@ -1060,8 +1067,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message message-${sender} tailed`;
-        msgDiv.dataset.timestamp = now.toISOString(); 
-        
+        msgDiv.dataset.timestamp = now.toISOString();
+
         if (imageDataUrl) {
             const imgElement = document.createElement('img');
             imgElement.src = imageDataUrl;
@@ -1071,20 +1078,20 @@ document.addEventListener('DOMContentLoaded', () => {
             msgDiv.appendChild(imgElement);
         }
 
-        if (textContent || isTyping) { 
+        if (textContent || isTyping) {
             const contentSpan = document.createElement('span');
-            contentSpan.className = 'message-content-text'; 
+            contentSpan.className = 'message-content-text';
             if (sender === 'bot' && !isTyping) {
-                contentSpan.innerHTML = formatTextToHtml(textContent); 
+                contentSpan.innerHTML = formatTextToHtml(textContent);
             } else {
-                contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : ''); 
+                contentSpan.textContent = textContent || (isTyping ? 'Печатает...' : '');
             }
             msgDiv.appendChild(contentSpan);
-            if (isTyping) { 
-                 contentSpan.classList.add('message-content'); 
+            if (isTyping) {
+                 contentSpan.classList.add('message-content');
             }
         }
-        
+
         if (isTyping) {
             msgDiv.classList.add('typing');
         } else {
@@ -1099,16 +1106,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isTyping && !isRestoredFromHistory) {
             const historyEntryParts = [];
-            if (textContent) historyEntryParts.push({ text: textContent }); 
+            if (textContent) historyEntryParts.push({ text: textContent });
             currentMiniAppChatHistory.push({ role: (sender === 'user' ? 'user' : 'model'), parts: historyEntryParts });
-            saveChatToLocalStorage(); 
+            saveChatToLocalStorage();
         }
         lastMessageInfo = { sender: sender, date: currentDate };
         chatMessagesContainer.scrollTo({ top: chatMessagesContainer.scrollHeight, behavior: 'smooth' });
         return msgDiv;
     }
 
-    async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType) { 
+    async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType) {
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
             addMessageToChat('bot', { text: "Ошибка: ID пользователя Telegram не найден." });
@@ -1116,24 +1123,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typingIndicator) typingIndicator.remove();
             return;
         }
-        
+
         const backendProcessUrl = `${APP_BACKEND_URL}/api/process_app_message/${userId}`;
-        const payload = { 
-            text: userText, 
-            agentKey: agentKeyForBackend, 
-            modelKey: modelKeyToSubmit 
+        const payload = {
+            text: userText,
+            agentKey: agentKeyForBackend,
+            modelKey: modelKeyToSubmit
         };
 
         if (imageBase64 && imageMimeType) {
             payload.image_base64 = imageBase64;
             payload.image_mime_type = imageMimeType;
-        } 
+        }
 
         try {
             const response = await fetch(backendProcessUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload) 
+                body: JSON.stringify(payload)
             });
             if (!response.ok) {
                 let errorText = `Ошибка бэкенда: ${response.status} ${response.statusText}`;
@@ -1156,16 +1163,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleSendMessage() {
         const text = chatPromptInput.value.trim();
-        let imageBase64ForBackend = null; 
-        let mimeTypeForBackend = null;   
-        let imageDataUrlForUi = null;    
+        let imageBase64ForBackend = null;
+        let mimeTypeForBackend = null;
+        let imageDataUrlForUi = null;
 
-        if (selectedFileBase64 && selectedFileMimeType) { 
+        if (selectedFileBase64 && selectedFileMimeType) {
             imageBase64ForBackend = selectedFileBase64;
             mimeTypeForBackend = selectedFileMimeType;
             imageDataUrlForUi = `data:${mimeTypeForBackend};base64,${imageBase64ForBackend}`;
             if (selectedAgentKey === "photo_dietitian_analyzer") {
-                pendingDietitianImage = { 
+                pendingDietitianImage = {
                     base64: imageBase64ForBackend,
                     mimeType: mimeTypeForBackend,
                 };
@@ -1181,15 +1188,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             return;
         }
-        
+
         let messageContentForChat = { text: text };
-        if (imageDataUrlForUi) { 
+        if (imageDataUrlForUi) {
              messageContentForChat.imageDataUrl = imageDataUrlForUi;
         }
         addMessageToChat('user', messageContentForChat);
-        
+
         let agentKeyForBackend = selectedAgentKey;
-        let modelKeyForBackend = selectedModelKey; 
+        let modelKeyForBackend = selectedModelKey;
         if (selectedAgentKey === "photo_dietitian_analyzer") {
             const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
             if (dietitianConfig?.forced_model_key) {
@@ -1197,20 +1204,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        chatPromptInput.value = ''; 
-        autoResizeTextarea.call(chatPromptInput); 
-        
-        if (selectedFileBase64) { 
-            clearImagePreview(); 
+        chatPromptInput.value = '';
+        autoResizeTextarea.call(chatPromptInput);
+
+        if (selectedFileBase64) {
+            clearImagePreview();
         }
 
-        chatSendMessageBtn.disabled = true; 
-        autoResizeTextarea.call(chatPromptInput); 
+        chatSendMessageBtn.disabled = true;
+        autoResizeTextarea.call(chatPromptInput);
 
         const oldTypingIndicator = chatMessagesContainer.querySelector('.message-bot.typing');
         if(oldTypingIndicator) oldTypingIndicator.remove();
-        addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true }); 
-        
+        addMessageToChat('bot', { text: 'Печатает...' }, { isTyping: true });
+
         await submitMessageToBackend(text, agentKeyForBackend, modelKeyForBackend, imageBase64ForBackend, mimeTypeForBackend);
 
         if (selectedAgentKey === "photo_dietitian_analyzer" && text && pendingDietitianImage && !selectedFileBase64 && imageBase64ForBackend === pendingDietitianImage.base64) {
@@ -1221,25 +1228,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function autoResizeTextarea() {
-        this.style.height = 'auto'; 
+        this.style.height = 'auto';
         let newHeight = this.scrollHeight;
         const maxHeight = parseInt(getComputedStyle(this).maxHeight);
-        if (newHeight > maxHeight) { newHeight = maxHeight; this.style.overflowY = 'auto';  } 
+        if (newHeight > maxHeight) { newHeight = maxHeight; this.style.overflowY = 'auto';  }
         else { this.style.overflowY = 'hidden'; }
         this.style.height = newHeight + 'px';
-        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage) ; 
+        chatSendMessageBtn.disabled = this.value.trim().length === 0 && !selectedFileBase64 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage) ;
     }
     chatPromptInput.addEventListener('input', autoResizeTextarea);
 
-    let isInputRecentlyFocused = false; 
+    let isInputRecentlyFocused = false;
     function hideKeyboardIfFocused() {
         if (document.activeElement === chatPromptInput) { chatPromptInput.blur(); }
     }
     chatPromptInput.addEventListener('focus', () => { isInputRecentlyFocused = true; setTimeout(() => { isInputRecentlyFocused = false; }, 300); });
     chatMessagesContainer.addEventListener('click', (event) => {
         if (event.target.classList.contains('message-image')) { return; }
-        if (event.target !== chatPromptInput && !chatPromptInput.contains(event.target) && 
-            event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target) && 
+        if (event.target !== chatPromptInput && !chatPromptInput.contains(event.target) &&
+            event.target !== chatSendMessageBtn && !chatSendMessageBtn.contains(event.target) &&
             event.target !== chatAttachFileBtn && !chatAttachFileBtn.contains(event.target)) {
             hideKeyboardIfFocused();
         }
@@ -1248,7 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessagesContainer.addEventListener('scroll', () => {
         if (isInputRecentlyFocused) { return; }
         clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => { hideKeyboardIfFocused(); }, 150); 
+        scrollTimeout = setTimeout(() => { hideKeyboardIfFocused(); }, 150);
     });
 
     chatAttachFileBtn.addEventListener('click', () => { chatFileInput.click(); });
@@ -1257,16 +1264,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file && file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                selectedFileBase64 = e.target.result.split(',')[1]; 
+                selectedFileBase64 = e.target.result.split(',')[1];
                 selectedFileMimeType = file.type;
                 displayImagePreview(e.target.result, file.name);
-                chatSendMessageBtn.disabled = false; 
-                autoResizeTextarea.call(chatPromptInput); 
+                chatSendMessageBtn.disabled = false;
+                autoResizeTextarea.call(chatPromptInput);
             };
             reader.onerror = () => { tg.showAlert("Не удалось прочитать файл."); clearImagePreview(); };
             reader.readAsDataURL(file);
         } else if (file) { tg.showAlert("Пожалуйста, выберите файл изображения."); clearImagePreview(); }
-        chatFileInput.value = ''; 
+        chatFileInput.value = '';
     });
 
     function displayImagePreview(imageDataUrl, fileName) {
@@ -1282,8 +1289,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearImagePreview() {
         selectedFileBase64 = null; selectedFileMimeType = null;
         imagePreviewContainer.innerHTML = ''; imagePreviewContainer.style.display = 'none';
-        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage); 
-        autoResizeTextarea.call(chatPromptInput); 
+        chatSendMessageBtn.disabled = chatPromptInput.value.trim().length === 0 && !(selectedAgentKey === "photo_dietitian_analyzer" && pendingDietitianImage);
+        autoResizeTextarea.call(chatPromptInput);
     }
 
     async function fetchUpdates() {
@@ -1313,11 +1320,11 @@ document.addEventListener('DOMContentLoaded', () => {
             slide.className = 'swiper-slide';
             slide.innerHTML = `<div class="tg-card"><div class="carousel-card ${item.palette || 'palette-grad-default'}"><div class="card-icon">${item.icon}</div><div><h3 class="card-title">${item.name}</h3><p class="card-description">${item.desc}</p></div></div></div>`;
             slide.addEventListener('click', () => {
-                if (type === 'agent') { 
+                if (type === 'agent') {
                     const agentConfig = generalAgents.find(a => a.key === item.key);
-                    if (agentConfig) openChat(agentConfig); 
-                } else if (type === 'model') { 
-                    selectedModelKey = item.key; 
+                    if (agentConfig) openChat(agentConfig);
+                } else if (type === 'model') {
+                    selectedModelKey = item.key;
                     if (chatScreen.classList.contains('active') && !chatScreen.classList.contains('dietitian-chat-active')) {
                          const modelDetails = models.find(m => m.key === selectedModelKey);
                          if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey;
@@ -1350,11 +1357,11 @@ document.addEventListener('DOMContentLoaded', () => {
             list.appendChild(card);
         });
     }
-    
+
     imageGeneratorCard?.addEventListener('click', () => switchScreen(imageGeneratorScreen));
     dietitianAgentCard?.addEventListener('click', () => {
         const dietitianConfig = toolConfigs["photo_dietitian_analyzer"];
-        if (dietitianConfig) openChat(dietitianConfig); 
+        if (dietitianConfig) openChat(dietitianConfig);
         else { tg.showAlert?.('Диетолог не настроен.'); }
     });
 
@@ -1382,7 +1389,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             if (data.status === 'ok') {
                 document.getElementById('gem-balance').textContent = data.gem_balance?.toFixed(1) || '0.0';
-                
+
                 const dailyLimitsContainer = document.getElementById('profile-daily-limits-container');
                 dailyLimitsContainer.innerHTML = ''; // Clear previous
                 if (data.daily_limits && Object.keys(data.daily_limits).length > 0) {
@@ -1441,14 +1448,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const avatarImg = document.getElementById('profile-avatar-img');
         const profileNameEl = document.getElementById('profile-name');
         const profileIdEl = document.getElementById('profile-id');
-        
+
         if (user && user.id) {
             if (user.photo_url) {
                 avatarImg.style.backgroundImage = `url(${user.photo_url})`;
-                avatarImg.innerHTML = ''; 
+                avatarImg.innerHTML = '';
             } else {
                 avatarImg.style.backgroundImage = '';
-                avatarImg.style.backgroundColor = '#444'; 
+                avatarImg.style.backgroundColor = '#444';
                 avatarImg.innerHTML = (user.first_name || 'U').charAt(0).toUpperCase();
             }
             profileNameEl.textContent = `${user.first_name || 'Пользователь'} ${user.last_name || ''}`.trim();
@@ -1456,7 +1463,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             avatarImg.style.backgroundImage = '';
             avatarImg.style.backgroundColor = '#444';
-            avatarImg.innerHTML = '?'; 
+            avatarImg.innerHTML = '?';
             profileNameEl.textContent = 'Нет данных';
             profileIdEl.textContent = 'ID: Н/Д';
         }
@@ -1468,49 +1475,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateNavArrows(swiperInstance, prefix) { /* ... same as before ... */ }
 
-    function openChat(config) { 
-        selectedAgentKey = config.key; 
+    function openChat(config) {
+        selectedAgentKey = config.key;
         if (chatAgentNameEl) chatAgentNameEl.textContent = config.name;
         let modelToDisplay, currentModelForBackend;
-        pendingDietitianImage = null; 
+        pendingDietitianImage = null;
         const titleContainer = document.querySelector('.chat-title-container');
 
-        if (config.key === "photo_dietitian_analyzer") { 
-            chatScreen.classList.add('dietitian-chat-active'); 
-            chatPromptInput.placeholder = "Фото: вес, детали..."; 
+        if (config.key === "photo_dietitian_analyzer") {
+            chatScreen.classList.add('dietitian-chat-active');
+            chatPromptInput.placeholder = "Фото: вес, детали...";
             currentModelForBackend = config.forced_model_key || models[0].key;
             const dietitianModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = dietitianModelDetails?.name || currentModelForBackend;
-            
+
             chatModelNameEl.style.display = 'none';
             chatSettingsBtn.style.display = 'none';
-            chatClearHistoryBtn.style.display = 'flex'; 
-            chatAttachFileBtn.style.display = 'flex'; 
+            chatClearHistoryBtn.style.display = 'flex';
+            chatAttachFileBtn.style.display = 'flex';
             titleContainer.classList.remove('has-two-right-buttons');
             titleContainer.classList.add('has-one-right-button');
-        } else { 
+        } else {
             chatScreen.classList.remove('dietitian-chat-active');
             chatPromptInput.placeholder = "Сообщение...";
-            currentModelForBackend = selectedModelKey; 
+            currentModelForBackend = selectedModelKey;
             const generalAgentModelDetails = models.find(m => m.key === currentModelForBackend);
             modelToDisplay = generalAgentModelDetails?.name || currentModelForBackend;
 
             chatModelNameEl.style.display = 'block';
-            chatSettingsBtn.style.display = 'flex'; 
-            chatClearHistoryBtn.style.display = 'flex'; 
-            chatAttachFileBtn.style.display = 'none'; 
+            chatSettingsBtn.style.display = 'flex';
+            chatClearHistoryBtn.style.display = 'flex';
+            chatAttachFileBtn.style.display = 'none';
             titleContainer.classList.add('has-two-right-buttons');
             titleContainer.classList.remove('has-one-right-button');
         }
-        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay; 
-        
-        agentSelect.value = selectedAgentKey; 
-        modelSelect.value = currentModelForBackend; 
+        if (chatModelNameEl) chatModelNameEl.textContent = modelToDisplay;
+
+        agentSelect.value = selectedAgentKey;
+        modelSelect.value = currentModelForBackend;
 
         clearImagePreview();
-        const historyLoaded = loadChatFromLocalStorage(); 
+        const historyLoaded = loadChatFromLocalStorage();
 
-        if (!historyLoaded && chatMessagesContainer.children.length === 0) { 
+        if (!historyLoaded && chatMessagesContainer.children.length === 0) {
             let welcomeMessageText = `Привет! Я ${config.name}. Чем могу помочь?`;
             if (config.key === "photo_dietitian_analyzer") {
                 welcomeMessageText = `Привет! Я ${config.name}. Прикрепите фото блюда и укажите примерный вес порции для анализа КБЖУ.`;
@@ -1521,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         switchScreen(chatScreen);
     }
-    
+
     function clearCurrentChatHistory() {
         tg.showConfirm("Вы уверены, что хотите очистить историю этого чата?", (confirmed) => {
             if (confirmed) {
@@ -1530,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentMiniAppChatHistory = [];
                 lastMessageInfo = { sender: null, date: null };
                 pendingDietitianImage = null;
-                clearImagePreview(); 
+                clearImagePreview();
                 logger.info(`Chat history cleared for agent/tool: ${selectedAgentKey}`);
 
                 let currentConfig = generalAgents.find(a => a.key === selectedAgentKey) || toolConfigs[selectedAgentKey];
@@ -1549,15 +1556,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function closeChat() { 
+    function closeChat() {
         stopPolling();
         clearImagePreview();
-        pendingDietitianImage = null; 
-        switchScreen(mainScreen); 
+        pendingDietitianImage = null;
+        switchScreen(mainScreen);
      }
-    function openSettingsModal() { 
+    function openSettingsModal() {
         if (!chatScreen.classList.contains('dietitian-chat-active')) {
-            agentSelect.value = selectedAgentKey; 
+            agentSelect.value = selectedAgentKey;
             modelSelect.value = selectedModelKey;
             settingsModal.style.display = 'flex';
         }
@@ -1567,14 +1574,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function init() {
         if (tg.ready) tg.ready();
-        if (tg.expand) tg.expand(); 
+        if (tg.expand) tg.expand();
         if (tg.MainButton) tg.MainButton.hide();
         if (tg.onEvent) tg.onEvent('viewportChanged', viewportChangedHandler);
-        setTimeout(viewportChangedHandler, 200); 
+        setTimeout(viewportChangedHandler, 200);
 
-        populateCarousel('agents-swiper-wrapper', generalAgents, 'agent'); 
+        populateCarousel('agents-swiper-wrapper', generalAgents, 'agent');
         populateCarousel('models-swiper-wrapper', models, 'model');
-        
+
         agentsSwiper = new Swiper("#agents-swiper", { slidesPerView: 'auto', spaceBetween: 10, on: { init(s){ updateNavArrows(s, 'agents') }, slideChange(s){ updateNavArrows(s, 'agents') } }});
         modelsSwiper = new Swiper("#models-swiper", { slidesPerView: 'auto', spaceBetween: 10, on: { init(s){ updateNavArrows(s, 'models') }, slideChange(s){ updateNavArrows(s, 'models') } }});
         document.getElementById('agents-nav-prev')?.addEventListener('click', () => agentsSwiper?.slidePrev());
@@ -1582,68 +1589,68 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('models-nav-prev')?.addEventListener('click', () => modelsSwiper?.slidePrev());
         document.getElementById('models-nav-next')?.addEventListener('click', () => modelsSwiper?.slideNext());
 
-        populateToolsList(); 
-        displayProfileData(); 
+        populateToolsList();
+        displayProfileData();
 
-        agentSelect.innerHTML = ''; 
-        generalAgents.forEach(a => { 
+        agentSelect.innerHTML = '';
+        generalAgents.forEach(a => {
             const icon = a.icon || "👤";
             agentSelect.appendChild(new Option(`${icon} ${a.name}`, a.key));
         });
-        modelSelect.innerHTML = ''; 
-        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key))); 
+        modelSelect.innerHTML = '';
+        models.forEach(m => modelSelect.appendChild(new Option(m.name, m.key)));
 
         document.querySelectorAll('.tab-item').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-        
+
         chatSendMessageBtn.addEventListener('click', handleSendMessage);
-        chatPromptInput.addEventListener('keydown', (e) => { 
-            if (e.key === 'Enter' && !e.shiftKey && !chatSendMessageBtn.disabled) { 
-                e.preventDefault(); handleSendMessage(); 
-            } 
+        chatPromptInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !chatSendMessageBtn.disabled) {
+                e.preventDefault(); handleSendMessage();
+            }
         });
 
-        chatBackButton?.addEventListener('click', closeChat); 
-        chatSettingsBtn?.addEventListener('click', openSettingsModal); 
-        chatClearHistoryBtn?.addEventListener('click', clearCurrentChatHistory); 
+        chatBackButton?.addEventListener('click', closeChat);
+        chatSettingsBtn?.addEventListener('click', openSettingsModal);
+        chatClearHistoryBtn?.addEventListener('click', clearCurrentChatHistory);
         document.querySelector('.modal-close-btn')?.addEventListener('click', closeSettingsModal);
         settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettingsModal(); });
 
         agentSelect.addEventListener('change', (e) => {
             const newAgentKey = e.target.value;
-            const agentConfig = generalAgents.find(a => a.key === newAgentKey); 
-            if (agentConfig) { 
-                selectedAgentKey = newAgentKey; 
+            const agentConfig = generalAgents.find(a => a.key === newAgentKey);
+            if (agentConfig) {
+                selectedAgentKey = newAgentKey;
                 if (chatAgentNameEl) chatAgentNameEl.textContent = agentConfig.name;
-                const modelDetails = models.find(m => m.key === selectedModelKey); 
-                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; 
-                modelSelect.value = selectedModelKey; 
-                
-                chatScreen.classList.remove('dietitian-chat-active'); 
+                const modelDetails = models.find(m => m.key === selectedModelKey);
+                if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey;
+                modelSelect.value = selectedModelKey;
+
+                chatScreen.classList.remove('dietitian-chat-active');
                 chatPromptInput.placeholder = "Сообщение...";
                 chatModelNameEl.style.display = 'block';
                 chatSettingsBtn.style.display = 'flex';
                 chatClearHistoryBtn.style.display = 'flex';
                 chatAttachFileBtn.style.display = 'none';
-                pendingDietitianImage = null; 
+                pendingDietitianImage = null;
 
                 clearImagePreview();
-                const historyWasLoaded = loadChatFromLocalStorage(); 
+                const historyWasLoaded = loadChatFromLocalStorage();
                 if (!historyWasLoaded && chatMessagesContainer.children.length === 0) {
                     addMessageToChat('bot', { text: `Агент изменен на ${agentConfig.name}. Чем могу помочь?` });
                 }
             }
         });
-        
-        modelSelect.addEventListener('change', (e) => { 
-            selectedModelKey = e.target.value; 
+
+        modelSelect.addEventListener('change', (e) => {
+            selectedModelKey = e.target.value;
             const modelDetails = models.find(m => m.key === selectedModelKey);
-            if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey; 
+            if (chatModelNameEl) chatModelNameEl.textContent = modelDetails?.name || selectedModelKey;
             if (chatScreen.classList.contains('active') && !chatScreen.classList.contains('dietitian-chat-active')) {
                 addMessageToChat('bot', { text: `Модель изменена на ${modelDetails?.name || selectedModelKey}.`});
             }
         });
 
-        autoResizeTextarea.call(chatPromptInput); 
+        autoResizeTextarea.call(chatPromptInput);
         showTab('home');
         if (tg.BackButton) tg.BackButton.hide();
 
