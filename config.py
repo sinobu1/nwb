@@ -446,7 +446,9 @@ class CustomHttpAIService(BaseAIService):
             "is_sync": True, 
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
-        
+        if is_gen_api_endpoint and self.model_id:
+             payload['model'] = self.model_id
+            
         endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
