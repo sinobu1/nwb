@@ -20,6 +20,7 @@ import nest_asyncio
 import json
 import base64 # Added for image processing
 from datetime import datetime, timedelta, timezone
+import pytz # Добавлено для работы с часовыми поясами
 from typing import Optional, Dict, Any, Tuple, Union, List
 import uuid
 import firebase_admin
@@ -53,28 +54,24 @@ class AppConfig:
     MIN_AI_REQUEST_LENGTH = 4
 
     DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY = 65
-    DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50 # For Gemini 2.5 Flash (Vision)
-    DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 1
-    DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1 # For Gemini 2.5 Pro
+    DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50 
+    DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 0 # Изменено: убран бесплатный дневной лимит для Grok
+    DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1 
     DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY = 10
     
     GEMS_FOR_NEW_USER = 0
-    # Обновленные пакеты гемов
+    
     GEM_PACKAGES = {
-        "pack_25_gems_trial": { # Ключ для пробного пакета
+        "pack_25_gems_trial": { 
             "gems": 25, 
-            "price_units": 5900, # 59 рублей = 5900 копеек
+            "price_units": 5900, 
             "currency": "RUB", 
             "title": "💎 25 Гемов (Пробный)", 
-            "description": "Специальный пробный пакет (1 раз)"
-            # Для логики "1 раз" потребуется доработка в bot_logic.py:
-            # - Хранить в Firestore флаг о покупке этого пакета пользователем.
-            # - При отображении пакетов проверять флаг.
-            # - В precheckout_callback проверять флаг.
+            "description": "Специальный пробный пакет" 
         },
         "pack_50_gems": {
             "gems": 50, 
-            "price_units": 12500, # 125 рублей = 12500 копеек
+            "price_units": 12500, 
             "currency": "RUB", 
             "title": "🌟 50 Гемов", 
             "description": "Выгодный пакет для частого использования"
@@ -83,11 +80,16 @@ class AppConfig:
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
-    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro" 
-    NEWS_CHANNEL_BONUS_GENERATIONS = 1
+    # Новая конфигурация для бонусов за подписку (модель: количество попыток)
+    NEWS_CHANNEL_BONUS_CONFIG = {
+        "custom_api_gemini_2_5_pro": 1,
+        "custom_api_grok_3": 1
+    }
 
     DEFAULT_AI_MODE_KEY = "universal_ai_basic"
     DEFAULT_MODEL_KEY = "google_gemini_2_0_flash"
+    
+    MOSCOW_TZ = pytz.timezone('Europe/Moscow') # Добавлено для часового пояса Москвы
 
 CONFIG = AppConfig()
 
@@ -188,7 +190,7 @@ AVAILABLE_TEXT_MODELS = {
         "name": "Gemini 2.0 Flash", "id": "gemini-2.0-flash", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
         "is_limited": True, 
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY,
-        "gem_cost": 0 
+        "gem_cost": 0 # Остается бесплатной базово, но лимитированной
     },
     "google_gemini_2_5_flash_preview": { 
         "name": "Gemini 2.5 Flash", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
@@ -201,14 +203,14 @@ AVAILABLE_TEXT_MODELS = {
         "name": "Gemini 2.5 Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, 
         "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True, 
-        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY,
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY, # 1 бесплатная попытка
         "gem_cost": 2.5
     },
     "custom_api_grok_3": {
         "name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
         "is_limited": True, 
-        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY,
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY, # 0 бесплатных дневных
         "gem_cost": 2.5
     },
     "custom_api_gpt_4o_mini": {
@@ -223,8 +225,9 @@ DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]["id"]
 
 MENU_STRUCTURE = {
     BotConstants.MENU_MAIN: {
-        "title": "📋 Главное меню", "items": [
-            {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://sinobu1.github.io/nwb/"},
+        "title": "📋 Главное меню 👇 Выберите опцию:", # Изменено: добавлен эмодзи и текст
+        "items": [
+            # {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://sinobu1.github.io/nwb/"}, # Удалено
             {"text": "🤖 Агенты ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_AI_MODES_SUBMENU},
             {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU},
             {"text": "📊 Лимиты", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_LIMITS_SUBMENU},
@@ -360,7 +363,7 @@ class GoogleGenAIService(BaseAIService):
             elif image_data:
                  logger.warning(f"Text model {self.model_id} received image_data but will ignore it.")
 
-            if user_prompt: # Add text prompt after image if image exists, or as the only part
+            if user_prompt: 
                 content_parts.append(user_prompt)
 
 
@@ -486,11 +489,16 @@ async def update_user_gem_balance(user_id: int, new_balance: float) -> None:
 
 async def get_daily_usage_for_model(user_id: int, model_key: str, bot_data_cache: Optional[Dict[str, Any]] = None) -> int:
     if bot_data_cache is None: bot_data_cache = await firestore_service.get_bot_data()
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Используем Московское время для определения "сегодня"
+    today_str = datetime.now(CONFIG.MOSCOW_TZ).strftime("%Y-%m-%d")
     all_user_daily_counts = bot_data_cache.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
     user_counts_today = all_user_daily_counts.get(str(user_id), {})
     model_usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
-    return model_usage_info['count'] if model_usage_info.get('date') == today_str else 0
+    
+    # Сброс счетчика, если дата не совпадает с сегодняшней (по Москве)
+    if model_usage_info.get('date') != today_str:
+        return 0
+    return model_usage_info['count']
 
 async def get_agent_lifetime_uses_left(user_id: int, agent_config_key: str, user_data: Optional[Dict[str, Any]] = None) -> int:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
@@ -517,11 +525,11 @@ async def check_and_log_request_attempt(
     if bot_data_cache is None: bot_data_cache = await firestore_service.get_bot_data()
     active_agent_config = AI_MODES.get(current_agent_key) if current_agent_key else None
 
-    if model_key == CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY and \
-       user_data.get('claimed_news_bonus', False) and \
-       user_data.get('news_bonus_uses_left', 0) > 0:
+    # Проверка бонуса за подписку
+    news_bonus_uses_left_key = f"news_bonus_uses_left_{model_key}"
+    if user_data.get('claimed_news_bonus', False) and user_data.get(news_bonus_uses_left_key, 0) > 0:
         logger.info(f"User {user_id} can use model {model_key} via news channel bonus.")
-        return True, "Используется бонусная генерация с новостного канала.", "bonus", 0.0
+        return True, f"Используется бонусная генерация для «{model_cfg['name']}».", "bonus", 0.0
 
     if active_agent_config and current_agent_key:
         initial_lifetime_uses = active_agent_config.get('initial_lifetime_free_uses')
@@ -545,19 +553,23 @@ async def check_and_log_request_attempt(
             return True, f"Будет списано {gem_cost:.1f} гемов.", "gem", gem_cost
         else:
             msg = (f"Недостаточно гемов для модели «{model_cfg['name']}».\n"
-                   f"Нужно: {gem_cost:.1f}, у вас: {user_gem_balance:.1f}.\n"
-                   f"Пополните баланс: /gems")
+                   f"Нужно: {gem_cost:.1f} гемов, у вас: {user_gem_balance:.1f} гемов.\n"
+                   f"Пополните баланс: /gems или через меню.")
             logger.warning(f"User {user_id} insufficient gems for {model_key}. Needed: {gem_cost}, Has: {user_gem_balance}")
             return False, msg, "no_gems", gem_cost
     
+    # Если gem_cost == 0 и дневной лимит исчерпан
     if gem_cost == 0 and current_daily_usage >= free_daily_limit:
+        # Проверяем, не исчерпан ли также и агентский лимит, если он был
         agent_had_lifetime_option = active_agent_config and active_agent_config.get('initial_lifetime_free_uses') is not None
         agent_lifetime_uses_exhausted_or_not_applicable = True
         if agent_had_lifetime_option and model_key == active_agent_config.get("forced_model_key"):
             if await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data) > 0:
                 agent_lifetime_uses_exhausted_or_not_applicable = False
+        
         if agent_lifetime_uses_exhausted_or_not_applicable:
-            msg = (f"Дневной бесплатный лимит для «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. Модель не доступна за гемы.")
+            msg = (f"Дневной бесплатный лимит для «{model_cfg['name']}» ({free_daily_limit}/{free_daily_limit}) исчерпан. "
+                   f"Эта модель не доступна за гемы после исчерпания бесплатных попыток.")
             logger.warning(f"User {user_id} free daily limit exhausted for {model_key} (no gem cost).")
             return False, msg, "limit_exhausted_no_gems", None
 
@@ -567,32 +579,49 @@ async def check_and_log_request_attempt(
 async def increment_request_count(user_id: int, model_key: str, usage_type: str, current_agent_key: Optional[str] = None, gem_cost_val: Optional[float] = None):
     if usage_type == "bonus":
         user_data = await firestore_service.get_user_data(user_id) 
-        bonus_left = user_data.get('news_bonus_uses_left', 0)
-        if bonus_left > 0: await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
-        logger.info(f"User {user_id} consumed bonus for {model_key}. Left: {bonus_left - 1 if bonus_left > 0 else 0}")
+        bonus_uses_left_key = f"news_bonus_uses_left_{model_key}"
+        bonus_left = user_data.get(bonus_uses_left_key, 0)
+        if bonus_left > 0: 
+            await firestore_service.set_user_data(user_id, {bonus_uses_left_key: bonus_left - 1})
+            logger.info(f"User {user_id} consumed bonus for {model_key}. Left: {bonus_left - 1}")
+        else:
+            logger.warning(f"User {user_id} tried to consume bonus for {model_key}, but no uses left (key: {bonus_uses_left_key}).")
+
     elif usage_type == "agent_lifetime_free":
-        if not current_agent_key: logger.error(f"User {user_id} used 'agent_lifetime_free' for {model_key} but current_agent_key missing."); return
+        if not current_agent_key: 
+            logger.error(f"User {user_id} used 'agent_lifetime_free' for {model_key} but current_agent_key missing.")
+            return
         await decrement_agent_lifetime_uses(user_id, current_agent_key)
     elif usage_type == "daily_free":
         bot_data = await firestore_service.get_bot_data()
         all_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
         user_counts = all_counts.get(str(user_id), {})
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Используем Московское время для определения "сегодня"
+        today = datetime.now(CONFIG.MOSCOW_TZ).strftime("%Y-%m-%d")
         model_usage = user_counts.get(model_key, {'date': today, 'count': 0})
-        if model_usage.get('date') != today: model_usage = {'date': today, 'count': 0}
+        
+        # Сброс счетчика, если дата не совпадает с сегодняшней (по Москве)
+        if model_usage.get('date') != today: 
+            model_usage = {'date': today, 'count': 0}
+            
         model_usage['count'] += 1
         user_counts[model_key] = model_usage
         all_counts[str(user_id)] = user_counts
         await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_counts})
-        logger.info(f"Incremented DAILY FREE for {user_id}, {model_key} to {model_usage['count']}.")
+        logger.info(f"Incremented DAILY FREE for {user_id}, {model_key} to {model_usage['count']} for date {today}.")
     elif usage_type == "gem":
-        if gem_cost_val is None or gem_cost_val <= 0: logger.error(f"User {user_id} gem usage for {model_key} but invalid gem_cost: {gem_cost_val}"); return
+        if gem_cost_val is None or gem_cost_val <= 0: 
+            logger.error(f"User {user_id} gem usage for {model_key} but invalid gem_cost: {gem_cost_val}")
+            return
         balance = await get_user_gem_balance(user_id) 
         new_balance = balance - gem_cost_val
-        if new_balance < 0: logger.error(f"User {user_id} overdraft on gems for {model_key}. Bal: {balance}, Cost: {gem_cost_val}"); new_balance = 0.0
+        if new_balance < 0: 
+            logger.error(f"User {user_id} overdraft on gems for {model_key}. Bal: {balance}, Cost: {gem_cost_val}")
+            new_balance = 0.0
         await update_user_gem_balance(user_id, new_balance)
         logger.info(f"User {user_id} spent {gem_cost_val:.1f} gems for {model_key}. New balance: {new_balance:.2f}")
-    else: logger.error(f"Unknown usage_type '{usage_type}' for {user_id}, {model_key}")
+    else: 
+        logger.error(f"Unknown usage_type '{usage_type}' for {user_id}, {model_key}")
 
 def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
@@ -602,7 +631,9 @@ def get_ai_service(model_key: str) -> Optional[BaseAIService]:
     api_type = model_cfg.get("api_type")
     if api_type == BotConstants.API_TYPE_GOOGLE_GENAI: return GoogleGenAIService(model_cfg)
     elif api_type == BotConstants.API_TYPE_CUSTOM_HTTP: return CustomHttpAIService(model_cfg)
-    else: logger.error(f"Unknown API type '{api_type}' for model key '{model_key}'."); return None
+    else: 
+        logger.error(f"Unknown API type '{api_type}' for model key '{model_key}'.")
+        return None
 
 async def _store_and_try_delete_message(update: Update, user_id: int, is_command_to_keep: bool = False):
     if not update.message: return
@@ -679,7 +710,7 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
     active_agent_key = user_data.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     agent_config = AI_MODES.get(active_agent_key)
 
-    if not agent_config: # Fallback if the stored agent key is somehow invalid
+    if not agent_config: 
         logger.warning(f"Invalid agent key '{active_agent_key}' found for user {user_id}. Resetting to default.")
         active_agent_key = CONFIG.DEFAULT_AI_MODE_KEY
         await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key})
@@ -717,7 +748,7 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
         text = item_config["text"]
         web_app_url = item_config.get("web_app_url")
-        if web_app_url:
+        if web_app_url and item_config.get("action") == "open_mini_app": # Убедимся, что web_app создается только для Mini App кнопки
             return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
         return KeyboardButton(text)
 
@@ -751,13 +782,24 @@ async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param
             reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
         await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
         return
+    
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
+    
+    menu_title_to_send = menu_cfg["title"]
+    # Добавляем эмодзи к заголовку главного меню, если это оно
+    # Это уже сделано в MENU_STRUCTURE, так что дополнительная логика здесь не нужна,
+    # но если бы заголовок менялся динамически, то здесь было бы место для этого.
+
     if update.message:
-        await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+        await update.message.reply_text(menu_title_to_send, reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     elif update.callback_query and update.callback_query.message: 
-        await update.callback_query.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+        # При обработке callback_query лучше использовать edit_message_text или send_new_message
+        # Для простоты и консистентности с текущей логикой, отправим новое сообщение,
+        # но в идеале, если это ответ на нажатие инлайн-кнопки, нужно редактировать.
+        # Однако, так как мы используем ReplyKeyboardMarkup, новое сообщение более уместно.
+        await update.callback_query.message.reply_text(menu_title_to_send, reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     else: 
-        bot = update.get_bot() # Simpler way to get bot instance
-        await bot.send_message(chat_id=user_id, text=menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+        bot_instance = update.get_bot() 
+        await bot_instance.send_message(chat_id=user_id, text=menu_title_to_send, reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
 
     logger.info(f"User {user_id} was shown menu '{menu_key}'.")
