@@ -62,16 +62,16 @@ class AppConfig:
     GEMS_FOR_NEW_USER = 0
     
     GEM_PACKAGES = {
-        "pack_25_gems_trial": { 
-            "gems": 25, "price_units": 5900, "currency": "RUB", 
-            "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет. Только один раз!",
-            "is_one_time": True 
-        },
-        "pack_50_gems": {
-            "gems": 50, "price_units": 12500, "currency": "RUB", 
-            "title": "🌟 50 Гемов", "description": "Выгодный пакет для частого использования"
-        }
+    "pack_25_gems": {  # <--- ИЗМЕНЕНИЕ ЗДЕСЬ
+        "gems": 25, "price_units": 5900, "currency": "RUB",
+        "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет. Только один раз!",
+        "is_one_time": True
+    },
+    "pack_50_gems": {
+        "gems": 50, "price_units": 12500, "currency": "RUB",
+        "title": "🌟 50 Гемов", "description": "Выгодный пакет для частого использования"
     }
+}
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
