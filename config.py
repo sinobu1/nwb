@@ -423,6 +423,11 @@ class CustomHttpAIService(BaseAIService):
             for msg in history:
                 role = msg.get("role")
                 parts = msg.get("parts")
+                # --- НАЧАЛО ИЗМЕНЕНИЯ ---
+                # API, совместимые с OpenAI, ожидают роль 'assistant', а не 'model'.
+                if role == "model":
+                    role = "assistant"
+                # --- КОНЕЦ ИЗМЕНЕНИЯ ---
                 if role and parts and isinstance(parts, list) and parts[0].get("text"):
                     messages_payload.append({"role": role, "content": parts[0]["text"]})
                 # Если история уже в нужном формате (например, от другого Custom API), можно добавить проверку
