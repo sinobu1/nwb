@@ -412,20 +412,16 @@ class CustomHttpAIService(BaseAIService):
         }
         
         endpoint_url = self.model_config.get("endpoint", "")
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-
-        # Определяем переменную здесь, чтобы она была доступна во всей функции
-        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
-        
-        # --- НАЧАЛО ИЗМЕНЕНИЙ (ФИНАЛЬНАЯ ВЕРСИЯ) ---
+       # --- НАЧАЛО ФИНАЛЬНЫХ ИЗМЕНЕНИЙ ---
 
         messages_payload = []
 
-        # 1. Сначала добавляем системный промпт, если он есть, в чистом виде.
-        if system_prompt:
-            messages_payload.append({"role": "system", "content": system_prompt})
+        # 1. Поскольку в примере нет роли 'system', объединяем системный промпт с первым сообщением пользователя.
+        current_user_content = user_prompt
+        if system_prompt and not history:
+            current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
-        # 2. Затем добавляем историю, исправляя роль 'model' на 'assistant'.
+        # 2. Добавляем историю, все еще исправляя роль 'model' на 'assistant' для совместимости.
         if history:
             for msg in history:
                 role = msg.get("role")
@@ -438,21 +434,19 @@ class CustomHttpAIService(BaseAIService):
                 elif role and msg.get("content"):
                      messages_payload.append({"role": role, "content": msg["content"]})
 
-        # 3. В конце добавляем сообщение пользователя.
+        # 3. Добавляем текущее сообщение пользователя.
         if user_prompt:
-            messages_payload.append({"role": "user", "content": user_prompt})
+            messages_payload.append({"role": "user", "content": current_user_content})
         
+        # 4. СОЗДАЕМ PAYLOAD СТРОГО ПО ДОКУМЕНТАЦИИ: только ключ 'messages'.
         payload = {
-            "messages": messages_payload,
-            "is_sync": True, 
-            "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
+            "messages": messages_payload
         }
         
-        # 4. Оставляем параметр 'model', так как он может быть необходим для валидации.
-        if is_gen_api_endpoint and self.model_id:
-             payload['model'] = self.model_id
+        # Примечание: документация также перечисляет другие необязательные параметры, такие как 'temperature', 'top_p' и т.д.
+        # Их можно добавить в этот payload при необходимости, но 'is_sync' и 'max_tokens', видимо, не поддерживаются.
         
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+        # --- КОНЕЦ ФИНАЛЬНЫХ ИЗМЕНЕНИЙ ---
             
         endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
