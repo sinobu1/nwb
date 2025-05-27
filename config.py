@@ -460,15 +460,15 @@ class CustomHttpAIService(BaseAIService):
 
         # ЭТАП 2: Получение результата по request_id (Long-Pooling)
         
-        # Формируем URL для получения результата. Обычно он выглядит так:
         result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}"
         
+        logger.info(f"Polling for result at: {result_url}")
+
         start_time = time.time()
-        timeout_seconds = 120 # Ждем результат не дольше 2 минут
+        timeout_seconds = 120 
 
         while time.time() - start_time < timeout_seconds:
             try:
-                # Опрашиваем результат
                 result_response = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: requests.get(result_url, headers=headers, timeout=30)
@@ -480,25 +480,42 @@ class CustomHttpAIService(BaseAIService):
                 logger.debug(f"Polling request_id {request_id}. Status: {status}")
 
                 if status == "success":
-                    # Успех! Извлекаем текст из поля 'output'
-                    output = result_json.get("output", "")
-                    # В 'output' может быть еще один JSON, извлекаем текст из него
+                    # --- НАЧАЛО ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
+                    output = result_json.get("output") 
+
+                    if not output:
+                        logger.error(f"Task {request_id} succeeded but the 'output' field is missing or empty. Full response: {result_json}")
+                        return f"API-задача для модели «{self.model_config.get('name')}» выполнена, но вернула пустой результат."
+
+                    # Проверяем, является ли output строкой, содержащей JSON
                     if isinstance(output, str) and output.startswith('{'):
                          try:
                              output_json = json.loads(output)
-                             if isinstance(output_json.get("response"), list) and len(output_json["response"]) > 0:
-                                 if isinstance(output_json["response"][0], dict):
-                                     return output_json["response"][0].get("message", {}).get("content", "")
-                         except:
-                              return output # Возвращаем как есть, если не JSON
-                    return output
+                             # Пытаемся извлечь вложенный ответ
+                             nested_response = output_json.get("response")
+                             if isinstance(nested_response, list) and len(nested_response) > 0:
+                                 if isinstance(nested_response[0], dict):
+                                     content = nested_response[0].get("message", {}).get("content")
+                                     if content:
+                                         return content
+                         except json.JSONDecodeError:
+                              # Если это невалидный JSON, просто возвращаем строку как есть
+                              return output
+
+                    # Если output - это обычная строка (или не удалось распарсить JSON), возвращаем ее
+                    if isinstance(output, str):
+                        return output
+                    
+                    # Если дошли сюда, значит структура ответа неизвестна
+                    logger.error(f"Task {request_id} succeeded but has an unknown output format. Full response: {result_json}")
+                    return f"API-задача для «{self.model_config.get('name')}» выполнена, но имеет неизвестный формат ответа."
+                    # --- КОНЕЦ ФИНАЛЬНОГО ИСПРАВЛЕНИЯ ---
 
                 elif status in ["error", "failed"]:
                     logger.error(f"Task failed for request_id {request_id}. Response: {result_json}")
                     return f"Ошибка генерации на стороне API: {result_json.get('output', 'Нет деталей')}"
                 
-                # Если статус 'starting' или 'processing', просто ждем и пробуем снова
-                await asyncio.sleep(3) # Пауза 3 секунды между попытками
+                await asyncio.sleep(3)
 
             except Exception as e:
                 logger.error(f"Error polling for result for request_id {request_id}: {e}", exc_info=True)
