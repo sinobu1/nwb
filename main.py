@@ -2,13 +2,14 @@
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response, status, Form, File, UploadFile
-from typing import Optional, Dict, List # Added Dict, List
+from typing import Optional, Dict, List
 from telegram import Update
 from telegram.ext import (
     Application,
 )
 from fastapi.middleware.cors import CORSMiddleware
-
+from pydantic import BaseModel
+from datetime import datetime, timezone
 
 from config import CONFIG, logger, BotConstants, firestore_service, genai, AI_MODES, AVAILABLE_TEXT_MODELS
 
@@ -17,9 +18,6 @@ try:
 except ImportError:
     logger.error("Не удалось импортировать bot_logic.py. Убедитесь, что вы переименовали handlers.py в bot_logic.py")
     import handlers as bot_logic
-
-from pydantic import BaseModel
-from datetime import datetime, timezone
 
 
 @asynccontextmanager
@@ -58,33 +56,36 @@ class AppChatMessageRequest(BaseModel):
     image_base64: Optional[str] = None
     image_mime_type: Optional[str] = None
 
-# Pydantic Models for Profile Data API
+# --- ИЗМЕНЕННЫЕ МОДЕЛИ Pydantic ---
 class DailyLimitInfo(BaseModel):
     used: int
     limit: int
     gem_cost: float
-    model_name: str # Added model_name for frontend display
+    model_name: str
 
 class AgentLifetimeUseInfo(BaseModel):
     left: int
     initial: int
-    agent_name: str # Added agent_name for frontend display
+    agent_name: str
 
-class NewsBonusInfo(BaseModel):
-    claimed: bool
+# Новый класс для деталей бонуса
+class BonusInfo(BaseModel):
     uses_left: int
     model_name: str
 
+# Обновленный класс ответа для профиля пользователя
 class UserProfileDataResponse(BaseModel):
     status: str
     user_id: int
     gem_balance: float
     daily_limits: Dict[str, DailyLimitInfo]
     agent_lifetime_uses: Dict[str, AgentLifetimeUseInfo]
-    news_bonus: NewsBonusInfo
+    claimed_news_bonus: bool
+    news_bonuses: Dict[str, BonusInfo] # Ключ - model_key, значение - детали бонуса
+# --- КОНЕЦ ИЗМЕНЕНИЙ В МОДЕЛЯХ ---
 
 
-app = FastAPI(title="Telegram Bot API Server", version="1.5.1", lifespan=lifespan) # Incremented version
+app = FastAPI(title="Telegram Bot API Server", version="1.5.2", lifespan=lifespan)
 
 origins = [
     "https://sinobu1.github.io",
@@ -101,7 +102,6 @@ app.add_middleware(
 ptb_app = Application.builder().token(CONFIG.TELEGRAM_TOKEN).build()
 
 # --- Регистрация обработчиков из bot_logic ---
-# (Предполагается, что все CommandHandler, MessageHandler и т.д. определены в bot_logic)
 if hasattr(bot_logic, 'start'): ptb_app.add_handler(bot_logic.CommandHandler("start", bot_logic.start), group=0)
 if hasattr(bot_logic, 'new_topic_command'): ptb_app.add_handler(bot_logic.CommandHandler("new", bot_logic.new_topic_command), group=0)
 if hasattr(bot_logic, 'open_menu_command'): ptb_app.add_handler(bot_logic.CommandHandler("menu", bot_logic.open_menu_command), group=0)
@@ -112,7 +112,7 @@ if hasattr(bot_logic, 'help_command'): ptb_app.add_handler(bot_logic.CommandHand
 if hasattr(bot_logic, 'photo_handler'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.PHOTO, bot_logic.photo_handler), group=1)
 if hasattr(bot_logic, 'menu_button_handler'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.menu_button_handler), group=1)
 if hasattr(bot_logic, 'web_app_data_handler'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.StatusUpdate.WEB_APP_DATA, bot_logic.web_app_data_handler), group=1)
-if hasattr(bot_logic, 'handle_text'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.handle_text), group=2) # Должен быть после menu_button_handler
+if hasattr(bot_logic, 'handle_text'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.TEXT & ~bot_logic.filters.COMMAND, bot_logic.handle_text), group=2)
 if hasattr(bot_logic, 'precheckout_callback'): ptb_app.add_handler(bot_logic.PreCheckoutQueryHandler(bot_logic.precheckout_callback))
 if hasattr(bot_logic, 'successful_payment_callback'): ptb_app.add_handler(bot_logic.MessageHandler(bot_logic.filters.SUCCESSFUL_PAYMENT, bot_logic.successful_payment_callback))
 if hasattr(bot_logic, 'error_handler'): ptb_app.add_error_handler(bot_logic.error_handler)
@@ -179,7 +179,6 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
     else:
         try:
             ai_service = bot_logic.get_ai_service(request_data.modelKey)
-            # system_prompt_key = request_data.agentKey # Используется для получения промпта
             active_agent_config = AI_MODES.get(request_data.agentKey)
 
             if not active_agent_config:
@@ -188,10 +187,10 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
             
             system_prompt = active_agent_config["prompt"]
 
-
             raw_ai_response = await ai_service.generate_response(
                 system_prompt,
                 request_data.text or ("Анализ изображения" if image_data_for_logic else "Пустой запрос"),
+                history=[], # Для Mini App история не передается
                 image_data=image_data_for_logic
             )
             ai_response_text, _ = bot_logic.smart_truncate(raw_ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
@@ -216,11 +215,12 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
     return {"status": "ok", "message": "Message received and is being processed."}
 
 
+# --- ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ ЭНДПОИНТ ---
 @app.get("/api/get_user_profile_data/{user_id}", response_model=UserProfileDataResponse)
 async def get_user_profile_data_endpoint(user_id: int):
     try:
         user_data = await firestore_service.get_user_data(user_id)
-        bot_data = await firestore_service.get_bot_data() # Assuming this is needed for daily limits
+        bot_data = await firestore_service.get_bot_data()
 
         gem_balance = await bot_logic.get_user_gem_balance(user_id, user_data)
 
@@ -237,7 +237,7 @@ async def get_user_profile_data_endpoint(user_id: int):
         agent_lifetime_uses_data: Dict[str, AgentLifetimeUseInfo] = {}
         for agent_key, agent_config in AI_MODES.items():
             initial_uses = agent_config.get('initial_lifetime_free_uses')
-            if initial_uses is not None: # Only include agents that have this defined
+            if initial_uses is not None:
                 uses_left = await bot_logic.get_agent_lifetime_uses_left(user_id, agent_key, user_data)
                 agent_lifetime_uses_data[agent_key] = AgentLifetimeUseInfo(
                     left=uses_left,
@@ -245,12 +245,18 @@ async def get_user_profile_data_endpoint(user_id: int):
                     agent_name=agent_config.get('name', agent_key)
                 )
         
-        news_bonus_model_config = AVAILABLE_TEXT_MODELS.get(CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY, {})
-        news_bonus_data = NewsBonusInfo(
-            claimed=user_data.get('claimed_news_bonus', False),
-            uses_left=user_data.get('news_bonus_uses_left', 0),
-            model_name=news_bonus_model_config.get('name', CONFIG.NEWS_CHANNEL_BONUS_MODEL_KEY)
-        )
+        claimed_bonus = user_data.get('claimed_news_bonus', False)
+        bonuses_data: Dict[str, BonusInfo] = {}
+        if claimed_bonus:
+            # Итерируемся по словарю бонусов из конфига
+            for model_key, _ in CONFIG.NEWS_CHANNEL_BONUS_CONFIG.items():
+                if model_config := AVAILABLE_TEXT_MODELS.get(model_key):
+                    uses_left_key = f"news_bonus_uses_left_{model_key}"
+                    uses_left = user_data.get(uses_left_key, 0)
+                    bonuses_data[model_key] = BonusInfo(
+                        uses_left=uses_left,
+                        model_name=model_config.get('name', model_key)
+                    )
 
         return UserProfileDataResponse(
             status="ok",
@@ -258,21 +264,23 @@ async def get_user_profile_data_endpoint(user_id: int):
             gem_balance=gem_balance,
             daily_limits=daily_limits_data,
             agent_lifetime_uses=agent_lifetime_uses_data,
-            news_bonus=news_bonus_data
+            claimed_news_bonus=claimed_bonus,
+            news_bonuses=bonuses_data
         )
     except Exception as e:
         logger.error(f"Error in /api/get_user_profile_data for user {user_id}: {e}", exc_info=True)
-        # Return a valid structure even on error, or define an error response model
+        # Возвращаем корректную структуру ответа даже в случае ошибки
         return UserProfileDataResponse(
             status="error",
             user_id=user_id,
             gem_balance=0.0,
             daily_limits={},
             agent_lifetime_uses={},
-            news_bonus=NewsBonusInfo(claimed=False, uses_left=0, model_name="N/A"),
-            # error_message=str(e) # Add if you extend UserProfileDataResponse for errors
+            claimed_news_bonus=False,
+            news_bonuses={}
         )
 
-
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=CONFIG.WEB_SERVER_PORT if hasattr(CONFIG, 'WEB_SERVER_PORT') else 8000, reload=True)
+    # Убедитесь, что порт соответствует конфигурации вашего сервера (например, Railway)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
