@@ -173,6 +173,16 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
         ai_response_text = limit_message
     else:
         try:
+            # --- НАЧАЛО ИЗМЕНЕНИЯ ---
+            # Проверяем особый случай: это первый шаг Диетолога (есть фото, но нет текста).
+            # За такой шаг мы не списываем попытку.
+            is_dietitian_first_step = (
+                request_data.agentKey == "photo_dietitian_analyzer" and 
+                image_data_for_logic and 
+                not request_data.text
+            )
+            # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
             ai_service = bot_logic.get_ai_service(request_data.modelKey)
             active_agent_config = AI_MODES.get(request_data.agentKey)
 
@@ -195,7 +205,15 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
                 image_data=image_data_for_logic
             )
             ai_response_text, _ = bot_logic.smart_truncate(raw_ai_response, CONFIG.MAX_MESSAGE_LENGTH_TELEGRAM)
-            await bot_logic.increment_request_count(user_id, request_data.modelKey, usage_type, request_data.agentKey, gem_cost)
+
+            # --- НАЧАЛО ИЗМЕНЕНИЯ ---
+            # Списываем попытку, только если это НЕ первый шаг диетолога.
+            if not is_dietitian_first_step:
+                await bot_logic.increment_request_count(user_id, request_data.modelKey, usage_type, request_data.agentKey, gem_cost)
+            else:
+                logger.info(f"Skipping request count for user {user_id} - Dietitian first step (image only).")
+            # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+                
         except Exception as e:
             logger.error(f"AI service error in /api/process_app_message for user {user_id}: {e}", exc_info=True)
             ai_response_text = f"Произошла внутренняя ошибка при обращении к ИИ ({type(e).__name__})."
