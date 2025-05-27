@@ -341,51 +341,59 @@ class GoogleGenAIService(BaseAIService):
                 # system_instruction убран из конструктора, т.к. Gemini API v1beta не поддерживает его напрямую в start_chat для мульти-тёрна
             )
             
-            # Формируем контент для отправки, включая системный промпт в начало истории, если его нет
-            # Gemini API v1beta (python client) для мульти-тёрна (start_chat) ожидает историю в формате:
-            # [{'role': 'user', 'parts': [...]}, {'role': 'model', 'parts': [...]}]
-            # Системный промпт можно добавить как первое сообщение от 'user' или 'model' с особой ролью,
-            # но более канонично - передавать его отдельно, если API это позволяет, или включать в первый user_prompt.
-            # В данном случае, для консистентности с CustomHttpAIService, мы будем передавать system_prompt
-            # и он будет добавлен в начало `messages_payload` в CustomHttpAIService.
-            # Для GoogleGenAIService, system_instruction передается при инициализации модели, но для chat_session
-            # он не применяется к каждому сообщению. Мы можем эмулировать это, добавляя его в начало истории.
+            # --- НАЧАЛО ОБНОВЛЕННОЙ ЛОГИКИ ---
 
-            current_history = []
-            if system_prompt: # Добавляем системный промпт как первую "инструкцию" в чат
-                 current_history.append({'role': 'user', 'parts': [{'text': system_prompt}]})
-                 current_history.append({'role': 'model', 'parts': [{'text': "Понял. Я готов."}]}) # Ответ-заглушка от модели
-
-            current_history.extend(history) # Добавляем основную историю
-
-            content_parts_for_current_message = []
+            # Если есть данные изображения, это мультимодальный запрос.
+            # Такие запросы лучше обрабатывать как бесстатусные вызовы через generate_content,
+            # это более стабильно, чем использовать chat_session.
             if image_data and self.model_config.get("is_vision_model"):
-                if image_data.get("base64") and image_data.get("mime_type"):
-                    try:
-                        image_bytes = base64.b64decode(image_data["base64"])
-                        image_part = {"mime_type": image_data["mime_type"], "data": image_bytes}
-                        content_parts_for_current_message.append(image_part) 
-                        logger.info(f"Image data prepared for vision model {self.model_id}")
-                    except Exception as e:
-                        logger.error(f"Error decoding base64 image for model {self.model_id}: {e}")
-                        return "Ошибка обработки изображения." 
-                else:
-                    logger.warning(f"Vision model {self.model_id} called but image_data is incomplete.")
-            
-            if user_prompt: 
-                content_parts_for_current_message.append({'text': user_prompt})
+                logger.info(f"Handling as a stateless multimodal request for model {self.model_id}")
+                
+                # Собираем полную полезную нагрузку для generate_content
+                full_payload = []
+                if system_prompt:
+                    full_payload.append(system_prompt) # Добавляем системный промпт как первую часть
 
+                try:
+                    image_bytes = base64.b64decode(image_data["base64"])
+                    image_part = {"mime_type": image_data["mime_type"], "data": image_bytes}
+                    full_payload.append(image_part) # Добавляем изображение
+                except Exception as e:
+                    logger.error(f"Error decoding base64 image for model {self.model_id}: {e}")
+                    return "Ошибка обработки изображения." 
+                
+                if user_prompt:
+                    full_payload.append(user_prompt) # Добавляем текстовый промпт пользователя
 
-            if not content_parts_for_current_message: 
-                logger.warning(f"No content parts to send for model {self.model_id}.")
-                return "Нет данных для отправки в ИИ."
-            
-            # logger.debug(f"Google GenAI History: {current_history}")
-            # logger.debug(f"Google GenAI Current Message Parts: {content_parts_for_current_message}")
+                if len(full_payload) <= 1: # Должно быть что-то кроме системного промпта
+                    return "Ошибка: для анализа изображения требуется текстовый комментарий."
 
-            chat_session = model_genai.start_chat(history=current_history)
-            response = await asyncio.get_event_loop().run_in_executor(None, lambda: chat_session.send_message(content_parts_for_current_message))
-            return response.text.strip() if response.text else "Ответ Google GenAI пуст."
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: model_genai.generate_content(full_payload)
+                )
+                return response.text.strip() if response.text else "Ответ от ИИ пуст."
+
+            # Если изображения нет, используем стандартную логику для текстового чата
+            else:
+                current_history = []
+                if system_prompt:
+                     current_history.append({'role': 'user', 'parts': [{'text': system_prompt}]})
+                     current_history.append({'role': 'model', 'parts': [{'text': "Понял. Я готов."}]})
+
+                current_history.extend(history)
+
+                if not user_prompt:
+                    return "Ошибка: текстовый запрос не может быть пустым."
+                
+                chat_session = model_genai.start_chat(history=current_history)
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: chat_session.send_message(user_prompt)
+                )
+                return response.text.strip() if response.text else "Ответ от ИИ пуст."
+
+            # --- КОНЕЦ ОБНОВЛЕННОЙ ЛОГИКИ ---
         except google.api_core.exceptions.ResourceExhausted as e:
             logger.error(f"Google GenAI API limit exhausted for model {self.model_id}: {e}")
             return f"Лимит Google API исчерпан: {e}"
