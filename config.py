@@ -51,7 +51,7 @@ class AppConfig:
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
-    MAX_CONVERSATION_HISTORY = 6 # Хранить последние 3 пары (вопрос-ответ)
+    MAX_CONVERSATION_HISTORY = 6 # Хранить последние 3 пары (вопрос-ответ) -> 6 элементов (user, model, user, model...)
 
     DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY = 65
     DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY = 50 
@@ -65,7 +65,7 @@ class AppConfig:
         "pack_25_gems_trial": { 
             "gems": 25, "price_units": 5900, "currency": "RUB", 
             "title": "💎 25 Гемов (Пробный)", "description": "Специальный пробный пакет. Только один раз!",
-            "is_one_time": True # Добавлен флаг для одноразовой покупки
+            "is_one_time": True 
         },
         "pack_50_gems": {
             "gems": 50, "price_units": 12500, "currency": "RUB", 
@@ -174,7 +174,8 @@ AI_MODES = {
         "multimodal_capable": True,
         "forced_model_key": "google_gemini_2_5_flash_preview", 
         "native_vision_model_id": "gemini-2.5-flash-preview-04-17", 
-        "initial_lifetime_free_uses": 5 
+        "initial_lifetime_free_uses": 5, # 5 бесплатных попыток за все время
+        "gem_cost_after_lifetime": 2.5 # Стоимость после исчерпания пожизненных попыток
     }
 }
 
@@ -183,7 +184,7 @@ AVAILABLE_TEXT_MODELS = {
         "name": "Gemini 2.0 Flash", "id": "gemini-2.0-flash", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
         "is_limited": True, 
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY,
-        "gem_cost": 0 # Остается бесплатной базово, но лимитированной
+        "gem_cost": 0 
     },
     "google_gemini_2_5_flash_preview": { 
         "name": "Gemini 2.5 Flash", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
@@ -196,14 +197,14 @@ AVAILABLE_TEXT_MODELS = {
         "name": "Gemini 2.5 Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, 
         "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
         "is_limited": True, 
-        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY, # 1 бесплатная попытка
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY, 
         "gem_cost": 2.5
     },
     "custom_api_grok_3": {
         "name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
         "is_limited": True, 
-        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY, # 0 бесплатных дневных
+        "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY, 
         "gem_cost": 2.5
     },
     "custom_api_gpt_4o_mini": {
@@ -218,9 +219,8 @@ DEFAULT_MODEL_ID = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]["id"]
 
 MENU_STRUCTURE = {
     BotConstants.MENU_MAIN: {
-        "title": "📋 Главное меню 👇 Выберите опцию:", # Изменено: добавлен эмодзи и текст
+        "title": "📋 Главное меню 👇 Выберите опцию:", 
         "items": [
-            # {"text": "📱 Mini App", "action": "open_mini_app", "target": "main_app", "web_app_url": "https://sinobu1.github.io/nwb/"}, # Удалено
             {"text": "🤖 Агенты ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_AI_MODES_SUBMENU},
             {"text": "⚙️ Модели ИИ", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_MODELS_SUBMENU},
             {"text": "📊 Лимиты", "action": BotConstants.CALLBACK_ACTION_SUBMENU, "target": BotConstants.MENU_LIMITS_SUBMENU},
@@ -319,9 +319,8 @@ firestore_service = FirestoreService(
     creds_json_str=CONFIG.FIREBASE_CREDENTIALS_JSON_STR
 )
 
-
-
-            class BaseAIService(ABC):
+# Исправлен отступ для этого класса и последующих
+class BaseAIService(ABC):
     def __init__(self, model_config: Dict[str, Any]):
         self.model_config = model_config
         self.model_id = model_config["id"]
@@ -339,36 +338,64 @@ class GoogleGenAIService(BaseAIService):
             model_genai = genai.GenerativeModel(
                 self.model_id, 
                 generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB},
-                system_instruction=system_prompt 
+                # system_instruction убран из конструктора, т.к. Gemini API v1beta не поддерживает его напрямую в start_chat для мульти-тёрна
             )
             
-            content_parts = []
+            # Формируем контент для отправки, включая системный промпт в начало истории, если его нет
+            # Gemini API v1beta (python client) для мульти-тёрна (start_chat) ожидает историю в формате:
+            # [{'role': 'user', 'parts': [...]}, {'role': 'model', 'parts': [...]}]
+            # Системный промпт можно добавить как первое сообщение от 'user' или 'model' с особой ролью,
+            # но более канонично - передавать его отдельно, если API это позволяет, или включать в первый user_prompt.
+            # В данном случае, для консистентности с CustomHttpAIService, мы будем передавать system_prompt
+            # и он будет добавлен в начало `messages_payload` в CustomHttpAIService.
+            # Для GoogleGenAIService, system_instruction передается при инициализации модели, но для chat_session
+            # он не применяется к каждому сообщению. Мы можем эмулировать это, добавляя его в начало истории.
+
+            current_history = []
+            if system_prompt: # Добавляем системный промпт как первую "инструкцию" в чат
+                 current_history.append({'role': 'user', 'parts': [{'text': system_prompt}]})
+                 current_history.append({'role': 'model', 'parts': [{'text': "Понял. Я готов."}]}) # Ответ-заглушка от модели
+
+            current_history.extend(history) # Добавляем основную историю
+
+            content_parts_for_current_message = []
             if image_data and self.model_config.get("is_vision_model"):
                 if image_data.get("base64") and image_data.get("mime_type"):
                     try:
                         image_bytes = base64.b64decode(image_data["base64"])
                         image_part = {"mime_type": image_data["mime_type"], "data": image_bytes}
-                        content_parts.append(image_part) 
+                        content_parts_for_current_message.append(image_part) 
+                        logger.info(f"Image data prepared for vision model {self.model_id}")
                     except Exception as e:
                         logger.error(f"Error decoding base64 image for model {self.model_id}: {e}")
                         return "Ошибка обработки изображения." 
+                else:
+                    logger.warning(f"Vision model {self.model_id} called but image_data is incomplete.")
             
             if user_prompt: 
-                content_parts.append(user_prompt)
+                content_parts_for_current_message.append({'text': user_prompt})
 
-            if not content_parts: 
+
+            if not content_parts_for_current_message: 
+                logger.warning(f"No content parts to send for model {self.model_id}.")
                 return "Нет данных для отправки в ИИ."
+            
+            # logger.debug(f"Google GenAI History: {current_history}")
+            # logger.debug(f"Google GenAI Current Message Parts: {content_parts_for_current_message}")
 
-            chat_session = model_genai.start_chat(history=history)
-            response = await asyncio.get_event_loop().run_in_executor(None, lambda: chat_session.send_message(content_parts))
+            chat_session = model_genai.start_chat(history=current_history)
+            response = await asyncio.get_event_loop().run_in_executor(None, lambda: chat_session.send_message(content_parts_for_current_message))
             return response.text.strip() if response.text else "Ответ Google GenAI пуст."
+        except google.api_core.exceptions.ResourceExhausted as e:
+            logger.error(f"Google GenAI API limit exhausted for model {self.model_id}: {e}")
+            return f"Лимит Google API исчерпан: {e}"
         except Exception as e:
             logger.error(f"Google GenAI API error for model {self.model_id}: {e}", exc_info=True)
             return f"Ошибка Google API ({type(e).__name__}) при обращении к {self.model_id}."
 
 class CustomHttpAIService(BaseAIService):
     async def generate_response(self, system_prompt: str, user_prompt: str, history: List[Dict], image_data: Optional[Dict[str, Any]] = None) -> str:
-        if image_data:
+        if image_data: # Custom HTTP API пока не поддерживает изображения в этом примере
             logger.warning(f"CustomHttpAIService for model {self.model_id} received image_data, but current implementation ignores it.")
 
         api_key_name = self.model_config.get("api_key_var_name")
@@ -391,14 +418,26 @@ class CustomHttpAIService(BaseAIService):
         if system_prompt:
             messages_payload.append({"role": "system", "content": system_prompt})
         
-        # Добавляем историю диалога
+        # Добавляем историю диалога, преобразуя формат Gemini (parts: [{'text': ...}]) в стандартный (content: ...)
         if history:
-            messages_payload.extend(history)
-            
+            for msg in history:
+                role = msg.get("role")
+                parts = msg.get("parts")
+                if role and parts and isinstance(parts, list) and parts[0].get("text"):
+                    messages_payload.append({"role": role, "content": parts[0]["text"]})
+                # Если история уже в нужном формате (например, от другого Custom API), можно добавить проверку
+                elif role and msg.get("content"):
+                     messages_payload.append({"role": role, "content": msg["content"]})
+
+
         if user_prompt: 
             messages_payload.append({"role": "user", "content": user_prompt})
         
-        payload = { "messages": messages_payload, "is_sync": True }
+        payload = {
+            "messages": messages_payload,
+            "is_sync": True, 
+            "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
+        }
         
         if is_gen_api_endpoint and self.model_id:
              payload['model'] = self.model_id 
@@ -441,16 +480,16 @@ class CustomHttpAIService(BaseAIService):
                     if not str(error_msg_from_api).strip() and str(error_msg_from_api) != '0':
                         final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
                     return final_error_message
-            else: 
+            else: # Предполагаем стандартный OpenAI-совместимый формат
                 if isinstance(json_resp.get("choices"), list) and json_resp["choices"]:
                     choice = json_resp["choices"][0]
                     if isinstance(choice.get("message"), dict) and choice["message"].get("content"):
                         extracted_text = choice["message"]["content"]
-                    elif isinstance(choice.get("text"), str):
+                    elif isinstance(choice.get("text"), str): # Для более старых API
                          extracted_text = choice.get("text")
-                elif isinstance(json_resp.get("text"), str):
+                elif isinstance(json_resp.get("text"), str): # Некоторые API могут возвращать текст напрямую
                     extracted_text = json_resp.get("text")
-                elif isinstance(json_resp.get("content"), str):
+                elif isinstance(json_resp.get("content"), str): # Еще один возможный вариант
                      extracted_text = json_resp.get("content")
             
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
@@ -475,13 +514,11 @@ async def update_user_gem_balance(user_id: int, new_balance: float) -> None:
 
 async def get_daily_usage_for_model(user_id: int, model_key: str, bot_data_cache: Optional[Dict[str, Any]] = None) -> int:
     if bot_data_cache is None: bot_data_cache = await firestore_service.get_bot_data()
-    # Используем Московское время для определения "сегодня"
     today_str = datetime.now(CONFIG.MOSCOW_TZ).strftime("%Y-%m-%d")
     all_user_daily_counts = bot_data_cache.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
     user_counts_today = all_user_daily_counts.get(str(user_id), {})
     model_usage_info = user_counts_today.get(model_key, {'date': '', 'count': 0})
     
-    # Сброс счетчика, если дата не совпадает с сегодняшней (по Москве)
     if model_usage_info.get('date') != today_str:
         return 0
     return model_usage_info['count']
@@ -521,21 +558,46 @@ async def check_and_log_request_attempt(
     agent_lifetime_uses_exhausted = False
     if active_agent_config and current_agent_key:
         initial_lifetime_uses = active_agent_config.get('initial_lifetime_free_uses')
-        if initial_lifetime_uses is not None and model_key == active_agent_config.get("forced_model_key"):
+        if initial_lifetime_uses is not None and model_key == active_agent_config.get("forced_model_key"): # Проверяем, что модель совпадает с форсированной агентом
             agent_uses_left = await get_agent_lifetime_uses_left(user_id, current_agent_key, user_data)
             if agent_uses_left > 0:
                 return True, f"Используется бесплатная попытка для агента «{active_agent_config.get('name')}» ({agent_uses_left}/{initial_lifetime_uses}).", "agent_lifetime_free", 0.0
-            else:
-                agent_lifetime_uses_exhausted = True
+            else: # Пожизненные попытки для агента исчерпаны
+                agent_lifetime_uses_exhausted = True 
+                # Если для этого агента есть спец. стоимость после исчерпания пожизненных лимитов
+                gem_cost_after_lifetime = active_agent_config.get('gem_cost_after_lifetime')
+                if gem_cost_after_lifetime is not None and gem_cost_after_lifetime > 0:
+                    user_gem_balance_check = await get_user_gem_balance(user_id, user_data)
+                    if user_gem_balance_check >= gem_cost_after_lifetime:
+                        return True, f"Будет списано {gem_cost_after_lifetime:.1f} гемов (спец. тариф агента).", "gem", gem_cost_after_lifetime
+                    else:
+                        msg_no_gems_agent = (f"Недостаточно гемов для агента «{active_agent_config.get('name')}».\n"
+                                           f"Нужно: {gem_cost_after_lifetime:.1f}, у вас: {user_gem_balance_check:.1f}\n"
+                                           f"Пополните баланс через меню «💎 Гемы».")
+                        return False, msg_no_gems_agent, "no_gems_agent_specific", gem_cost_after_lifetime
+                # Если спец. стоимости нет, то дальше будет общая логика (дневные лимиты модели / обычная стоимость модели)
 
-    # 3. Проверка дневного бесплатного лимита (ПРОПУСКАЕТСЯ, если лимит агента исчерпан)
-    if not agent_lifetime_uses_exhausted:
+
+    # 3. Проверка дневного бесплатного лимита (пропускается, если агентский лимит был, но исчерпан И НЕТ спец. цены для агента)
+    # Эта логика теперь более сложная из-за agent_lifetime_uses_exhausted
+    can_try_daily_limit = True
+    if agent_lifetime_uses_exhausted and active_agent_config and active_agent_config.get('gem_cost_after_lifetime') is not None:
+        # Если пожизненные попытки агента исчерпаны И у агента есть своя цена после этого,
+        # то дневные лимиты модели уже не проверяем, т.к. агент имеет приоритет.
+        can_try_daily_limit = False
+
+
+    if can_try_daily_limit:
         free_daily_limit = model_cfg.get('free_daily_limit', 0)
         current_daily_usage = await get_daily_usage_for_model(user_id, model_key, bot_data_cache)
         if current_daily_usage < free_daily_limit:
             return True, f"Используется бесплатная дневная попытка для модели «{model_cfg['name']}» ({current_daily_usage + 1}/{free_daily_limit}).", "daily_free", 0.0
 
-    # 4. Проверка платного использования за гемы
+    # 4. Проверка платного использования за гемы (обычная стоимость модели)
+    # Эта проверка выполняется, если:
+    # - агент не имеет пожизненных лимитов ИЛИ
+    # - агент имеет пожизненные лимиты, они исчерпаны, НО у агента НЕТ спец. цены после исчерпания ИЛИ
+    # - дневные лимиты модели исчерпаны
     gem_cost = model_cfg.get('gem_cost', 0.0)
     if gem_cost > 0:
         user_gem_balance = await get_user_gem_balance(user_id, user_data)
@@ -547,18 +609,18 @@ async def check_and_log_request_attempt(
                    f"Пополните баланс через меню «💎 Гемы».")
             return False, msg, "no_gems", gem_cost
     
-    # 5. Если дошли сюда, значит все лимиты исчерпаны и модель не платная
-    msg = (f"Все бесплатные лимиты для «{model_cfg['name']}» на сегодня исчерпаны. "
-           f"Эта модель недоступна за гемы.")
-    if agent_lifetime_uses_exhausted:
-        msg = (f"Все бесплатные попытки для агента «{active_agent_config.get('name')}» исчерпаны. "
-               f"Для дальнейшего использования требуются гемы, но для этой модели они не настроены.")
+    # 5. Если дошли сюда, значит все лимиты исчерпаны и модель не платная (gem_cost == 0)
+    # или агент исчерпал лимиты и не имеет платной опции.
+    final_msg = ""
+    if agent_lifetime_uses_exhausted and active_agent_config:
+        final_msg = (f"Все бесплатные попытки для агента «{active_agent_config.get('name')}» исчерпаны. "
+                     f"Эта модель ({model_cfg['name']}) далее не доступна для данного агента.")
+    else:
+        final_msg = (f"Все бесплатные лимиты для «{model_cfg['name']}» на сегодня исчерпаны. "
+                     f"Эта модель не доступна за гемы.")
         
-    logger.warning(f"User {user_id} all limits exhausted for {model_key} (no gem cost).")
-    return False, msg, "limit_exhausted_no_gems", None
-
-    logger.error(f"User {user_id} check_and_log_request_attempt unexpected state for {model_key} with agent {current_agent_key}.")
-    return False, "Не удалось определить возможность использования модели. Обратитесь в поддержку.", "error", None
+    logger.warning(f"User {user_id} all limits exhausted for {model_key} (agent: {current_agent_key}). Message: {final_msg}")
+    return False, final_msg, "limit_exhausted_no_gems", None
 
 async def increment_request_count(user_id: int, model_key: str, usage_type: str, current_agent_key: Optional[str] = None, gem_cost_val: Optional[float] = None):
     if usage_type == "bonus":
@@ -580,11 +642,9 @@ async def increment_request_count(user_id: int, model_key: str, usage_type: str,
         bot_data = await firestore_service.get_bot_data()
         all_counts = bot_data.get(BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY, {})
         user_counts = all_counts.get(str(user_id), {})
-        # Используем Московское время для определения "сегодня"
         today = datetime.now(CONFIG.MOSCOW_TZ).strftime("%Y-%m-%d")
         model_usage = user_counts.get(model_key, {'date': today, 'count': 0})
         
-        # Сброс счетчика, если дата не совпадает с сегодняшней (по Москве)
         if model_usage.get('date') != today: 
             model_usage = {'date': today, 'count': 0}
             
@@ -593,7 +653,7 @@ async def increment_request_count(user_id: int, model_key: str, usage_type: str,
         all_counts[str(user_id)] = user_counts
         await firestore_service.set_bot_data({BotConstants.FS_ALL_USER_DAILY_COUNTS_KEY: all_counts})
         logger.info(f"Incremented DAILY FREE for {user_id}, {model_key} to {model_usage['count']} for date {today}.")
-    elif usage_type == "gem":
+    elif usage_type == "gem": # Это включает и обычную стоимость модели, и спец. стоимость агента
         if gem_cost_val is None or gem_cost_val <= 0: 
             logger.error(f"User {user_id} gem usage for {model_key} but invalid gem_cost: {gem_cost_val}")
             return
@@ -634,23 +694,20 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
                 await update.get_bot().delete_message(chat_id=chat_id, message_id=prev_command_info['message_id'])
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
         except (telegram.error.BadRequest, ValueError) as e:
-            logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
+            if "message to delete not found" not in str(e).lower(): # Не логируем ошибку, если сообщение уже удалено
+                 logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
     
-    if not is_command_to_keep:
-        user_data_for_msg_handling['user_command_to_delete'] = {
-            'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
-        }
-        try:
-            await update.get_bot().delete_message(chat_id=chat_id, message_id=message_id_to_process)
-            logger.info(f"Successfully deleted current user message {message_id_to_process} (not kept).")
-            user_data_for_msg_handling.pop('user_command_to_delete', None)
-        except telegram.error.BadRequest as e:
-            logger.warning(f"Failed to delete current user message {message_id_to_process}: {e}. Will try next time if stored.")
-    else:
+    if not is_command_to_keep: # Если это не команда, которую нужно хранить (например, /start)
+        # Не удаляем сообщение пользователя сразу, если это не кнопка меню
+        # Удаление происходит в menu_button_handler для кнопок
+        # Для обычных текстовых сообщений - не удаляем, они часть диалога
+        pass 
+    else: # Команды типа /start, /menu и т.д.
          user_data_for_msg_handling['user_command_message_to_keep'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
         }
     await firestore_service.set_user_data(user_id, user_data_for_msg_handling)
+
 
 def auto_delete_message_decorator(is_command_to_keep: bool = False):
     def decorator(func):
@@ -697,7 +754,7 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
     if not agent_config: 
         logger.warning(f"Invalid agent key '{active_agent_key}' found for user {user_id}. Resetting to default.")
         active_agent_key = CONFIG.DEFAULT_AI_MODE_KEY
-        await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key})
+        await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key, 'conversation_history': []}) # Сброс истории
         agent_config = AI_MODES[active_agent_key]
         
     return agent_config
@@ -732,7 +789,7 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
         text = item_config["text"]
         web_app_url = item_config.get("web_app_url")
-        if web_app_url and item_config.get("action") == "open_mini_app": # Убедимся, что web_app создается только для Mini App кнопки
+        if web_app_url and item_config.get("action") == "open_mini_app": 
             return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
         return KeyboardButton(text)
 
@@ -770,17 +827,10 @@ async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
     
     menu_title_to_send = menu_cfg["title"]
-    # Добавляем эмодзи к заголовку главного меню, если это оно
-    # Это уже сделано в MENU_STRUCTURE, так что дополнительная логика здесь не нужна,
-    # но если бы заголовок менялся динамически, то здесь было бы место для этого.
 
     if update.message:
         await update.message.reply_text(menu_title_to_send, reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     elif update.callback_query and update.callback_query.message: 
-        # При обработке callback_query лучше использовать edit_message_text или send_new_message
-        # Для простоты и консистентности с текущей логикой, отправим новое сообщение,
-        # но в идеале, если это ответ на нажатие инлайн-кнопки, нужно редактировать.
-        # Однако, так как мы используем ReplyKeyboardMarkup, новое сообщение более уместно.
         await update.callback_query.message.reply_text(menu_title_to_send, reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
     else: 
         bot_instance = update.get_bot() 
