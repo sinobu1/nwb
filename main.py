@@ -193,6 +193,12 @@ async def process_app_message(user_id_unsafe: int, request_data: AppChatMessageR
             system_prompt = active_agent_config["prompt"]
 
             history_from_app = request_data.history or []
+            # --- НАЧАЛО НОВОГО БЛОКА ---
+            # Для Диетолога каждый анализ - это новая транзакция. Игнорируем прошлую историю.
+            if request_data.agentKey == "photo_dietitian_analyzer":
+                history_from_app = []
+                logger.info(f"Clearing history for Dietitian agent request for user {user_id}.")
+            # --- КОНЕЦ НОВОГО БЛОКА ---
             
             if len(history_from_app) > CONFIG.MAX_CONVERSATION_HISTORY * 2:
                 history_from_app = history_from_app[-(CONFIG.MAX_CONVERSATION_HISTORY * 2):]
