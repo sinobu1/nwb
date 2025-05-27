@@ -1108,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return msgDiv;
     }
 
-     async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType, history) { 
+    async function submitMessageToBackend(userText, agentKeyForBackend, modelKeyToSubmit, imageBase64, imageMimeType, history) { 
         let userId = tg.initDataUnsafe?.user?.id;
         if (!userId) {
             addMessageToChat('bot', { text: "Ошибка: ID пользователя Telegram не найден." });
@@ -1122,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             text: userText, 
             agentKey: agentKeyForBackend, 
             modelKey: modelKeyToSubmit,
-            history: history || [] // <<< ДОБАВЬТЕ ИСТОРИЮ В PAYLOAD
+            history: history || []
         };
 
         if (imageBase64 && imageMimeType) {
@@ -1159,8 +1159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = chatPromptInput.value.trim();
         let imageBase64ForBackend = null; 
         let mimeTypeForBackend = null;   
-        let imageDataUrlForUi = null;  
+        let imageDataUrlForUi = null;    
         
+        // Создаем копию истории ДО добавления нового сообщения пользователя
         const historyToSend = [...currentMiniAppChatHistory];
 
         if (selectedFileBase64 && selectedFileMimeType) { 
@@ -1391,10 +1392,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.daily_limits && Object.keys(data.daily_limits).length > 0) {
                     for (const modelKey in data.daily_limits) {
                         const limitInfo = data.daily_limits[modelKey];
-                        const modelConfig = models.find(m => m.key === modelKey) || {name: modelKey}; // Fallback name
+                        const modelConfig = models.find(m => m.key === modelKey) || {name: limitInfo.model_name};
                         const item = document.createElement('div');
                         item.className = 'limit-item';
-                        item.innerHTML = `<span class="name">${modelConfig.name}</span><span class="value">${limitInfo.used}/${limitInfo.limit} (гем: ${limitInfo.gem_cost.toFixed(1)})</span>`;
+                        
+                        let bonusText = '';
+                        if (limitInfo.bonus_uses_left > 0) {
+                            bonusText = ` (+${limitInfo.bonus_uses_left} бонусных)`;
+                        }
+                        
+                        item.innerHTML = `<span class="name">${modelConfig.name}</span><span class="value">${limitInfo.used}/${limitInfo.limit}${bonusText}</span>`;
                         dailyLimitsContainer.appendChild(item);
                     }
                 } else {
@@ -1407,7 +1414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.agent_lifetime_uses && Object.keys(data.agent_lifetime_uses).length > 0) {
                      for (const agentKey in data.agent_lifetime_uses) {
                         const bonusInfo = data.agent_lifetime_uses[agentKey];
-                        const agentConfig = generalAgents.find(a => a.key === agentKey) || toolConfigs[agentKey] || {name: agentKey};
+                        const agentConfig = generalAgents.find(a => a.key === agentKey) || toolConfigs[agentKey] || {name: bonusInfo.agent_name};
                         const item = document.createElement('div');
                         item.className = 'limit-item';
                         item.innerHTML = `<span class="name">${agentConfig.name}</span><span class="value">${bonusInfo.left}/${bonusInfo.initial}</span>`;
@@ -1415,18 +1422,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         hasBonuses = true;
                     }
                 }
-                 if (data.news_bonus && data.news_bonus.claimed) {
-                    const item = document.createElement('div');
-                    item.className = 'limit-item';
-                    item.innerHTML = `<span class="name">Бонус (${data.news_bonus.model_name})</span><span class="value">${data.news_bonus.uses_left}</span>`;
-                    agentBonusContainer.appendChild(item);
-                    hasBonuses = true;
-                }
+
                 if (!hasBonuses) {
                     agentBonusContainer.innerHTML = '<div class="limit-item"><span class="name">Специальные бонусы не найдены</span><span class="value"></span></div>';
                 }
-
-
             } else {
                 throw new Error(data.message || 'Failed to parse profile data');
             }
