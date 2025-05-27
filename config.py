@@ -401,8 +401,7 @@ class CustomHttpAIService(BaseAIService):
         api_key_name = self.model_config.get("api_key_var_name")
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
-        if not actual_key or ("YOUR_" in actual_key and not (actual_key.startswith("sk-") or actual_key.startswith("AIzaSy"))):
-            logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
+        if not actual_key or ("YOUR_" in actual_key):
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
 
         headers = {
@@ -411,14 +410,13 @@ class CustomHttpAIService(BaseAIService):
             "Accept": "application/json"
         }
         
-        endpoint_url = self.model_config.get("endpoint", "")
-      # --- НАЧАЛО ИЗМЕНЕНИЙ (ВЕРСИЯ С ИСПРАВЛЕННЫМ NameError) ---
+        # --- НАЧАЛО ФИНАЛЬНЫХ ИЗМЕНЕНИЙ: АСИНХРОННАЯ ЛОГИКА ---
 
-        # ЭТА СТРОКА БЫЛА ПРОПУЩЕНА В ПРОШЛЫЙ РАЗ. ТЕПЕРЬ ОНА НА МЕСТЕ.
-        is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
-
+        # ЭТАП 1: Создание задачи на генерацию
+        
+        task_creation_url = self.model_config.get("endpoint", "")
         messages_payload = []
-
+        
         current_user_content = user_prompt
         if system_prompt and not history:
             current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
@@ -428,91 +426,85 @@ class CustomHttpAIService(BaseAIService):
                 role = msg.get("role")
                 if role == "model":
                     role = "assistant"
-                
                 parts = msg.get("parts")
                 if role and parts and isinstance(parts, list) and parts[0].get("text"):
                     messages_payload.append({"role": role, "content": parts[0]["text"]})
                 elif role and msg.get("content"):
-                     messages_payload.append({"role": role, "content": msg["content"]})
-
+                    messages_payload.append({"role": role, "content": msg["content"]})
+        
         if user_prompt:
             messages_payload.append({"role": "user", "content": current_user_content})
         
-        payload = { "messages": messages_payload }
-        
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-            
-        endpoint = endpoint_url
-        logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+        # Payload для создания задачи, как в документации
+        task_payload = { "messages": messages_payload }
 
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
+            # Отправляем запрос на создание задачи
+            task_response = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: requests.post(endpoint, headers=headers, json=payload, timeout=90)
+                lambda: requests.post(task_creation_url, headers=headers, json=task_payload, timeout=30)
             )
-            response.raise_for_status()
-            json_resp = response.json()
-            logger.debug(f"Получен ответ от {endpoint}: {json.dumps(json_resp, ensure_ascii=False, indent=2)}")
+            task_response.raise_for_status()
+            task_json = task_response.json()
             
-            extracted_text = None
-
-            # Здесь мы снова используем is_gen_api_endpoint для выбора логики
-            if is_gen_api_endpoint:
-                if json_resp.get("status") == "success" and "output" in json_resp:
-                    extracted_text = json_resp["output"]
-                elif "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
-                    first_response_item = json_resp["response"][0]
-                    if "message" in first_response_item and "content" in first_response_item["message"]:
-                        extracted_text = first_response_item["message"]["content"]
-                elif "text" in json_resp: 
-                    extracted_text = json_resp.get("text")
-
-                if not extracted_text and json_resp.get("status") not in ["success", "starting", "processing"]:
-                    status_from_api = json_resp.get('status','N/A')
-                    error_msg_from_api = json_resp.get('error_message', json_resp.get('result'))
-                    if isinstance(error_msg_from_api, list): error_msg_from_api = " ".join(map(str, error_msg_from_api))
-                    elif isinstance(error_msg_from_api, dict): error_msg_from_api = str(error_msg_from_api)
-
-                    # Извлекаем ошибку из 'response' если она там
-                    if not error_msg_from_api and "response" in json_resp and isinstance(json_resp["response"], list) and json_resp["response"]:
-                        if isinstance(json_resp["response"][0], str):
-                            error_msg_from_api = json_resp["response"][0]
-
-                    input_details_on_error = json_resp.get('input', {})
-                    if not error_msg_from_api and isinstance(input_details_on_error, dict): error_msg_from_api = input_details_on_error.get('error', '')
-                    
-                    logger.error(f"Ошибка API для {self.model_config['name']}. Статус: {status_from_api}. Полный ответ: {json_resp}")
-                    final_error_message = f"Ошибка API «{self.model_config['name']}»: {error_msg_from_api or 'Неизвестная ошибка'}"
-                    return final_error_message
-            else: # Стандартный OpenAI-совместимый формат
-                if isinstance(json_resp.get("choices"), list) and json_resp["choices"]:
-                    choice = json_resp["choices"][0]
-                    if isinstance(choice.get("message"), dict) and choice["message"].get("content"):
-                        extracted_text = choice["message"]["content"]
-                    elif isinstance(choice.get("text"), str):
-                         extracted_text = choice.get("text")
-                elif isinstance(json_resp.get("text"), str):
-                    extracted_text = json_resp.get("text")
-                elif isinstance(json_resp.get("content"), str):
-                     extracted_text = json_resp.get("content")
+            request_id = task_json.get("request_id")
+            if not request_id:
+                logger.error(f"API did not return a request_id. Response: {task_json}")
+                return "Ошибка API: не удалось создать задачу на генерацию."
             
-            return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
-        except requests.exceptions.HTTPError as e:
-            error_body = e.response.text if e.response else "No response body"; status_code = e.response.status_code if e.response else "N/A"
-            logger.error(f"Custom API HTTPError for {self.model_id} ({endpoint}): {status_code} - {error_body}", exc_info=True)
-            try:
-                error_json = e.response.json()
-                detail = error_json.get("detail", error_body)
-                if isinstance(detail, list) and detail: detail = detail[0].get("msg", str(detail))
-                return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Детали: {detail}"
-            except:
-                 return f"Ошибка сети Custom API ({status_code}) для {self.model_config['name']}. Ответ: {error_body[:200]}"
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Custom API RequestException for {self.model_id} ({endpoint}): {e}", exc_info=True)
-            return f"Сетевая ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
+            logger.info(f"Task created successfully for model {self.model_id}. Request ID: {request_id}")
+
         except Exception as e:
-            logger.error(f"Unexpected Custom API error for {self.model_id} ({endpoint}): {e}", exc_info=True)
-            return f"Неожиданная ошибка Custom API ({type(e).__name__}) для {self.model_config['name']}."
+            logger.error(f"Error creating task for model {self.model_id}: {e}", exc_info=True)
+            return f"Ошибка при создании задачи для API ({type(e).__name__})."
+
+        # ЭТАП 2: Получение результата по request_id (Long-Pooling)
+        
+        # Формируем URL для получения результата. Обычно он выглядит так:
+        result_url = f"https://api.gen-api.ru/api/v1/requests/{request_id}"
+        
+        start_time = time.time()
+        timeout_seconds = 120 # Ждем результат не дольше 2 минут
+
+        while time.time() - start_time < timeout_seconds:
+            try:
+                # Опрашиваем результат
+                result_response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: requests.get(result_url, headers=headers, timeout=30)
+                )
+                result_response.raise_for_status()
+                result_json = result_response.json()
+
+                status = result_json.get("status")
+                logger.debug(f"Polling request_id {request_id}. Status: {status}")
+
+                if status == "success":
+                    # Успех! Извлекаем текст из поля 'output'
+                    output = result_json.get("output", "")
+                    # В 'output' может быть еще один JSON, извлекаем текст из него
+                    if isinstance(output, str) and output.startswith('{'):
+                         try:
+                             output_json = json.loads(output)
+                             if isinstance(output_json.get("response"), list) and len(output_json["response"]) > 0:
+                                 if isinstance(output_json["response"][0], dict):
+                                     return output_json["response"][0].get("message", {}).get("content", "")
+                         except:
+                              return output # Возвращаем как есть, если не JSON
+                    return output
+
+                elif status in ["error", "failed"]:
+                    logger.error(f"Task failed for request_id {request_id}. Response: {result_json}")
+                    return f"Ошибка генерации на стороне API: {result_json.get('output', 'Нет деталей')}"
+                
+                # Если статус 'starting' или 'processing', просто ждем и пробуем снова
+                await asyncio.sleep(3) # Пауза 3 секунды между попытками
+
+            except Exception as e:
+                logger.error(f"Error polling for result for request_id {request_id}: {e}", exc_info=True)
+                return f"Ошибка при получении результата от API ({type(e).__name__})."
+
+        return "Превышено время ожидания ответа от API."
 
 async def get_user_gem_balance(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> float:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
