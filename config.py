@@ -402,6 +402,7 @@ class CustomHttpAIService(BaseAIService):
         actual_key = _API_KEYS_PROVIDER.get(api_key_name)
 
         if not actual_key or ("YOUR_" in actual_key):
+            logger.error(f"Invalid API key for model {self.model_id} (key name: {api_key_name}).")
             return f"Ошибка конфигурации ключа API для «{self.model_config.get('name', self.model_id)}»."
 
         headers = {
@@ -410,62 +411,63 @@ class CustomHttpAIService(BaseAIService):
             "Accept": "application/json"
         }
         
-        # --- НАЧАЛО ФИНАЛЬНЫХ ИЗМЕНЕНИЙ: АСИНХРОННАЯ ЛОГИКА ---
-
-        # ЭТАП 1: Создание задачи на генерацию
-        
         task_creation_url = self.model_config.get("endpoint", "")
-        messages_payload = []
+        is_gen_api_endpoint = task_creation_url.startswith("https://api.gen-api.ru")
         
+        # --- ЭТАП 1: Формирование messages_payload и создание задачи ---
+        messages_payload = []
         current_user_content = user_prompt
-        if system_prompt and not history:
-            current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
-
+        
+        # Для Grok системный промпт не добавляем, для остальных - добавляем, если нет истории.
+        # Сравниваем model_id (например, "grok-3-beta") в нижнем регистре.
+        if "grok" not in self.model_id.lower():
+            if system_prompt and not history:
+                current_user_content = f"{system_prompt}\n\n---\n\n{user_prompt}"
+        
         if history:
             for msg in history:
                 role = msg.get("role")
+                # Роль 'model' меняем на 'assistant' для совместимости с API, ожидающими формат OpenAI
                 if role == "model":
                     role = "assistant"
+                
                 parts = msg.get("parts")
                 if role and parts and isinstance(parts, list) and parts[0].get("text"):
                     messages_payload.append({"role": role, "content": parts[0]["text"]})
-                elif role and msg.get("content"):
-                    messages_payload.append({"role": role, "content": msg["content"]})
+                elif role and msg.get("content"): # Если история уже в формате content
+                     messages_payload.append({"role": role, "content": msg["content"]})
         
-        if user_prompt:
+        if user_prompt: # Добавляем текущее сообщение пользователя (уже обработанное с system_prompt при необходимости)
             messages_payload.append({"role": "user", "content": current_user_content})
         
-        # Payload для создания задачи, как в документации
-        # --- НАЧАЛО ИЗМЕНЕНИЙ PAYLOAD ---
-        if is_gen_api_endpoint: # Если это endpoint api.gen-api.ru
-            # Формируем payload согласно второму, более полному примеру из документации Grok
-            task_payload = {
-                "messages": messages_payload,
-                "model": self.model_id,  # Явно указываем модель, даже если есть default
-                "is_sync": False,        # Явно указываем асинхронный режим
-                "stream": False,         # Явно указываем, что не используем стриминг
-                "n": 1,
-                "temperature": 1.0,      # Используем float для температуры
-                "top_p": 1.0,            # Используем float для top_p
-                "response_format": "{\"type\":\"text\"}", # Передаем как JSON-строку
-                "frequency_penalty": 0,
-                "presence_penalty": 0
-            }
-            # callback_url здесь не указываем, так как его нет во втором примере
-            # и мы используем is_sync: false для асинхронного опроса.
-        else:
-            # Для других Custom HTTP API оставляем более простой payload,
-            # который, возможно, работал для них ранее.
-            # Либо можно будет унифицировать, если этот новый payload подойдет всем.
+        # Формируем task_payload
+        if is_gen_api_endpoint:
+            # Payload для api.gen-api.ru согласно последней документации Grok (второй пример)
             task_payload = {
                 "messages": messages_payload,
                 "model": self.model_id,
-                # Можно добавить другие параметры, если они общие для других API
+                "is_sync": False, # Явно асинхронный режим для опроса
+                "stream": False,
+                "n": 1,
+                "temperature": 1.0,
+                "top_p": 1.0,
+                "response_format": "{\"type\":\"text\"}", # Как строка, содержащая JSON
+                "frequency_penalty": 0,
+                "presence_penalty": 0
             }
-        # --- КОНЕЦ ИЗМЕНЕНИЙ PAYLOAD ---
+            # callback_url не добавляем, так как используем is_sync: false и опрос
+        else:
+            # Для других Custom HTTP API можно использовать более простой payload
+            # или адаптировать по их документации.
+            task_payload = {
+                "messages": messages_payload,
+                "model": self.model_id,
+                # Другие параметры по умолчанию, если нужны:
+                # "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
+            }
 
         try:
-            # Отправляем запрос на создание задачи
+            logger.debug(f"Отправка payload на {task_creation_url} для создания задачи: {json.dumps(task_payload, ensure_ascii=False, indent=2)}")
             task_response = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: requests.post(task_creation_url, headers=headers, json=task_payload, timeout=30)
@@ -475,23 +477,38 @@ class CustomHttpAIService(BaseAIService):
             
             request_id = task_json.get("request_id")
             if not request_id:
-                logger.error(f"API did not return a request_id. Response: {task_json}")
-                return "Ошибка API: не удалось создать задачу на генерацию."
+                logger.error(f"API {self.model_id} did not return a request_id. Response: {task_json}")
+                return f"Ошибка API «{self.model_config.get('name')}»: не удалось создать задачу."
             
             logger.info(f"Task created successfully for model {self.model_id}. Request ID: {request_id}")
 
+        except requests.exceptions.HTTPError as e_http:
+            error_body = e_http.response.text if e_http.response else "No response body"
+            status_code = e_http.response.status_code if e_http.response else "N/A"
+            logger.error(f"HTTPError creating task for model {self.model_id} ({status_code}): {error_body}", exc_info=True)
+            return f"Ошибка API «{self.model_config.get('name')}» ({status_code}) при создании задачи: {error_body[:200]}"
         except Exception as e:
             logger.error(f"Error creating task for model {self.model_id}: {e}", exc_info=True)
-            return f"Ошибка при создании задачи для API ({type(e).__name__})."
+            return f"Ошибка при создании задачи для API «{self.model_config.get('name')}» ({type(e).__name__})."
 
-        # ЭТАП 2: Получение результата по request_id (Long-Pooling)
-        
-        result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}"
-        
-        logger.info(f"Polling for result at: {result_url}")
+        # --- ЭТАП 2: Получение результата по request_id (только для is_gen_api_endpoint) ---
+        if not is_gen_api_endpoint:
+            # Если это не gen-api.ru, предполагаем, что ответ уже в task_json (синхронный API)
+            # Эта логика потребует адаптации под конкретный синхронный API
+            logger.warning(f"Модель {self.model_id} не является gen-api.ru, но логика синхронного ответа не полностью реализована здесь.")
+            # Попытка извлечь текст из стандартных полей для OpenAI-совместимых API
+            if isinstance(task_json.get("choices"), list) and task_json["choices"]:
+                choice = task_json["choices"][0]
+                if isinstance(choice.get("message"), dict) and choice["message"].get("content"):
+                    return choice["message"]["content"].strip()
+            return "Ответ от API получен, но логика извлечения текста для этого типа API не настроена."
+
+
+        result_url = f"https://api.gen-api.ru/api/v1/request/get/{request_id}" # Правильный URL для опроса
+        logger.info(f"Polling for result for model {self.model_id} at: {result_url}")
 
         start_time = time.time()
-        timeout_seconds = 120 
+        timeout_seconds = 120 # Ждем результат не дольше 2 минут
 
         while time.time() - start_time < timeout_seconds:
             try:
@@ -501,39 +518,60 @@ class CustomHttpAIService(BaseAIService):
                 )
                 result_response.raise_for_status()
                 result_json = result_response.json()
+                logger.debug(f"Polling request_id {request_id} for {self.model_id}. Status: {result_json.get('status')}. Full: {result_json}")
 
                 status = result_json.get("status")
-                logger.debug(f"Polling request_id {request_id}. Status: {status}")
 
                 if status == "success":
-                    # --- НАЧАЛО ПОБЕДНОГО ИСПРАВЛЕНИЯ ---
-                    # Лог показал, что текст ответа находится в ключе 'result',
-                    # который является списком (массивом).
-                    
+                    # Извлекаем текст из ключа 'result', который является списком строк
                     result_list = result_json.get("result")
-
-                    # Проверяем, что 'result' существует, это список, и он не пустой
                     if result_list and isinstance(result_list, list) and len(result_list) > 0:
-                        # Извлекаем первый элемент из списка — это и есть наш текст.
                         ai_text = result_list[0]
-                        return ai_text
+                        if isinstance(ai_text, str):
+                            return ai_text.strip()
+                        else: # Если вдруг внутри списка не строка
+                            logger.error(f"Task {request_id} succeeded but result[0] is not a string. Full response: {result_json}")
+                            return f"API-задача для «{self.model_config.get('name')}» выполнена, но текст ответа имеет неожиданный тип."
                     else:
-                        # Если 'result' пустой или имеет неверный формат
-                        logger.error(f"Task {request_id} succeeded but the 'result' field has an unexpected format. Full response: {result_json}")
-                        return f"API-задача для «{self.model_config.get('name')}» выполнена, но вернула неожиданный формат ответа."
-                    # --- КОНЕЦ ПОБЕДНОГО ИСПРАВЛЕНИЯ ---
+                        logger.error(f"Task {request_id} succeeded but 'result' field is missing, empty, or not a list. Full response: {result_json}")
+                        # Пробуем извлечь из full_response как запасной вариант
+                        full_resp_list = result_json.get("full_response")
+                        if full_resp_list and isinstance(full_resp_list, list) and len(full_resp_list) > 0:
+                            if isinstance(full_resp_list[0], dict):
+                                message_content = full_resp_list[0].get("message", {}).get("content")
+                                if message_content and isinstance(message_content, str):
+                                    logger.info(f"Extracted text from full_response for task {request_id}")
+                                    return message_content.strip()
+                        return f"API-задача для «{self.model_config.get('name')}» выполнена, но не удалось извлечь текст ответа."
 
                 elif status in ["error", "failed"]:
-                    logger.error(f"Task failed for request_id {request_id}. Response: {result_json}")
-                    return f"Ошибка генерации на стороне API: {result_json.get('output', 'Нет деталей')}"
+                    error_message_from_result = "Нет деталей"
+                    if isinstance(result_json.get("result"), list) and len(result_json.get("result")) > 0:
+                        error_message_from_result = result_json["result"][0]
+                    elif isinstance(result_json.get("full_response"), list) and len(result_json.get("full_response")) > 0:
+                        if isinstance(result_json["full_response"][0], dict):
+                             error_message_from_result = result_json["full_response"][0].get("error", error_message_from_result)
+                    
+                    logger.error(f"Task failed for request_id {request_id} for model {self.model_id}. Response: {result_json}")
+                    return f"Ошибка генерации на стороне API «{self.model_config.get('name')}»: {error_message_from_result}"
                 
+                # Если статус 'starting', 'processing' или другой, не конечный, просто ждем
                 await asyncio.sleep(3)
 
-            except Exception as e:
-                logger.error(f"Error polling for result for request_id {request_id}: {e}", exc_info=True)
-                return f"Ошибка при получении результата от API ({type(e).__name__})."
+            except requests.exceptions.HTTPError as e_http_poll:
+                poll_error_body = e_http_poll.response.text if e_http_poll.response else "No response body"
+                poll_status_code = e_http_poll.response.status_code if e_http_poll.response else "N/A"
+                logger.error(f"HTTPError polling for result for request_id {request_id} ({poll_status_code}): {poll_error_body}", exc_info=True)
+                # Если 404, то задача могла уже удалиться с сервера или URL неверный
+                if poll_status_code == 404:
+                    return f"Ошибка при получении результата от API «{self.model_config.get('name')}»: задача не найдена (возможно, истек срок)."
+                return f"Ошибка сети ({poll_status_code}) при получении результата от API «{self.model_config.get('name')}»."
+            except Exception as e_poll:
+                logger.error(f"Error polling for result for request_id {request_id} for model {self.model_id}: {e_poll}", exc_info=True)
+                return f"Ошибка при получении результата от API «{self.model_config.get('name')}» ({type(e_poll).__name__})."
 
-        return "Превышено время ожидания ответа от API."
+        logger.warning(f"Timeout waiting for result for request_id {request_id} for model {self.model_id}.")
+        return f"Превышено время ожидания ответа от API для «{self.model_config.get('name')}»."
 
 async def get_user_gem_balance(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> float:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
