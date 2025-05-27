@@ -46,8 +46,8 @@ class AppConfig:
     FIREBASE_CREDENTIALS_JSON_STR = os.getenv("FIREBASE_CREDENTIALS")
     FIREBASE_CERT_PATH = "gemioracle-firebase-adminsdk-fbsvc-8f89d5b941.json"
 
-    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://nwb-production.up.railway.app/") 
-    
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://nwb-production.up.railway.app/")
+
     MAX_OUTPUT_TOKENS_GEMINI_LIB = 2048
     MAX_MESSAGE_LENGTH_TELEGRAM = 4000
     MIN_AI_REQUEST_LENGTH = 4
@@ -57,33 +57,35 @@ class AppConfig:
     DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY = 1
     DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY = 1 # For Gemini 2.5 Pro
     DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY = 10
-    
+
     GEMS_FOR_NEW_USER = 0
-    # Обновленные пакеты гемов
+    # --- ИЗМЕНЕННЫЕ ПАКЕТЫ ГЕМОВ ---
     GEM_PACKAGES = {
         "pack_25_gems_trial": { # Ключ для пробного пакета
-            "gems": 25, 
+            "gems": 25,
             "price_units": 5900, # 59 рублей = 5900 копеек
-            "currency": "RUB", 
-            "title": "💎 25 Гемов (Пробный)", 
-            "description": "Специальный пробный пакет (1 раз)"
+            "currency": "RUB",
+            "title": "💎 25 Гемов (Пробный)",
+            "description": "Специальный пробный пакет (1 раз)",
+            "is_trial": True # Добавлен флаг для идентификации пробного пакета
             # Для логики "1 раз" потребуется доработка в bot_logic.py:
-            # - Хранить в Firestore флаг о покупке этого пакета пользователем.
-            # - При отображении пакетов проверять флаг.
-            # - В precheckout_callback проверять флаг.
+            # - Хранить в Firestore флаг о покупке этого пакета пользователем (например, user_data['purchased_trial_pack_25_gems'] = True).
+            # - При отображении пакетов в меню проверять этот флаг.
+            # - В precheckout_callback и successful_payment_callback проверять этот флаг и устанавливать его после успешной покупки.
         },
         "pack_50_gems": {
-            "gems": 50, 
+            "gems": 50,
             "price_units": 12500, # 125 рублей = 12500 копеек
-            "currency": "RUB", 
-            "title": "🌟 50 Гемов", 
+            "currency": "RUB",
+            "title": "🌟 50 Гемов",
             "description": "Выгодный пакет для частого использования"
         }
     }
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ПАКЕТОВ ГЕМОВ ---
 
     NEWS_CHANNEL_USERNAME = "@timextech"
     NEWS_CHANNEL_LINK = "https://t.me/timextech"
-    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro" 
+    NEWS_CHANNEL_BONUS_MODEL_KEY = "custom_api_gemini_2_5_pro"
     NEWS_CHANNEL_BONUS_GENERATIONS = 1
 
     DEFAULT_AI_MODE_KEY = "universal_ai_basic"
@@ -102,7 +104,7 @@ class BotConstants:
     FS_BOT_DATA_COLLECTION = "bot_data"
     FS_BOT_DATA_DOCUMENT = "data"
     FS_ALL_USER_DAILY_COUNTS_KEY = "all_user_daily_counts"
-    FS_APP_MESSAGES_COLLECTION = "app_messages" 
+    FS_APP_MESSAGES_COLLECTION = "app_messages"
 
     MENU_MAIN = "main_menu"
     MENU_AI_MODES_SUBMENU = "ai_modes_submenu"
@@ -126,37 +128,37 @@ class BotConstants:
 
 AI_MODES = {
     "universal_ai_basic": {
-        "name": "Универсальный", 
+        "name": "Универсальный",
         "prompt": ("Ты — ИИ-ассистент. Твоя задача — кратко и по существу отвечать на широкий круг вопросов пользователя. Будь вежлив и полезен. Используй ясное форматирование для списков и абзацев, если это необходимо."),
         "welcome": "Универсальный агент к вашим услугам. Какой у вас вопрос?"
     },
     "idea_generator": {
-        "name": "Генератор идей", 
+        "name": "Генератор идей",
         "prompt": ("Ты — Генератор Идей, креативный ИИ-помощник. Твоя задача — помогать пользователю находить новые и оригинальные идеи для различных целей: вечеринок, подарков, бизнеса, творческих проектов и многого другого. Предлагай разнообразные варианты, стимулируй воображение пользователя. Будь позитивным и вдохновляющим. Используй списки для перечисления идей, если это уместно. Четко разделяй смысловые блоки."),
         "welcome": "Готов генерировать идеи! Какая тема вас интересует?"
     },
     "career_coach": {
-        "name": "Карьерный консультант", 
+        "name": "Карьерный консультант",
         "prompt": ("Ты — Карьерный Консультант, ИИ-специалист по развитию карьеры. Твоя цель — помочь пользователю раскрыть свой карьерный потенциал. Предоставляй подробные и структурированные планы по совершенствованию навыков, достижению карьерных целей, поиску работы и профессиональному росту. Будь объективным, давай практические советы. Оформляй планы по пунктам, выделяй ключевые этапы."),
         "welcome": "Раскроем ваш карьерный потенциал! Расскажите о ваших целях или текущей ситуации."
     },
     "programming_partner": {
-        "name": "Партнер программиста", 
+        "name": "Партнер программиста",
         "prompt": ("Ты — Партнер Программиста, ИИ-ассистент для разработчиков. Твоя задача — помогать пользователям совершенствовать навыки программирования, работать над проектами и изучать новые технологии. Объясняй концепции, предлагай решения для задач, помогай отлаживать код, делись лучшими практиками. Предоставляй фрагменты кода, если это необходимо, используя форматирование для кода. Будь точным и терпеливым."),
         "welcome": "Готов помочь с кодом! Какая задача или вопрос у вас сегодня?"
     },
     "tutor_assistant": {
-        "name": "Внешкольный наставник", 
+        "name": "Внешкольный наставник",
         "prompt": ("Ты — Внешкольный Наставник, дружелюбный ИИ-помощник для учебы. Твоя миссия — помогать с учебой и практическими заданиями. Объясняй сложные темы простым языком, помогай с решением задач, проверяй понимание материала, предлагай ресурсы для дополнительного изучения. Будь терпеливым, ободряющим и ясным в своих объяснениях."),
         "welcome": "Рад помочь с учебой! За что сегодня возьмемся?"
     },
     "literary_editor": {
-        "name": "Литературный редактор", 
+        "name": "Литературный редактор",
         "prompt": ("Ты — Литературный Редактор, ИИ-помощник для писателей. Твоя задача — помогать пользователям писать лучше, предоставляя четкие и конструктивные отзывы по их текстам. Анализируй стиль, грамматику, структуру, логику изложения. Предлагай улучшения, помогай с выбором слов и выражений. Будь тактичным и объективным в своих рекомендациях."),
         "welcome": "Готов помочь улучшить ваш текст! Пожалуйста, предоставьте текст для редактуры."
     },
-    "photo_dietitian_analyzer": { 
-        "name": "🥑 Диетолог (анализ фото)", 
+    "photo_dietitian_analyzer": {
+        "name": "🥑 Диетолог (анализ фото)",
         "prompt": (
             "Ты — Диетолог-Профессионал, эксперт по здоровому питанию, работающий с продвинутой мультимодальной ИИ-моделью, способной анализировать изображения еды. "
             "Твоя главная задача — детальный анализ ФОТОГРАФИЙ еды, присланных пользователем, и предоставление развернутых рекомендаций.\n\n"
@@ -177,44 +179,44 @@ AI_MODES = {
         ),
         "welcome": "Здравствуйте! Я ваш Диетолог. Прикрепите фото блюда и укажите вес/комментарий для анализа КБЖУ, или задайте вопрос по питанию.",
         "multimodal_capable": True,
-        "forced_model_key": "google_gemini_2_5_flash_preview", 
-        "native_vision_model_id": "gemini-2.5-flash-preview-04-17", 
-        "initial_lifetime_free_uses": 5 
+        "forced_model_key": "google_gemini_2_5_flash_preview",
+        "native_vision_model_id": "gemini-2.5-flash-preview-04-17",
+        "initial_lifetime_free_uses": 5
     }
 }
 
 AVAILABLE_TEXT_MODELS = {
     "google_gemini_2_0_flash": {
         "name": "Gemini 2.0 Flash", "id": "gemini-2.0-flash", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
-        "is_limited": True, 
+        "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_0_FLASH_DAILY,
-        "gem_cost": 0 
+        "gem_cost": 0
     },
-    "google_gemini_2_5_flash_preview": { 
+    "google_gemini_2_5_flash_preview": {
         "name": "Gemini 2.5 Flash", "id": "gemini-2.5-flash-preview-04-17", "api_type": BotConstants.API_TYPE_GOOGLE_GENAI,
         "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_GEMINI_2_5_FLASH_PREVIEW_DAILY,
         "gem_cost": 2.5,
-        "is_vision_model": True 
+        "is_vision_model": True
     },
     "custom_api_gemini_2_5_pro": {
-        "name": "Gemini 2.5 Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP, 
+        "name": "Gemini 2.5 Pro", "id": "gemini-2.5-pro-preview-03-25", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": CONFIG.CUSTOM_GEMINI_PRO_ENDPOINT, "api_key_var_name": "CUSTOM_GEMINI_PRO_API_KEY",
-        "is_limited": True, 
+        "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GEMINI_PRO_DAILY,
         "gem_cost": 2.5
     },
     "custom_api_grok_3": {
         "name": "Grok 3", "id": "grok-3-beta", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/grok-3", "api_key_var_name": "CUSTOM_GROK_3_API_KEY",
-        "is_limited": True, 
+        "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GROK_DAILY,
         "gem_cost": 2.5
     },
     "custom_api_gpt_4o_mini": {
         "name": "GPT-4o mini", "id": "gpt-4o-mini", "api_type": BotConstants.API_TYPE_CUSTOM_HTTP,
         "endpoint": "https://api.gen-api.ru/api/v1/networks/gpt-4o-mini", "api_key_var_name": "CUSTOM_GPT4O_MINI_API_KEY",
-        "is_limited": True, 
+        "is_limited": True,
         "free_daily_limit": CONFIG.DEFAULT_FREE_REQUESTS_CUSTOM_GPT4O_MINI_DAILY,
         "gem_cost": 0.5
     }
@@ -236,7 +238,7 @@ MENU_STRUCTURE = {
     BotConstants.MENU_AI_MODES_SUBMENU: {
         "title": "Выберите агент ИИ", "items": [
             {"text": mode["name"], "action": BotConstants.CALLBACK_ACTION_SET_AGENT, "target": key}
-            for key, mode in AI_MODES.items() 
+            for key, mode in AI_MODES.items()
         ], "parent": BotConstants.MENU_MAIN, "is_submenu": True
     },
     BotConstants.MENU_MODELS_SUBMENU: {
@@ -248,12 +250,13 @@ MENU_STRUCTURE = {
     BotConstants.MENU_LIMITS_SUBMENU: {"title": "Ваши лимиты и баланс", "items": [{"text": "📊 Показать", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "usage"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
     BotConstants.MENU_BONUS_SUBMENU: {"title": "Бонус за подписку на канал", "items": [{"text": "🎁 Получить", "action": BotConstants.CALLBACK_ACTION_CHECK_BONUS, "target": "news_bonus"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True},
     BotConstants.MENU_GEMS_SUBMENU: {
-        "title": "💎 Магазин Гемов", 
+        "title": "💎 Магазин Гемов",
         "items": [
-            {"text": package_info["title"], "action": BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE, "target": package_key}
-            for package_key, package_info in CONFIG.GEM_PACKAGES.items()
+            # Элементы будут генерироваться динамически в bot_logic.py с учетом флага is_trial и статуса покупки
+            # {"text": package_info["title"], "action": BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE, "target": package_key}
+            # for package_key, package_info in CONFIG.GEM_PACKAGES.items()
         ] + [{"text": "ℹ️ Мой баланс и лимиты", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "show_limits_from_gems_menu"}],
-        "parent": BotConstants.MENU_MAIN, 
+        "parent": BotConstants.MENU_MAIN,
         "is_submenu": True
     },
     BotConstants.MENU_HELP_SUBMENU: {"title": "Помощь", "items": [{"text": "❓ Справка", "action": BotConstants.CALLBACK_ACTION_SHOW_HELP, "target": "help"}], "parent": BotConstants.MENU_MAIN, "is_submenu": True}
@@ -339,32 +342,32 @@ class GoogleGenAIService(BaseAIService):
                  return "API ключ для Google Gemini не настроен."
 
             model_genai = genai.GenerativeModel(
-                self.model_id, 
+                self.model_id,
                 generation_config={"max_output_tokens": CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB},
-                system_instruction=system_prompt 
+                system_instruction=system_prompt
             )
-            
+
             content_parts = []
             if image_data and self.model_config.get("is_vision_model"):
                 if image_data.get("base64") and image_data.get("mime_type"):
                     try:
                         image_bytes = base64.b64decode(image_data["base64"])
                         image_part = {"mime_type": image_data["mime_type"], "data": image_bytes}
-                        content_parts.append(image_part) 
+                        content_parts.append(image_part)
                         logger.info(f"Image data prepared for vision model {self.model_id}")
                     except Exception as e:
                         logger.error(f"Error decoding base64 image for model {self.model_id}: {e}")
-                        return "Ошибка обработки изображения." 
+                        return "Ошибка обработки изображения."
                 else:
                     logger.warning(f"Vision model {self.model_id} called but image_data is incomplete.")
             elif image_data:
                  logger.warning(f"Text model {self.model_id} received image_data but will ignore it.")
 
-            if user_prompt: # Add text prompt after image if image exists, or as the only part
+            if user_prompt: 
                 content_parts.append(user_prompt)
 
 
-            if not content_parts: 
+            if not content_parts:
                 logger.warning(f"No content parts to send for model {self.model_id}.")
                 return "Нет данных для отправки в ИИ."
 
@@ -394,30 +397,30 @@ class CustomHttpAIService(BaseAIService):
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        
+
         endpoint_url = self.model_config.get("endpoint", "")
         is_gen_api_endpoint = endpoint_url.startswith("https://api.gen-api.ru")
-        
+
         messages_payload = []
         if system_prompt:
             messages_payload.append({"role": "system", "content": system_prompt})
-        
-        if user_prompt: 
+
+        if user_prompt:
             messages_payload.append({"role": "user", "content": user_prompt})
-        
+
         payload = {
             "messages": messages_payload,
-            "is_sync": True, 
+            "is_sync": True,
             "max_tokens": self.model_config.get("max_tokens", CONFIG.MAX_OUTPUT_TOKENS_GEMINI_LIB)
         }
-        
+
         if is_gen_api_endpoint and self.model_id:
-             payload['model'] = self.model_id 
+             payload['model'] = self.model_id
 
         if self.model_config.get("parameters"):
             payload.update(self.model_config["parameters"])
-        
-        endpoint = endpoint_url 
+
+        endpoint = endpoint_url
         logger.debug(f"Отправка payload на {endpoint}: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
         try:
@@ -428,7 +431,7 @@ class CustomHttpAIService(BaseAIService):
             response.raise_for_status()
             json_resp = response.json()
             logger.debug(f"Получен ответ от {endpoint}: {json.dumps(json_resp, ensure_ascii=False, indent=2)}")
-            
+
             extracted_text = None
 
             if is_gen_api_endpoint:
@@ -438,7 +441,7 @@ class CustomHttpAIService(BaseAIService):
                     first_response_item = json_resp["response"][0]
                     if "message" in first_response_item and "content" in first_response_item["message"]:
                         extracted_text = first_response_item["message"]["content"]
-                elif "text" in json_resp: 
+                elif "text" in json_resp:
                     extracted_text = json_resp.get("text")
 
                 if not extracted_text and json_resp.get("status") not in ["success", "starting", "processing"]:
@@ -452,7 +455,7 @@ class CustomHttpAIService(BaseAIService):
                     if not str(error_msg_from_api).strip() and str(error_msg_from_api) != '0':
                         final_error_message = f"Ошибка API {self.model_config['name']}: Статус «{status_from_api}». Детали: {str(json_resp)[:200]}"
                     return final_error_message
-            else: 
+            else:
                 if isinstance(json_resp.get("choices"), list) and json_resp["choices"]:
                     choice = json_resp["choices"][0]
                     if isinstance(choice.get("message"), dict) and choice["message"].get("content"):
@@ -463,7 +466,7 @@ class CustomHttpAIService(BaseAIService):
                     extracted_text = json_resp.get("text")
                 elif isinstance(json_resp.get("content"), str):
                      extracted_text = json_resp.get("content")
-            
+
             return extracted_text.strip() if extracted_text else f"Ответ API {self.model_config['name']} не содержит ожидаемого текста или структура ответа неизвестна."
         except requests.exceptions.HTTPError as e:
             error_body = e.response.text if e.response else "No response body"; status_code = e.response.status_code if e.response else "N/A"
@@ -507,7 +510,7 @@ async def decrement_agent_lifetime_uses(user_id: int, agent_config_key: str, use
         logger.info(f"User {user_id} consumed a lifetime free use for agent {agent_config_key}. Left: {current_uses - 1}")
 
 async def check_and_log_request_attempt(
-    user_id: int, model_key: str, user_data: Optional[Dict[str, Any]] = None, 
+    user_id: int, model_key: str, user_data: Optional[Dict[str, Any]] = None,
     bot_data_cache: Optional[Dict[str, Any]] = None, current_agent_key: Optional[str] = None
 ) -> Tuple[bool, str, str, Optional[float]]:
     model_cfg = AVAILABLE_TEXT_MODELS.get(model_key)
@@ -549,7 +552,7 @@ async def check_and_log_request_attempt(
                    f"Пополните баланс: /gems")
             logger.warning(f"User {user_id} insufficient gems for {model_key}. Needed: {gem_cost}, Has: {user_gem_balance}")
             return False, msg, "no_gems", gem_cost
-    
+
     if gem_cost == 0 and current_daily_usage >= free_daily_limit:
         agent_had_lifetime_option = active_agent_config and active_agent_config.get('initial_lifetime_free_uses') is not None
         agent_lifetime_uses_exhausted_or_not_applicable = True
@@ -566,7 +569,7 @@ async def check_and_log_request_attempt(
 
 async def increment_request_count(user_id: int, model_key: str, usage_type: str, current_agent_key: Optional[str] = None, gem_cost_val: Optional[float] = None):
     if usage_type == "bonus":
-        user_data = await firestore_service.get_user_data(user_id) 
+        user_data = await firestore_service.get_user_data(user_id)
         bonus_left = user_data.get('news_bonus_uses_left', 0)
         if bonus_left > 0: await firestore_service.set_user_data(user_id, {'news_bonus_uses_left': bonus_left - 1})
         logger.info(f"User {user_id} consumed bonus for {model_key}. Left: {bonus_left - 1 if bonus_left > 0 else 0}")
@@ -587,7 +590,7 @@ async def increment_request_count(user_id: int, model_key: str, usage_type: str,
         logger.info(f"Incremented DAILY FREE for {user_id}, {model_key} to {model_usage['count']}.")
     elif usage_type == "gem":
         if gem_cost_val is None or gem_cost_val <= 0: logger.error(f"User {user_id} gem usage for {model_key} but invalid gem_cost: {gem_cost_val}"); return
-        balance = await get_user_gem_balance(user_id) 
+        balance = await get_user_gem_balance(user_id)
         new_balance = balance - gem_cost_val
         if new_balance < 0: logger.error(f"User {user_id} overdraft on gems for {model_key}. Bal: {balance}, Cost: {gem_cost_val}"); new_balance = 0.0
         await update_user_gem_balance(user_id, new_balance)
@@ -620,7 +623,7 @@ async def _store_and_try_delete_message(update: Update, user_id: int, is_command
                 logger.info(f"Successfully deleted previous user message {prev_command_info['message_id']}")
         except (telegram.error.BadRequest, ValueError) as e:
             logger.warning(f"Failed to delete/process previous user message {prev_command_info.get('message_id')}: {e}")
-    
+
     if not is_command_to_keep:
         user_data_for_msg_handling['user_command_to_delete'] = {
             'message_id': message_id_to_process, 'timestamp': timestamp_now_iso
@@ -655,16 +658,16 @@ async def get_current_model_key(user_id: int, user_data: Optional[Dict[str, Any]
         for key, info in AVAILABLE_TEXT_MODELS.items():
             if info["id"] == selected_id and info.get("api_type") == selected_api_type:
                 return key
-    
+
     for key, info in AVAILABLE_TEXT_MODELS.items():
         if info["id"] == selected_id:
             if user_data.get('selected_api_type') != info.get("api_type"):
                 await firestore_service.set_user_data(user_id, {'selected_api_type': info.get("api_type")})
             return key
-            
+
     default_cfg = AVAILABLE_TEXT_MODELS[CONFIG.DEFAULT_MODEL_KEY]
     await firestore_service.set_user_data(user_id, {
-        'selected_model_id': default_cfg["id"], 
+        'selected_model_id': default_cfg["id"],
         'selected_api_type': default_cfg["api_type"]
     })
     return CONFIG.DEFAULT_MODEL_KEY
@@ -675,7 +678,7 @@ async def get_selected_model_details(user_id: int, user_data: Optional[Dict[str,
 
 async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if user_data is None: user_data = await firestore_service.get_user_data(user_id)
-    
+
     active_agent_key = user_data.get('current_ai_mode', CONFIG.DEFAULT_AI_MODE_KEY)
     agent_config = AI_MODES.get(active_agent_key)
 
@@ -684,7 +687,7 @@ async def get_current_mode_details(user_id: int, user_data: Optional[Dict[str, A
         active_agent_key = CONFIG.DEFAULT_AI_MODE_KEY
         await firestore_service.set_user_data(user_id, {'current_ai_mode': active_agent_key})
         agent_config = AI_MODES[active_agent_key]
-        
+
     return agent_config
 
 def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
@@ -692,9 +695,9 @@ def smart_truncate(text: str, max_length: int) -> Tuple[str, bool]:
     if len(text) <= max_length: return text, False
     suffix = "\n\n(...ответ был сокращен)"
     adjusted_max_length = max_length - len(suffix)
-    if adjusted_max_length <= 0: return text[:max_length - len("...")] + "...", True 
+    if adjusted_max_length <= 0: return text[:max_length - len("...")] + "...", True
     truncated_text = text[:adjusted_max_length]
-    for separator in ['\n\n', '. ', '! ', '? ', '\n', ' ']: 
+    for separator in ['\n\n', '. ', '! ', '? ', '\n', ' ']:
         position = truncated_text.rfind(separator)
         if position != -1:
             actual_cut_position = position + (len(separator) if separator != ' ' else 0)
@@ -712,7 +715,28 @@ def is_menu_button_text(text: str) -> bool:
 def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
     keyboard_rows: List[List[KeyboardButton]] = []
-    items = menu_config.get("items", [])
+    items_to_display = []
+
+    user_id = None # We need user_id to check for trial pack purchase
+    # This function is called in contexts where user_id might not be directly available
+    # For dynamic menu items (like hiding trial pack), this function needs user_data or user_id
+    # For now, we will assume all configured packages are shown.
+    # Logic to filter trial pack if already purchased should ideally be here, or when `items` are prepared.
+
+    if menu_key == BotConstants.MENU_GEMS_SUBMENU:
+        # Dynamically generate gem package buttons
+        # This is a placeholder, full implementation requires user_data access here.
+        # For simplicity, we'll just use what's in CONFIG.GEM_PACKAGES
+        # TODO: Add logic here to check if trial pack was purchased and exclude it.
+        for package_key, package_info in CONFIG.GEM_PACKAGES.items():
+            items_to_display.append(
+                {"text": package_info["title"], "action": BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE, "target": package_key}
+            )
+        # Add the static "My Balance and Limits" button
+        items_to_display.append({"text": "ℹ️ Мой баланс и лимиты", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "show_limits_from_gems_menu"})
+    else:
+        items_to_display = menu_config.get("items", [])
+
 
     def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
         text = item_config["text"]
@@ -722,18 +746,18 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
         return KeyboardButton(text)
 
     group_by_two_keys = [
-        BotConstants.MENU_MAIN, 
-        BotConstants.MENU_MODELS_SUBMENU, 
-        BotConstants.MENU_GEMS_SUBMENU,
+        BotConstants.MENU_MAIN,
+        BotConstants.MENU_MODELS_SUBMENU,
+        BotConstants.MENU_GEMS_SUBMENU, # This will now use items_to_display
         BotConstants.MENU_AI_MODES_SUBMENU
     ]
 
     if menu_key in group_by_two_keys:
-        for i in range(0, len(items), 2):
-            row = [create_button(items[j]) for j in range(i, min(i + 2, len(items)))]
+        for i in range(0, len(items_to_display), 2):
+            row = [create_button(items_to_display[j]) for j in range(i, min(i + 2, len(items_to_display)))]
             keyboard_rows.append(row)
     else:
-        for item in items:
+        for item in items_to_display: # Use items_to_display here as well
             keyboard_rows.append([create_button(item)])
 
     if menu_config.get("is_submenu", False):
@@ -744,20 +768,84 @@ def generate_menu_keyboard(menu_key: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
 
 async def show_menu(update: Update, user_id: int, menu_key: str, user_data_param: Optional[Dict[str, Any]] = None):
+    # Note: If generate_menu_keyboard needs user_data for dynamic items (like trial pack),
+    # it should be passed here or retrieved within generate_menu_keyboard.
+    # For now, generate_menu_keyboard is simplified for static package display.
+    
     menu_cfg = MENU_STRUCTURE.get(menu_key)
     if not menu_cfg:
         logger.error(f"Menu key '{menu_key}' not found. Defaulting to main menu for user {user_id}.")
+        reply_markup = await generate_menu_keyboard_async(BotConstants.MENU_MAIN, user_id) # Pass user_id
         await update.message.reply_text("Ошибка: Запрошенное меню не найдено. Показываю главное меню.",
-            reply_markup=generate_menu_keyboard(BotConstants.MENU_MAIN))
+            reply_markup=reply_markup)
         await firestore_service.set_user_data(user_id, {'current_menu': BotConstants.MENU_MAIN})
         return
+
     await firestore_service.set_user_data(user_id, {'current_menu': menu_key})
+    reply_markup = await generate_menu_keyboard_async(menu_key, user_id) # Pass user_id
+    
     if update.message:
-        await update.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
-    elif update.callback_query and update.callback_query.message: 
-        await update.callback_query.message.reply_text(menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
-    else: 
-        bot = update.get_bot() # Simpler way to get bot instance
-        await bot.send_message(chat_id=user_id, text=menu_cfg["title"], reply_markup=generate_menu_keyboard(menu_key), disable_web_page_preview=True)
+        await update.message.reply_text(menu_cfg["title"], reply_markup=reply_markup, disable_web_page_preview=True)
+    elif update.callback_query and update.callback_query.message:
+        await update.callback_query.message.reply_text(menu_cfg["title"], reply_markup=reply_markup, disable_web_page_preview=True)
+    else:
+        bot = update.get_bot()
+        await bot.send_message(chat_id=user_id, text=menu_cfg["title"], reply_markup=reply_markup, disable_web_page_preview=True)
 
     logger.info(f"User {user_id} was shown menu '{menu_key}'.")
+
+# Async wrapper for generate_menu_keyboard if it needs to fetch user_data
+async def generate_menu_keyboard_async(menu_key: str, user_id: int) -> ReplyKeyboardMarkup:
+    menu_config = MENU_STRUCTURE.get(menu_key, MENU_STRUCTURE[BotConstants.MENU_MAIN])
+    keyboard_rows: List[List[KeyboardButton]] = []
+    items_to_display = []
+
+    user_data = await firestore_service.get_user_data(user_id) # Fetch user data
+
+    if menu_key == BotConstants.MENU_GEMS_SUBMENU:
+        for package_key, package_info in CONFIG.GEM_PACKAGES.items():
+            # Logic to check if trial pack was purchased
+            is_trial = package_info.get("is_trial", False)
+            trial_pack_firestore_key = f"purchased_trial_{package_key}" # Example key
+
+            if is_trial and user_data.get(trial_pack_firestore_key, False):
+                # Optionally, show as "Purchased" or hide completely
+                # For now, let's hide it if purchased
+                logger.info(f"User {user_id} has already purchased trial pack {package_key}. Hiding it.")
+                continue 
+            
+            items_to_display.append(
+                {"text": package_info["title"], "action": BotConstants.CALLBACK_ACTION_BUY_GEM_PACKAGE, "target": package_key}
+            )
+        items_to_display.append({"text": "ℹ️ Мой баланс и лимиты", "action": BotConstants.CALLBACK_ACTION_SHOW_LIMITS, "target": "show_limits_from_gems_menu"})
+    else:
+        items_to_display = menu_config.get("items", [])
+
+    def create_button(item_config: Dict[str, Any]) -> KeyboardButton:
+        text = item_config["text"]
+        web_app_url = item_config.get("web_app_url")
+        if web_app_url:
+            return KeyboardButton(text, web_app=WebAppInfo(url=web_app_url))
+        return KeyboardButton(text)
+
+    group_by_two_keys = [
+        BotConstants.MENU_MAIN,
+        BotConstants.MENU_MODELS_SUBMENU,
+        BotConstants.MENU_GEMS_SUBMENU,
+        BotConstants.MENU_AI_MODES_SUBMENU
+    ]
+
+    if menu_key in group_by_two_keys:
+        for i in range(0, len(items_to_display), 2):
+            row = [create_button(items_to_display[j]) for j in range(i, min(i + 2, len(items_to_display)))]
+            keyboard_rows.append(row)
+    else:
+        for item in items_to_display:
+            keyboard_rows.append([create_button(item)])
+
+    if menu_config.get("is_submenu", False):
+        navigation_row = [KeyboardButton("🏠 Главное меню")]
+        if menu_config.get("parent"): navigation_row.insert(0, KeyboardButton("⬅️ Назад"))
+        keyboard_rows.append(navigation_row)
+
+    return ReplyKeyboardMarkup(keyboard_rows, resize_keyboard=True, one_time_keyboard=False)
